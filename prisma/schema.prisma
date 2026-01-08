@@ -1,0 +1,261 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Multi-tenancy: Business (tenant)
+// ============================================
+
+model Business {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  logoUrl     String?
+  coverUrl    String?
+  
+  // Настройки
+  settings    Json?    // Дополнительные настройки бизнеса
+  
+  // Владелец
+  ownerId     String
+  owner       User     @relation("BusinessOwner", fields: [ownerId], references: [id])
+  
+  // Связи
+  users       BusinessUser[]
+  portfolios  Portfolio[]
+  requests    Request[]
+  invoices    Invoice[]
+  documents   Document[]
+  
+  // Метаданные
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([slug])
+  @@index([ownerId])
+}
+
+// ============================================
+// Аутентификация и пользователи
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Хешированный пароль
+  name      String?
+  avatarUrl String?
+  
+  // Роль на платформе
+  role      UserRole @default(BUSINESS_OWNER)
+  
+  // Бизнесы, которыми владеет
+  businesses Business[] @relation("BusinessOwner")
+  
+  // Бизнесы, в которых участвует
+  businessMemberships BusinessUser[]
+  
+  // Метаданные
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([email])
+  @@index([role])
+}
+
+enum UserRole {
+  BUSINESS_OWNER
+  LEC7_ADMIN
+}
+
+// Связь пользователя с бизнесом (для расширения в будущем)
+model BusinessUser {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  role       String   @default("member") // member, admin, etc.
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([userId, businessId])
+  @@index([businessId])
+}
+
+// ============================================
+// Портфолио
+// ============================================
+
+model Portfolio {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  imageUrl    String   // S3 URL
+  order       Int      @default(0) // Для сортировки
+  
+  // Метаданные
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([businessId])
+  @@index([businessId, order])
+}
+
+// ============================================
+// Заявки (Requests)
+// ============================================
+
+model Request {
+  id          String      @id @default(cuid())
+  businessId  String
+  business    Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  // Данные клиента
+  clientName  String?
+  clientEmail String?
+  clientPhone String?
+  
+  // Содержание заявки
+  title       String
+  description String
+  source      String      @default("ai_chat") // ai_chat, manual, etc.
+  
+  // Статус
+  status      RequestStatus @default(NEW)
+  
+  // Связи
+  invoice     Invoice?
+  
+  // Метаданные
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([status])
+}
+
+enum RequestStatus {
+  NEW
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================
+// Счета (Invoices)
+// ============================================
+
+model Invoice {
+  id          String        @id @default(cuid())
+  businessId  String
+  business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  requestId   String?       @unique
+  request     Request?      @relation(fields: [requestId], references: [id])
+  
+  // Номер счёта
+  number      String        @unique
+  
+  // Данные клиента
+  clientName  String
+  clientEmail String?
+  clientPhone String?
+  
+  // Сумма
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("RUB")
+  
+  // Статус оплаты
+  status      InvoiceStatus @default(DRAFT)
+  
+  // Связи
+  document    Document?
+  
+  // Метаданные
+  dueDate     DateTime?
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([number])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  CANCELLED
+}
+
+// ============================================
+// Документы
+// ============================================
+
+model Document {
+  id          String       @id @default(cuid())
+  businessId  String
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  invoiceId   String?      @unique
+  invoice     Invoice?     @relation(fields: [invoiceId], references: [id])
+  
+  // Тип документа
+  type        DocumentType
+  
+  // Файл
+  fileUrl     String       // S3 URL
+  fileName    String
+  mimeType    String
+  
+  // Метаданные
+  createdAt   DateTime     @default(now())
+  
+  @@index([businessId])
+  @@index([type])
+}
+
+enum DocumentType {
+  INVOICE_PDF
+  CONTRACT
+  OTHER
+}
+
+// ============================================
+// События (Events) для будущих модулей
+// ============================================
+
+model Event {
+  id          String   @id @default(cuid())
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  // Тип события
+  type        String   // ad_ai_event, bookkeeping_event, etc.
+  
+  // Данные события
+  data        Json
+  
+  // Метаданные
+  createdAt   DateTime @default(now())
+  
+  @@index([businessId])
+  @@index([type])
+  @@index([createdAt])
+}

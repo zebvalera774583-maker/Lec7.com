@@ -1,0 +1,17 @@
+# Команды для загрузки кода на GitHub
+# Выполните ПОСЛЕ создания репозитория на GitHub
+
+# 1. Добавляем все файлы
+git add .
+
+# 2. Создаём первый коммит
+git commit -m "Initial commit: Lec7 v1 ready for deploy"
+
+# 3. Добавляем удалённый репозиторий
+git remote add origin https://github.com/zebvalera774583-maker/Lec7.com.git
+
+# 4. Устанавливаем основную ветку
+git branch -M main
+
+# 5. Загружаем код на GitHub
+git push -u origin main
