@@ -6,6 +6,8 @@ echo "🚀 Starting deployment..."
 cd ~/Lec7.com
 
 echo "📥 Pulling latest code..."
+# Проверяем, использует ли git HTTPS, если да - переключаем на SSH
+git remote get-url origin | grep -q '^https' && git remote set-url origin git@github.com:zebvalera774583-maker/Lec7.com.git || true
 git pull
 
 echo "🛑 Stopping containers..."
