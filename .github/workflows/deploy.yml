@@ -23,7 +23,5 @@ jobs:
           script: |
             cd ~/Lec7.com
             git pull
-            chmod +x scripts/deploy-simple.sh
-            nohup ./scripts/deploy-simple.sh > /tmp/deploy.log 2>&1 &
-            echo "✅ Deployment started in background"
-            echo "📋 Check logs: tail -f /tmp/deploy.log"
+            chmod +x scripts/deploy-background.sh
+            ./scripts/deploy-background.sh
