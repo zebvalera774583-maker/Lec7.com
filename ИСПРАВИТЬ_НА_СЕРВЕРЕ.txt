@@ -1,0 +1,8 @@
+Выполните эту команду на сервере (в консоли Timeweb):
+
+sed -i 's/RUN npm ci/RUN npm install/' Dockerfile && docker-compose build --no-cache app && docker-compose up -d
+
+Эта команда:
+1. Исправит Dockerfile (заменит npm ci на npm install)
+2. Пересоберёт образ без кэша
+3. Запустит контейнеры

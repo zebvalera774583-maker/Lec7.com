@@ -1,0 +1,50 @@
+===========================================
+КОМАНДЫ ДЛЯ ВЫПОЛНЕНИЯ НА СЕРВЕРЕ
+===========================================
+
+1. ПОДКЛЮЧИТЕСЬ ПО SSH:
+   ssh root@194.87.104.179
+   
+   (Введите пароль root из панели Timeweb)
+
+2. СКОПИРУЙТЕ И ВЫПОЛНИТЕ ЭТИ КОМАНДЫ:
+
+# Обновляем систему
+apt update && apt upgrade -y
+
+# Устанавливаем Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Устанавливаем Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Проверяем установку
+docker --version
+docker-compose --version
+
+# Клонируем проект
+cd ~
+git clone https://github.com/zebvalera774583-maker/Lec7.com.git
+cd Lec7.com
+
+===========================================
+ПОСЛЕ ЭТОГО:
+===========================================
+
+1. Создайте .env файл:
+   nano .env
+   
+   (Вставьте настройки из SETUP_SERVER.md)
+
+2. Запустите проект:
+   docker-compose up -d --build
+
+3. Примените миграции:
+   docker-compose exec app npx prisma migrate deploy
+
+4. Проверьте работу:
+   docker-compose logs -f app
+
+===========================================
