@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,253 +7,128 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// Multi-tenancy: Business (tenant)
-// ============================================
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  password   String
+  name       String?
+  role       String   @default("BUSINESS_OWNER") // BUSINESS_OWNER | LEC7_ADMIN
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  businesses Business[] @relation("BusinessOwner")
+}
 
 model Business {
   id          String   @id @default(cuid())
-  slug        String   @unique
   name        String
+  slug        String   @unique
   description String?
-  logoUrl     String?
-  coverUrl    String?
-  
-  // Настройки
-  settings    Json?    // Дополнительные настройки бизнеса
-  
-  // Владелец
   ownerId     String
-  owner       User     @relation("BusinessOwner", fields: [ownerId], references: [id])
-  
-  // Связи
-  users       BusinessUser[]
-  portfolios  Portfolio[]
-  requests    Request[]
-  invoices    Invoice[]
-  documents   Document[]
-  events      Event[]
-  
-  // Метаданные
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  @@index([slug])
-  @@index([ownerId])
+
+  owner     User       @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  portfolios Portfolio[]
+  requests   Request[]
+  invoices   Invoice[]
+  events     Event[]
 }
-
-// ============================================
-// Аутентификация и пользователи
-// ============================================
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // Хешированный пароль
-  name      String?
-  avatarUrl String?
-  
-  // Роль на платформе
-  role      UserRole @default(BUSINESS_OWNER)
-  
-  // Бизнесы, которыми владеет
-  businesses Business[] @relation("BusinessOwner")
-  
-  // Бизнесы, в которых участвует
-  businessMemberships BusinessUser[]
-  
-  // Метаданные
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([email])
-  @@index([role])
-}
-
-enum UserRole {
-  BUSINESS_OWNER
-  LEC7_ADMIN
-}
-
-// Связь пользователя с бизнесом (для расширения в будущем)
-model BusinessUser {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  
-  role       String   @default("member") // member, admin, etc.
-  
-  createdAt  DateTime @default(now())
-  
-  @@unique([userId, businessId])
-  @@index([businessId])
-}
-
-// ============================================
-// Портфолио
-// ============================================
 
 model Portfolio {
   id          String   @id @default(cuid())
   businessId  String
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  
   title       String
   description String?
-  imageUrl    String   // S3 URL
-  order       Int      @default(0) // Для сортировки
-  
-  // Метаданные
+  imageUrl    String
+  order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
   @@index([businessId])
-  @@index([businessId, order])
 }
 
-// ============================================
-// Заявки (Requests)
-// ============================================
-
 model Request {
-  id          String      @id @default(cuid())
+  id          String   @id @default(cuid())
   businessId  String
-  business    Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  
-  // Данные клиента
+  title       String
+  description String
   clientName  String?
   clientEmail String?
   clientPhone String?
-  
-  // Содержание заявки
-  title       String
-  description String
-  source      String      @default("ai_chat") // ai_chat, manual, etc.
-  
-  // Статус
-  status      RequestStatus @default(NEW)
-  
-  // Связи
-  invoice     Invoice?
-  
-  // Метаданные
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
+  source      String   @default("ai_chat")
+  status      String   @default("NEW") // NEW | IN_PROGRESS | COMPLETED | CANCELLED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
   @@index([businessId])
-  @@index([businessId, status])
-  @@index([status])
 }
-
-enum RequestStatus {
-  NEW
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-// ============================================
-// Счета (Invoices)
-// ============================================
 
 model Invoice {
-  id          String        @id @default(cuid())
+  id          String    @id @default(cuid())
   businessId  String
-  business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  
-  requestId   String?       @unique
-  request     Request?      @relation(fields: [requestId], references: [id])
-  
-  // Номер счёта
-  number      String        @unique
-  
-  // Данные клиента
+  requestId   String?
+  number      String
   clientName  String
   clientEmail String?
   clientPhone String?
-  
-  // Сумма
-  amount      Decimal       @db.Decimal(10, 2)
-  currency    String        @default("RUB")
-  
-  // Статус оплаты
-  status      InvoiceStatus @default(DRAFT)
-  
-  // Связи
-  document    Document?
-  
-  // Метаданные
+  amount      Decimal   @db.Decimal(10, 2)
+  currency    String    @default("RUB")
+  status      String    @default("DRAFT") // DRAFT | SENT | PAID | CANCELLED
   dueDate     DateTime?
-  paidAt      DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime       @updatedAt
-  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  request  Request?  @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
   @@index([businessId])
-  @@index([businessId, status])
-  @@index([number])
+  @@index([requestId])
 }
-
-enum InvoiceStatus {
-  DRAFT
-  SENT
-  PAID
-  CANCELLED
-}
-
-// ============================================
-// Документы
-// ============================================
-
-model Document {
-  id          String       @id @default(cuid())
-  businessId  String
-  business    Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  
-  invoiceId   String?      @unique
-  invoice     Invoice?     @relation(fields: [invoiceId], references: [id])
-  
-  // Тип документа
-  type        DocumentType
-  
-  // Файл
-  fileUrl     String       // S3 URL
-  fileName    String
-  mimeType    String
-  
-  // Метаданные
-  createdAt   DateTime     @default(now())
-  
-  @@index([businessId])
-  @@index([type])
-}
-
-enum DocumentType {
-  INVOICE_PDF
-  CONTRACT
-  OTHER
-}
-
-// ============================================
-// События (Events) для будущих модулей
-// ============================================
 
 model Event {
   id          String   @id @default(cuid())
-  businessId  String?
-  business    Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  
-  // Тип события
-  type        String   // ad_ai_event, bookkeeping_event, etc.
-  
-  // Данные события
-  data        Json
-  
-  // Метаданные
+  businessId  String
+  type        String   // EVENT_TYPE
+  title       String
+  description String?
+  metadata    Json?
   createdAt   DateTime @default(now())
-  
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
   @@index([businessId])
   @@index([type])
-  @@index([createdAt])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  businessId  String?
+  invoiceId   String?
+  type        String   // INVOICE_PDF | CONTRACT | OTHER
+  fileName    String
+  fileUrl     String
+  mimeType    String?
+  size        Int?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+  @@index([invoiceId])
+}
+
+model BusinessUser {
+  id         String   @id @default(cuid())
+  businessId String
+  userId     String
+  role       String   @default("MEMBER")
+  createdAt  DateTime @default(now())
+
+  @@unique([businessId, userId])
+  @@index([businessId])
+  @@index([userId])
 }
