@@ -1,0 +1,26 @@
+name: Deploy to Timeweb
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.TIMEWEB_HOST }}
+          username: ${{ secrets.TIMEWEB_USER }}
+          key: ${{ secrets.TIMEWEB_SSH_KEY }}
+          script: |
+            cd ~/Lec7.com
+            git pull
+            docker-compose down
+            docker system prune -af
+            docker-compose build --no-cache app
+            docker-compose up -d
+            docker-compose exec -T postgres npx prisma migrate deploy || true

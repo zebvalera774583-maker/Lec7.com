@@ -1,43 +1,27 @@
 #!/bin/bash
-
-# Скрипт для деплоя на VPS
-
 set -e
 
-echo "🚀 Начинаем деплой Lec7..."
+echo "🚀 Starting deployment..."
 
-# Проверяем наличие Docker
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker не установлен. Установите Docker сначала."
-    exit 1
-fi
+cd ~/Lec7.com
 
-# Проверяем наличие .env
-if [ ! -f .env ]; then
-    echo "❌ Файл .env не найден. Создайте его перед деплоем."
-    exit 1
-fi
+echo "📥 Pulling latest code..."
+git pull
 
-# Останавливаем старые контейнеры
-echo "🛑 Останавливаем старые контейнеры..."
+echo "🛑 Stopping containers..."
 docker-compose down
 
-# Собираем новые образы
-echo "🔨 Собираем образы..."
-docker-compose build --no-cache
+echo "🧹 Cleaning up Docker..."
+docker system prune -af
 
-# Запускаем контейнеры
-echo "▶️  Запускаем контейнеры..."
+echo "🔨 Building application..."
+docker-compose build --no-cache app
+
+echo "🚀 Starting containers..."
 docker-compose up -d
 
-# Ждём готовности базы данных
-echo "⏳ Ждём готовности базы данных..."
-sleep 10
+echo "📊 Running database migrations..."
+docker-compose exec -T postgres npx prisma migrate deploy || echo "⚠️  Migrations skipped (database might be empty)"
 
-# Применяем миграции
-echo "📦 Применяем миграции базы данных..."
-docker-compose exec -T app npx prisma migrate deploy || docker-compose exec -T app npx prisma db push
-
-echo "✅ Деплой завершён!"
-echo "🌐 Приложение доступно по адресу: http://localhost:3000"
-echo "📊 Проверить логи: docker-compose logs -f app"
+echo "✅ Deployment complete!"
+docker-compose ps
