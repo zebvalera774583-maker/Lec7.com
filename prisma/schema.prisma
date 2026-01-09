@@ -24,6 +24,8 @@ model Business {
   name        String
   slug        String   @unique
   description String?
+  logoUrl     String?
+  coverUrl    String?
   ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
