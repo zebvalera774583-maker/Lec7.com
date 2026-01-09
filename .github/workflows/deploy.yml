@@ -22,5 +22,41 @@ jobs:
           key: ${{ secrets.TIMEWEB_SSH_KEY }}
           command_timeout: 30m
           script: |
-            chmod +x scripts/deploy-fresh.sh 2>/dev/null || true
-            curl -fsSL https://raw.githubusercontent.com/zebvalera774583-maker/Lec7.com/main/scripts/deploy-fresh.sh | bash
+            # Clean up old deployment
+            cd ~/Lec7.com 2>/dev/null && docker-compose down -v 2>/dev/null || true
+            cd ~ && rm -rf Lec7.com 2>/dev/null || true
+            docker system prune -af --volumes 2>/dev/null || true
+            
+            # Clone fresh project
+            git clone https://github.com/zebvalera774583-maker/Lec7.com.git
+            cd Lec7.com
+            
+            # Create .env
+            cat > .env <<'ENVEOF'
+            DATABASE_URL=postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
+            NEXT_PUBLIC_APP_URL=http://194.87.104.179:3000
+            JWT_SECRET=lec7-super-secret-jwt-key-minimum-32-characters-long-2024-change-in-production
+            OPENAI_API_KEY=sk-your-openai-api-key-here
+            S3_ENDPOINT=https://s3.timeweb.com
+            S3_ACCESS_KEY_ID=your-timeweb-s3-access-key
+            S3_SECRET_ACCESS_KEY=your-timeweb-s3-secret-key
+            S3_BUCKET_NAME=lec7-storage
+            S3_REGION=ru-1
+            S3_PUBLIC_URL=https://lec7-storage.s3.timeweb.com
+            ENVEOF
+            
+            # Build and start
+            docker-compose up -d --build
+            
+            # Wait for postgres
+            sleep 15
+            
+            # Run migrations
+            docker-compose exec -T app npx prisma migrate deploy || echo "⚠️  Migrations skipped"
+            
+            # Show status
+            echo "📊 Container status:"
+            docker-compose ps
+            echo ""
+            echo "📋 App logs (last 10 lines):"
+            docker-compose logs --tail=10 app || echo "⚠️  App not running"
