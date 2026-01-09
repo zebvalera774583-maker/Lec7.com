@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15
     container_name: lec7-postgres
     environment:
       POSTGRES_USER: lec7
@@ -28,7 +26,7 @@ services:
     environment:
       DATABASE_URL: postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
       NODE_ENV: production
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://194.87.104.179:3000
     depends_on:
       postgres:
         condition: service_healthy
