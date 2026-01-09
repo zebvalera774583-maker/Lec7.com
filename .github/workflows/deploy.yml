@@ -10,15 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Deploy to server
+      - name: Start deployment
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
           username: ${{ secrets.TIMEWEB_USER }}
           key: ${{ secrets.TIMEWEB_SSH_KEY }}
-          command_timeout: 30m
           script: |
             cd ~/Lec7.com
             git pull
-            chmod +x scripts/deploy.sh
-            ./scripts/deploy.sh
+            chmod +x scripts/deploy-background.sh
+            ./scripts/deploy-background.sh
