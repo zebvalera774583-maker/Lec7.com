@@ -35,6 +35,7 @@ model Business {
   requests    Request[]
   invoices    Invoice[]
   documents   Document[]
+  events      Event[]
   
   // Метаданные
   createdAt   DateTime @default(now())
