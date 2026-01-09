@@ -23,5 +23,9 @@ jobs:
           script: |
             cd ~/Lec7.com
             git pull
-            chmod +x scripts/deploy-background.sh
-            ./scripts/deploy-background.sh
+            chmod +x scripts/deploy-background.sh scripts/deploy-simple.sh
+            # Запускаем деплой в фоне через screen для надёжности
+            screen -dmS deploy bash -c './scripts/deploy-simple.sh > /tmp/deploy.log 2>&1' || nohup ./scripts/deploy-simple.sh > /tmp/deploy.log 2>&1 &
+            echo "✅ Deployment started in background"
+            echo "📋 Check logs: tail -f /tmp/deploy.log"
+            echo "📊 Check status: cd ~/Lec7.com && docker-compose ps"
