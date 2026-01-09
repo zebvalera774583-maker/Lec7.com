@@ -16,8 +16,8 @@ export default async function HomePage() {
       description: true,
       coverUrl: true,
       logoUrl: true,
-      city: true,
-      category: true,
+      // city: true, // Поле отсутствует в схеме Prisma
+      // category: true, // Поле отсутствует в схеме Prisma
     },
   })
 

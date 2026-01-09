@@ -1,41 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { uploadFile, getPortfolioKey } from '@/lib/s3'
+// import { uploadFile, getPortfolioKey } from '@/lib/s3' // Временно отключено
 
 export async function POST(request: NextRequest) {
-  try {
-    const formData = await request.formData()
-    const businessId = formData.get('businessId') as string
-    const title = formData.get('title') as string
-    const description = formData.get('description') as string | null
-    const file = formData.get('file') as File
-    const order = parseInt(formData.get('order') as string) || 0
-
-    if (!businessId || !title || !file) {
-      return NextResponse.json({ error: 'Неверные параметры' }, { status: 400 })
-    }
-
-    // Загружаем файл в S3
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const key = getPortfolioKey(businessId, file.name)
-    const imageUrl = await uploadFile(key, buffer, file.type)
-
-    // Создаём запись в БД
-    const portfolio = await prisma.portfolio.create({
-      data: {
-        businessId,
-        title,
-        description,
-        imageUrl,
-        order,
-      },
-    })
-
-    return NextResponse.json(portfolio)
-  } catch (error) {
-    console.error('Create portfolio error:', error)
-    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 })
-  }
+  // S3 временно отключен
+  return NextResponse.json(
+    { error: 'Portfolio upload temporarily disabled' },
+    { status: 501 }
+  )
 }
 
 export async function GET(request: NextRequest) {

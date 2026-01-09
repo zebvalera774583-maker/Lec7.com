@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken, AuthUser } from './auth'
+import { verifyToken } from './auth'
+import type { AuthUser } from '@/types'
 
 export interface RequestWithAuth extends NextRequest {
   user?: AuthUser
