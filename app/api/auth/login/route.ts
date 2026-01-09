@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserByEmail, verifyPassword, createToken } from '@/lib/auth'
+import { getUserByEmail, verifyPassword, createToken, isUserRole } from '@/lib/auth'
+import type { UserRole } from '@/types'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,15 +24,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Неверный email или пароль' }, { status: 401 })
     }
 
+    // Валидация роли
+    if (!isUserRole(user.role)) {
+      console.error('Invalid user role:', user.role)
+      return NextResponse.json({ error: 'Ошибка сервера: невалидная роль пользователя' }, { status: 500 })
+    }
+
+    const validatedRole: UserRole = user.role
+
     const token = createToken({
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: validatedRole,
       businessId: user.businesses[0]?.id,
     })
 
-    const response = NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } })
+    const response = NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: validatedRole } })
     response.cookies.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

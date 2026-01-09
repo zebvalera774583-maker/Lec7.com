@@ -1,19 +1,16 @@
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-
-export type UserRole = 'BUSINESS_OWNER' | 'LEC7_ADMIN'
-export type AuthRole = UserRole | 'visitor'
-
-export interface AuthUser {
-  id: string
-  email: string
-  name: string | null
-  role: UserRole
-  businessId?: string
-}
+import type { UserRole, AuthRole, AuthUser } from '@/types'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production'
+
+/**
+ * Guard-функция для проверки валидности роли
+ */
+export function isUserRole(value: unknown): value is UserRole {
+  return value === 'BUSINESS_OWNER' || value === 'LEC7_ADMIN'
+}
 
 /**
  * Хеширование пароля

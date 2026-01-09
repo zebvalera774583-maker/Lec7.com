@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createUser, createToken } from '@/lib/auth'
+import { createUser, createToken, getUserByEmail, isUserRole } from '@/lib/auth'
+import type { UserRole } from '@/types'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверяем, существует ли пользователь
-    const { getUserByEmail } = await import('@/lib/auth')
     const existingUser = await getUserByEmail(email)
     if (existingUser) {
       return NextResponse.json({ error: 'Пользователь с таким email уже существует' }, { status: 400 })
@@ -23,14 +23,22 @@ export async function POST(request: NextRequest) {
 
     const user = await createUser(email, password, name, 'BUSINESS_OWNER')
 
+    // Валидация роли после создания
+    if (!isUserRole(user.role)) {
+      console.error('Invalid user role after creation:', user.role)
+      return NextResponse.json({ error: 'Ошибка сервера: невалидная роль пользователя' }, { status: 500 })
+    }
+
+    const validatedRole: UserRole = user.role
+
     const token = createToken({
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: validatedRole,
     })
 
-    const response = NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } })
+    const response = NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: validatedRole } })
     response.cookies.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
