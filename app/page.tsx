@@ -2,6 +2,9 @@ import { prisma } from '@/lib/prisma'
 import BusinessCard from '@/components/BusinessCard'
 import Link from 'next/link'
 
+// Делаем страницу динамической, чтобы Prisma вызывалась только на runtime
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   // Получаем список всех бизнесов для каталога
   const businesses = await prisma.business.findMany({
