@@ -21,7 +21,6 @@ jobs:
             cd ~/Lec7.com
             git pull
             docker-compose down
-            docker system prune -af
             docker-compose build --no-cache app
             docker-compose up -d
             docker-compose exec -T postgres npx prisma migrate deploy || true
