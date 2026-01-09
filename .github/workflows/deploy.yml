@@ -16,6 +16,7 @@ jobs:
           host: ${{ secrets.TIMEWEB_HOST }}
           username: ${{ secrets.TIMEWEB_USER }}
           key: ${{ secrets.TIMEWEB_SSH_KEY }}
+          command_timeout: 20m
           script: |
             cd ~/Lec7.com
             git pull
