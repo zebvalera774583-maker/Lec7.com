@@ -3,7 +3,16 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { businessId, title, description, clientName, clientEmail, clientPhone, source = 'ai_chat' } = await request.json()
+    const body = await request.json() as {
+      businessId: string
+      title: string
+      description: string
+      clientName?: string
+      clientEmail?: string
+      clientPhone?: string
+      source?: string
+    }
+    const { businessId, title, description, clientName, clientEmail, clientPhone, source = 'ai_chat' } = body
 
     if (!businessId || !title || !description) {
       return NextResponse.json({ error: 'Неверные параметры' }, { status: 400 })

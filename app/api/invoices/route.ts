@@ -3,7 +3,17 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { businessId, requestId, clientName, clientEmail, clientPhone, amount, currency = 'RUB', dueDate } = await request.json()
+    const body = await request.json() as {
+      businessId: string
+      requestId?: string
+      clientName: string
+      clientEmail?: string
+      clientPhone?: string
+      amount: number | string
+      currency?: string
+      dueDate?: string
+    }
+    const { businessId, requestId, clientName, clientEmail, clientPhone, amount, currency = 'RUB', dueDate } = body
 
     if (!businessId || !clientName || !amount) {
       return NextResponse.json({ error: 'Неверные параметры' }, { status: 400 })
@@ -23,7 +33,7 @@ export async function POST(request: NextRequest) {
         clientName,
         clientEmail,
         clientPhone,
-        amount,
+        amount: typeof amount === 'string' ? parseFloat(amount) : amount,
         currency,
         status: 'DRAFT',
         dueDate: dueDate ? new Date(dueDate) : null,
