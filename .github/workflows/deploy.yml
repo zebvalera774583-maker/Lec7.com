@@ -10,27 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Update code
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.TIMEWEB_HOST }}
-          username: ${{ secrets.TIMEWEB_USER }}
-          key: ${{ secrets.TIMEWEB_SSH_KEY }}
-          script: |
-            cd ~/Lec7.com
-            git pull
-
-      - name: Stop containers
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.TIMEWEB_HOST }}
-          username: ${{ secrets.TIMEWEB_USER }}
-          key: ${{ secrets.TIMEWEB_SSH_KEY }}
-          script: |
-            cd ~/Lec7.com
-            docker-compose down
-
-      - name: Build and start
+      - name: Deploy to server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
@@ -39,6 +19,5 @@ jobs:
           command_timeout: 30m
           script: |
             cd ~/Lec7.com
-            docker-compose build app
-            docker-compose up -d
-            docker-compose exec -T postgres npx prisma migrate deploy || true
+            git pull
+            ./scripts/deploy.sh
