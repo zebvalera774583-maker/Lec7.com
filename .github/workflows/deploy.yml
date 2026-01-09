@@ -1,9 +1,10 @@
 name: Deploy to Timeweb
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:  # Только ручной запуск
+  # push:  # Автоматический запуск отключен - запрашиваем разрешение
+  #   branches:
+  #     - main
 
 concurrency:
   group: deploy-prod
