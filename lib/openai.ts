@@ -1,12 +1,12 @@
 import OpenAI from 'openai'
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY is not set')
-}
-
-export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Не падаем на этапе билда, если ключ не задан.
+// Ключ обязателен только при реальном вызове AI.
+export const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  : null
 
 /**
  * Создание AI-чата (Комната 14)
@@ -29,6 +29,9 @@ export async function createAIChatResponse(
     clientPhone?: string
   }
 }> {
+  if (!openai) {
+    throw new Error('OPENAI_API_KEY is not set')
+  }
   const systemPrompt = `Ты - AI-ассистент для бизнеса "${businessContext?.businessName || 'бизнеса'}".
 ${businessContext?.businessDescription ? `Описание бизнеса: ${businessContext.businessDescription}` : ''}
 
