@@ -3,7 +3,11 @@ import { getUserByEmail, verifyPassword, createToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const body = await request.json() as {
+      email: string
+      password: string
+    }
+    const { email, password } = body
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email и пароль обязательны' }, { status: 400 })

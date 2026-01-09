@@ -4,7 +4,11 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { businessId, messages } = await request.json()
+    const body = await request.json() as {
+      businessId: string
+      messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+    }
+    const { businessId, messages } = body
 
     if (!businessId || !messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Неверные параметры' }, { status: 400 })
