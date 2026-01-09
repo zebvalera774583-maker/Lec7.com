@@ -90,7 +90,7 @@ export default async function BusinessDetailPage({ params }: PageProps) {
                   <div key={invoice.id} style={{ padding: '0.75rem', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
                     <h4 style={{ marginBottom: '0.25rem' }}>{invoice.number}</h4>
                     <p style={{ fontSize: '0.85rem', color: '#666' }}>
-                      {invoice.amount} {invoice.currency} • {invoice.status}
+                      {invoice.amount.toString()} {invoice.currency} • {invoice.status}
                     </p>
                   </div>
                 ))}
