@@ -39,9 +39,6 @@ jobs:
           command_timeout: 30m
           script: |
             cd ~/Lec7.com
-            nohup docker-compose build --no-cache app > /tmp/docker-build.log 2>&1 &
-            BUILD_PID=$!
-            echo "Build started with PID $BUILD_PID"
-            wait $BUILD_PID
+            docker-compose build app
             docker-compose up -d
             docker-compose exec -T postgres npx prisma migrate deploy || true
