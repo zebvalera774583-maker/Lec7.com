@@ -11,11 +11,8 @@ git pull
 echo "🛑 Stopping containers..."
 docker-compose down
 
-echo "🧹 Cleaning up Docker..."
-docker system prune -af
-
 echo "🔨 Building application..."
-docker-compose build --no-cache app
+docker-compose build app
 
 echo "🚀 Starting containers..."
 docker-compose up -d
