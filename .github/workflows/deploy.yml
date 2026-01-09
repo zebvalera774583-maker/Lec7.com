@@ -26,3 +26,20 @@ jobs:
             git pull
             chmod +x scripts/deploy-simple.sh
             ./scripts/deploy-simple.sh
+            
+      - name: Check deployment status
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.TIMEWEB_HOST }}
+          username: ${{ secrets.TIMEWEB_USER }}
+          key: ${{ secrets.TIMEWEB_SSH_KEY }}
+          script: |
+            cd ~/Lec7.com
+            echo "📊 Container status:"
+            docker-compose ps
+            echo ""
+            echo "📋 App logs (last 20 lines):"
+            docker-compose logs --tail=20 app || echo "⚠️  App container not running"
+            echo ""
+            echo "📋 Postgres logs (last 10 lines):"
+            docker-compose logs --tail=10 postgres || echo "⚠️  Postgres container not running"
