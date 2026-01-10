@@ -34,7 +34,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # build output
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --chown=nextjs:nodejs public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # prisma schema + migrations
