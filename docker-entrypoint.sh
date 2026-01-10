@@ -4,7 +4,7 @@ set -e
 echo "⏳ Waiting for DB..."
 
 echo "📊 Running Prisma migrations..."
-npx prisma migrate deploy || echo "⚠️  Migrations skipped or already applied"
+node node_modules/prisma/build/index.js migrate deploy || echo "⚠️  Migrations skipped or already applied"
 
 echo "🚀 Starting Next.js..."
 if [ -f "./server.js" ]; then
