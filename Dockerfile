@@ -29,14 +29,16 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-# standalone
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./.next/standalone
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# production dependencies (from builder where Prisma Client is generated)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# build output
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # prisma schema + migrations
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
 # entrypoint
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
