@@ -19,6 +19,7 @@ RUN npx prisma generate
 
 # Build Next.js
 RUN npm run build
+RUN ls -la .next && ls -la .next/standalone
 
 # Production image, copy all the files and run next
 FROM base AS runner
