@@ -1,3 +1,5 @@
+'use client'
+
 import { prisma } from '@/lib/prisma'
 import BusinessCard from '@/components/BusinessCard'
 import HoverLink from '@/components/HoverLink'
