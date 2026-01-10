@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import BusinessCard from '@/components/BusinessCard'
+import HoverLink from '@/components/HoverLink'
 import Link from 'next/link'
 
 // Делаем страницу динамической, чтобы Prisma вызывалась только на runtime
@@ -69,73 +70,21 @@ export default async function HomePage() {
           marginTop: '3rem',
           flexWrap: 'wrap'
         }}>
-          <Link 
+          <HoverLink 
             href="#businesses"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem 2rem',
-              background: '#f5f5f5',
-              color: '#1a1a1a',
-              textDecoration: 'none',
-              fontSize: '1rem',
-              fontWeight: '500',
-              borderRadius: '8px',
-              border: '2px solid #e0e0e0',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#e8e8e8'
-              e.currentTarget.style.borderColor = '#d0d0d0'
-              e.currentTarget.style.transform = 'translateY(-2px)'
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f5f5f5'
-              e.currentTarget.style.borderColor = '#e0e0e0'
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)'
-            }}
+            variant="secondary"
           >
             <span style={{ fontSize: '1.2rem' }}>←</span>
             <span>Посмотреть предложения бизнесов</span>
-          </Link>
+          </HoverLink>
           
-          <Link 
+          <HoverLink 
             href="/office"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '1rem 2rem',
-              background: '#0070f3',
-              color: 'white',
-              textDecoration: 'none',
-              fontSize: '1rem',
-              fontWeight: '600',
-              borderRadius: '8px',
-              border: '2px solid #0070f3',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(0, 112, 243, 0.3)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#0051cc'
-              e.currentTarget.style.borderColor = '#0051cc'
-              e.currentTarget.style.transform = 'translateY(-2px)'
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 112, 243, 0.4)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#0070f3'
-              e.currentTarget.style.borderColor = '#0070f3'
-              e.currentTarget.style.transform = 'translateY(0)'
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 112, 243, 0.3)'
-            }}
+            variant="primary"
           >
             <span>Создать свой бизнес</span>
             <span style={{ fontSize: '1.2rem' }}>→</span>
-          </Link>
+          </HoverLink>
         </div>
       </header>
 
