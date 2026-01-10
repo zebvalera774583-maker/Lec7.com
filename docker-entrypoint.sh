@@ -2,4 +2,4 @@
 set -e
 
 echo "🚀 Starting Next.js..."
-exec npm run start
+exec node server.js

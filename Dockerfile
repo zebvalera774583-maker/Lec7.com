@@ -30,13 +30,10 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
-# production dependencies (from builder where Prisma Client is generated)
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# build output
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --chown=nextjs:nodejs public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+# standalone output
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # prisma schema + migrations
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
