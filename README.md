@@ -43,6 +43,11 @@ npm run db:generate  # Генерация Prisma Client
 npm run db:push      # Применить схему к БД
 npm run db:migrate   # Создать миграцию
 npm run db:studio    # Открыть Prisma Studio
+
+# Миграции
+npx prisma migrate dev --name init --create-only
+npx prisma migrate deploy
+docker compose up -d --build
 ```
 
 ## Переменные окружения
