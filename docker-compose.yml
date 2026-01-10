@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   postgres:
     image: postgres:15
@@ -24,8 +26,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
       NODE_ENV: production
+      DATABASE_URL: postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
       NEXT_PUBLIC_APP_URL: http://194.87.104.179:3000
     depends_on:
       postgres:
