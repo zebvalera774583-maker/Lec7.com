@@ -83,3 +83,81 @@ S3_PUBLIC_URL="https://your-bucket.s3.timeweb.com"
 - **Vercel** - самый простой, автоматический деплой из Git
 - **VPS + Docker** - полный контроль, подходит для Timeweb
 - **Timeweb Cloud** - российский хостинг с хорошей поддержкой
+
+## Уборка Timeweb/SSH (безопасно)
+
+Очистка неиспользуемых Docker-ресурсов на сервере.
+
+### ⚠️ Важно: Безопасные команды только
+
+**✅ Разрешено:**
+```bash
+# Очистка билд-кэша
+docker builder prune -af
+
+# Очистка неиспользуемых образов
+docker image prune -af
+
+# Просмотр использования дискового пространства
+docker system df
+```
+
+**❌ Запрещено:**
+```bash
+# НИКОГДА не используй эту команду - она удалит ВСЕ volumes (включая БД!)
+docker system prune --volumes
+```
+
+### Чек-лист перед уборкой
+
+1. **Проверить статус контейнеров:**
+   ```bash
+   docker-compose ps
+   ```
+   Ожидаемый результат: `lec7-app` и `lec7-postgres` в статусе `Up`
+
+2. **Проверить доступность приложения:**
+   ```bash
+   curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:3000
+   ```
+   Ожидаемый результат: `HTTP: 200`
+
+### Чек-лист после уборки
+
+1. **Проверить статус контейнеров:**
+   ```bash
+   docker-compose ps
+   ```
+   Ожидаемый результат: `lec7-app` и `lec7-postgres` в статусе `Up`
+
+2. **Проверить доступность приложения:**
+   ```bash
+   curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:3000
+   ```
+   Ожидаемый результат: `HTTP: 200`
+
+### Полный скрипт уборки
+
+```bash
+cd ~/Lec7.com
+
+# Проверка ДО уборки
+echo "=== Проверка ДО уборки ==="
+docker-compose ps
+curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:3000
+
+# Уборка
+echo "=== Очистка билд-кэша ==="
+docker builder prune -af
+
+echo "=== Очистка неиспользуемых образов ==="
+docker image prune -af
+
+echo "=== Статистика использования ==="
+docker system df
+
+# Проверка ПОСЛЕ уборки
+echo "=== Проверка ПОСЛЕ уборки ==="
+docker-compose ps
+curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:3000
+```

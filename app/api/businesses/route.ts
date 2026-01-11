@@ -1,46 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/middleware'
+import { generateSlug } from '@/lib/slug'
+
+export async function GET() {
+  try {
+    const businesses = await prisma.business.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 24,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        city: true,
+        category: true,
+        createdAt: true,
+      },
+    })
+
+    return NextResponse.json(businesses)
+  } catch (error) {
+    console.error('Error fetching businesses:', error)
+    return NextResponse.json(
+      { error: 'Ошибка получения списка бизнесов' },
+      { status: 500 }
+    )
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const user = getAuthUser(request)
-    if (!user || user.role !== 'BUSINESS_OWNER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const body = await request.json()
+    const { name, city, category } = body
+
+    if (!name) {
+      return NextResponse.json(
+        { error: 'Поле name обязательно' },
+        { status: 400 }
+      )
     }
 
-    const body = await request.json() as {
-      name: string
-      slug: string
-      description?: string
-    }
-    const { name, slug, description } = body
-
-    if (!name || !slug) {
-      return NextResponse.json({ error: 'Имя и slug обязательны' }, { status: 400 })
-    }
+    // Генерируем уникальный slug
+    let baseSlug = generateSlug(name)
+    let slug = baseSlug
+    let counter = 1
 
     // Проверяем уникальность slug
-    const existing = await prisma.business.findUnique({
-      where: { slug },
+    while (await prisma.business.findUnique({ where: { slug } })) {
+      slug = `${baseSlug}-${counter}`
+      counter++
+    }
+
+    // Временно: создаём или получаем тестового пользователя для бизнесов без авторизации
+    // В продакшене ownerId должен приходить из сессии/токена
+    let testUser = await prisma.user.findFirst({
+      where: { email: 'test@lec7.com' },
     })
 
-    if (existing) {
-      return NextResponse.json({ error: 'Бизнес с таким slug уже существует' }, { status: 400 })
+    if (!testUser) {
+      testUser = await prisma.user.create({
+        data: {
+          email: 'test@lec7.com',
+          password: 'temp', // В продакшене не используется без авторизации
+          name: 'Test User',
+          role: 'BUSINESS_OWNER',
+        },
+      })
     }
 
     const business = await prisma.business.create({
       data: {
         name,
         slug,
-        description,
-        ownerId: user.id,
+        city: city || null,
+        category: category || null,
+        ownerId: testUser.id,
+      },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        city: true,
+        category: true,
+        createdAt: true,
       },
     })
 
-    return NextResponse.json(business)
+    return NextResponse.json(business, { status: 201 })
   } catch (error) {
-    console.error('Create business error:', error)
-    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 })
+    console.error('Error creating business:', error)
+    return NextResponse.json(
+      { error: 'Ошибка создания бизнеса' },
+      { status: 500 }
+    )
   }
 }

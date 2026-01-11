@@ -24,6 +24,8 @@ model Business {
   name        String
   slug        String   @unique
   description String?
+  city        String?
+  category    String?
   logoUrl     String?
   coverUrl    String?
   ownerId     String
