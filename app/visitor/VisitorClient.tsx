@@ -10,30 +10,43 @@ export default function VisitorClient() {
   const router = useRouter()
   
   const [businesses, setBusinesses] = useState<any[]>([])
+  const [allBusinesses, setAllBusinesses] = useState<any[]>([]) // Для формирования списков городов/категорий
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [city, setCity] = useState(searchParams.get('city') || '')
   const [category, setCategory] = useState(searchParams.get('category') || '')
 
-  // Получаем уникальные города и категории
+  // Получаем уникальные города и категории из всех бизнесов (не отфильтрованных)
   const cities = useMemo(() => {
     const citySet = new Set<string>()
-    businesses.forEach(b => {
-      if (b.city) citySet.add(b.city)
+    allBusinesses.forEach(b => {
+      if (b.city) citySet.add(b.city.trim())
     })
     return Array.from(citySet).sort()
-  }, [businesses])
+  }, [allBusinesses])
 
   const categories = useMemo(() => {
     const categorySet = new Set<string>()
-    businesses.forEach(b => {
-      if (b.category) categorySet.add(b.category)
+    allBusinesses.forEach(b => {
+      if (b.category) categorySet.add(b.category.trim())
     })
     return Array.from(categorySet).sort()
-  }, [businesses])
+  }, [allBusinesses])
 
-  // Загружаем бизнесы
+  // Загружаем все бизнесы для формирования списков городов/категорий
   useEffect(() => {
+    const loadAllBusinesses = async () => {
+      try {
+        const response = await fetch('/api/businesses')
+        if (response.ok) {
+          const data = await response.json()
+          setAllBusinesses(data)
+        }
+      } catch (error) {
+        console.error('Error loading all businesses:', error)
+      }
+    }
+    loadAllBusinesses()
     loadBusinesses()
   }, [])
 
@@ -58,7 +71,9 @@ export default function VisitorClient() {
       if (city) params.set('city', city)
       if (category) params.set('category', category)
 
-      const response = await fetch(`/api/businesses?${params.toString()}`)
+      const url = `/api/businesses?${params.toString()}`
+
+      const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
         setBusinesses(data)
