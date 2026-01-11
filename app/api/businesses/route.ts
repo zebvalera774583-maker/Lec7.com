@@ -11,13 +11,31 @@ export async function GET(request: NextRequest) {
 
     const where: any = {}
 
+    // Поиск по name, city, category через OR
     if (search) {
-      where.name = {
-        contains: search,
-        mode: 'insensitive',
-      }
+      where.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          city: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          category: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ]
     }
 
+    // Фильтры city и category через AND
     if (city) {
       where.city = city
     }

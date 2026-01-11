@@ -146,7 +146,7 @@ export default function VisitorClient() {
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
-              placeholder="Поиск по названию..."
+              placeholder="Поиск (название, город, категория)..."
               value={search}
               onChange={handleSearchChange}
               style={{
