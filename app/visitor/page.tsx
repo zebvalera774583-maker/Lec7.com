@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import BusinessCardLink from '@/components/BusinessCardLink'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -54,44 +55,7 @@ export default async function VisitorPage() {
             gap: '2rem'
           }}>
             {businesses.map((business) => (
-              <Link
-                key={business.id}
-                href={`/biz/${business.slug}`}
-                style={{
-                  display: 'block',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                  padding: '1.5rem',
-                  borderRadius: '8px',
-                  background: 'white',
-                  border: '1px solid #e0e0e0',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <h2 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '600',
-                  margin: '0 0 0.5rem 0',
-                  color: '#1a1a1a'
-                }}>
-                  {business.name}
-                </h2>
-                <p style={{
-                  color: '#666',
-                  margin: '0.5rem 0',
-                  fontSize: '0.9rem'
-                }}>
-                  {business.city} • {business.category}
-                </p>
-              </Link>
+              <BusinessCardLink key={business.id} business={business} />
             ))}
           </div>
         ) : (
