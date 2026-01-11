@@ -12,8 +12,13 @@ interface PageProps {
 }
 
 export default async function BizPage({ params }: PageProps) {
+  const raw = params.slug
+  let slug = raw
+  try { slug = decodeURIComponent(raw) } catch {}
+  slug = slug.normalize('NFC')
+
   const business = await prisma.business.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     select: {
       id: true,
       slug: true,
