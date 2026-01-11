@@ -2,11 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateSlug } from '@/lib/slug'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search') || ''
+    const city = searchParams.get('city') || ''
+    const category = searchParams.get('category') || ''
+
+    const where: any = {}
+
+    if (search) {
+      where.name = {
+        contains: search,
+        mode: 'insensitive',
+      }
+    }
+
+    if (city) {
+      where.city = city
+    }
+
+    if (category) {
+      where.category = category
+    }
+
     const businesses = await prisma.business.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
-      take: 24,
+      take: 100,
       select: {
         id: true,
         slug: true,
