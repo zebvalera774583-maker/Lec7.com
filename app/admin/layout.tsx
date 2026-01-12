@@ -7,8 +7,8 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const headersList = await headers()
-  const cookiesList = await cookies()
+  const headersList = headers()
+  const cookiesList = cookies()
   const user = getAuthUser({
     headers: () => headersList,
     cookies: {
