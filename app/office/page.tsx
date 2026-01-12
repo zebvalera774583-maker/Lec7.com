@@ -1,22 +1,17 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/middleware'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import Link from 'next/link'
 
 export default async function OfficePage() {
   const headersList = await headers()
+  const cookiesList = await cookies()
   const user = getAuthUser({
     headers: () => headersList,
     cookies: {
       get: (name: string) => {
-        const cookieHeader = headersList.get('cookie')
-        if (!cookieHeader) return undefined
-        const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-          const [key, value] = cookie.trim().split('=')
-          acc[key] = value
-          return acc
-        }, {} as Record<string, string>)
-        return { value: cookies[name] } as { value: string } | undefined
+        const cookie = cookiesList.get(name)
+        return cookie ? { value: cookie.value } : undefined
       },
     } as any,
   } as any)

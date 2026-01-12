@@ -1,4 +1,5 @@
 import { execSync } from 'child_process'
+import { headers, cookies } from 'next/headers'
 import OwnerAgentClient from './OwnerAgentClient'
 
 export const dynamic = 'force-dynamic'
