@@ -40,6 +40,7 @@ export default function PortfolioGallery({ portfolios }: PortfolioGalleryProps) 
               position: 'relative',
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={portfolio.imageUrl}
               alt={portfolio.title}
@@ -81,6 +82,7 @@ export default function PortfolioGallery({ portfolios }: PortfolioGalleryProps) 
             cursor: 'pointer',
           }}
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selectedImage}
             alt="Fullscreen"
