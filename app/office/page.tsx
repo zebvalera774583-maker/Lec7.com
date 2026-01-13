@@ -1,20 +1,21 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/middleware'
+import { getAuthUserFromContext } from '@/lib/middleware'
 import { headers, cookies } from 'next/headers'
 import Link from 'next/link'
 
 export default async function OfficePage() {
-  const headersList = await headers()
-  const cookiesList = await cookies()
-  const user = getAuthUser({
-    headers: () => headersList,
+  const headersList = headers()
+  const cookiesList = cookies()
+
+  const user = getAuthUserFromContext({
+    headers: { get: (name: string) => headersList.get(name) },
     cookies: {
       get: (name: string) => {
-        const cookie = cookiesList.get(name)
-        return cookie ? { value: cookie.value } : undefined
+        const c = cookiesList.get(name)
+        return c ? { value: c.value } : undefined
       },
-    } as any,
-  } as any)
+    },
+  })
 
   if (!user) {
     return <div>Не авторизован</div>
@@ -39,14 +40,14 @@ export default async function OfficePage() {
       {businesses.length === 0 ? (
         <div style={{ padding: '2rem', background: 'white', borderRadius: '8px', textAlign: 'center' }}>
           <p style={{ marginBottom: '1rem' }}>У вас пока нет бизнесов</p>
-          <Link 
+          <Link
             href="/office/businesses/new"
-            style={{ 
-              display: 'inline-block', 
-              padding: '0.75rem 1.5rem', 
-              background: '#0070f3', 
-              color: 'white', 
-              borderRadius: '4px' 
+            style={{
+              display: 'inline-block',
+              padding: '0.75rem 1.5rem',
+              background: '#0070f3',
+              color: 'white',
+              borderRadius: '4px',
             }}
           >
             Создать бизнес

@@ -54,3 +54,19 @@ export function requireRole(
     return handler(req, user)
   })
 }
+
+/**
+ * Получение пользователя в Server Components (App Router),
+ * где у нас есть cookies() и headers() вместо NextRequest
+ */
+export function getAuthUserFromContext(ctx: {
+  cookies: { get: (name: string) => { value: string } | undefined }
+  headers: { get: (name: string) => string | null }
+}): AuthUser | null {
+  const token =
+    ctx.cookies.get('auth_token')?.value ||
+    ctx.headers.get('authorization')?.replace('Bearer ', '')
+
+  if (!token) return null
+  return verifyToken(token)
+}

@@ -1,23 +1,30 @@
-import { getAuthUser } from '@/lib/middleware'
-import { headers, cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import jwt from 'jsonwebtoken'
+
+type JwtPayload = {
+  id?: string
+  email?: string
+  role?: string
+}
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const headersList = headers()
-  const cookiesList = cookies()
-  const user = getAuthUser({
-    headers: () => headersList,
-    cookies: {
-      get: (name: string) => {
-        const cookie = cookiesList.get(name)
-        return cookie ? { value: cookie.value } : undefined
-      },
-    } as any,
-  } as any)
+  const token = cookies().get('token')?.value
+
+  if (!token) {
+    redirect('/login?redirect=/admin')
+  }
+
+  let user: JwtPayload | null = null
+  try {
+    user = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload
+  } catch {
+    user = null
+  }
 
   if (!user || user.role !== 'LEC7_ADMIN') {
     redirect('/login?redirect=/admin')
