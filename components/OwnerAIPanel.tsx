@@ -39,7 +39,10 @@ export default function OwnerAIPanel() {
     ;(async () => {
       try {
         setError('')
-        const res = await fetch('/api/owner/conversations', { method: 'GET' })
+        const res = await fetch('/api/owner/conversations', {
+          method: 'GET',
+          credentials: 'include',
+        })
         if (res.status === 403) {
           setError('Нет доступа к owner-панели')
           return
@@ -69,6 +72,7 @@ export default function OwnerAIPanel() {
         setError('')
         const res = await fetch(`/api/owner/conversations/${activeConversationId}/messages`, {
           method: 'GET',
+          credentials: 'include',
         })
         if (res.status === 403) {
           setError('Нет доступа к owner-панели')
@@ -99,6 +103,7 @@ export default function OwnerAIPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title ?? 'Новый диалог' }),
+        credentials: 'include',
       })
       if (res.status === 403) {
         setError('Нет доступа к owner-панели')
@@ -139,6 +144,7 @@ export default function OwnerAIPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text }),
+        credentials: 'include',
       })
 
       if (resMsg.status === 403) {
