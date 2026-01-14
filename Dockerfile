@@ -38,8 +38,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # prisma schema + migrations
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# node_modules для Prisma CLI (нужен для migrate deploy)
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+# Prisma CLI (нужен для migrate deploy)
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.bin ./node_modules/.bin
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+
+# сгенерированный Prisma Client
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
 # entrypoint
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
