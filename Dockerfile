@@ -38,6 +38,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # prisma schema + migrations
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
+# node_modules для Prisma CLI (нужен для migrate deploy)
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+
 # entrypoint
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
