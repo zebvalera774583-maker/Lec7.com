@@ -1,160 +1,154 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type Conversation = {
   id: string
-  title: string | null
-  createdAt: string
+  title?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 type Message = {
   id: string
-  role: string
+  role: 'user' | 'assistant'
   content: string
-  createdAt: string
+  createdAt?: string
 }
 
 export default function OwnerAIPanel() {
+  const [collapsed, setCollapsed] = useState(false)
+
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [collapsed, setCollapsed] = useState(false)
+  const [error, setError] = useState<string>('')
 
-  const loadConversations = async () => {
-    try {
-      setError(null)
-      const res = await fetch('/api/owner/conversations', {
-        method: 'GET',
-      })
-      if (res.status === 403) {
-        setError('Нет доступа к owner-панели')
-        return
-      }
-      if (!res.ok) {
-        throw new Error('Ошибка загрузки диалогов')
-      }
-      const data = (await res.json()) as Conversation[]
-      setConversations(data)
-      if (data.length > 0 && !activeConversationId) {
-        setActiveConversationId(data[0].id)
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки диалогов')
-    }
-  }
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  const loadMessages = async (conversationId: string) => {
-    try {
-      setError(null)
-      const res = await fetch(`/api/owner/conversations/${conversationId}/messages`)
-      if (res.status === 403) {
-        setError('Нет доступа к owner-панели')
-        return
-      }
-      if (!res.ok) {
-        throw new Error('Ошибка загрузки сообщений')
-      }
-      const data = (await res.json()) as Message[]
-      setMessages(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка загрузки сообщений')
-    }
-  }
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId) || null,
+    [conversations, activeConversationId]
+  )
 
+  // Загрузка диалогов при монтировании
   useEffect(() => {
-    void loadConversations()
+    ;(async () => {
+      try {
+        setError('')
+        const res = await fetch('/api/owner/conversations', { method: 'GET' })
+        if (res.status === 403) {
+          setError('Нет доступа к owner-панели')
+          return
+        }
+        if (!res.ok) throw new Error('Не удалось загрузить диалоги')
+
+        const data = (await res.json()) as Conversation[]
+        setConversations(data || [])
+        if ((data || []).length > 0) {
+          setActiveConversationId(data[0].id)
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Ошибка загрузки диалогов')
+      }
+    })()
   }, [])
 
+  // Загрузка сообщений при смене активного диалога
   useEffect(() => {
-    if (activeConversationId) {
-      void loadMessages(activeConversationId)
-    } else {
+    if (!activeConversationId) {
       setMessages([])
+      return
     }
+
+    ;(async () => {
+      try {
+        setError('')
+        const res = await fetch(`/api/owner/conversations/${activeConversationId}/messages`, {
+          method: 'GET',
+        })
+        if (res.status === 403) {
+          setError('Нет доступа к owner-панели')
+          return
+        }
+        if (!res.ok) throw new Error('Не удалось загрузить сообщения')
+
+        const data = (await res.json()) as Message[] | { messages: Message[] }
+        const list = Array.isArray(data) ? data : data.messages
+        setMessages(list || [])
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Ошибка загрузки сообщений')
+      }
+    })()
   }, [activeConversationId])
 
-  const handleSelectConversation = (id: string) => {
-    setActiveConversationId(id)
-  }
+  // Автоскролл вниз
+  useEffect(() => {
+    if (!collapsed) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, collapsed])
 
-  const handleNewConversation = async () => {
+  const createConversation = async (title?: string) => {
     try {
-      setError(null)
+      setError('')
       const res = await fetch('/api/owner/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Новый диалог' }),
+        body: JSON.stringify({ title: title ?? 'Новый диалог' }),
       })
       if (res.status === 403) {
         setError('Нет доступа к owner-панели')
-        return
+        return null
       }
-      if (!res.ok) {
-        throw new Error('Ошибка создания диалога')
-      }
+      if (!res.ok) throw new Error('Не удалось создать диалог')
+
       const conv = (await res.json()) as Conversation
       setConversations((prev) => [conv, ...prev])
       setActiveConversationId(conv.id)
-      setMessages([])
+      return conv.id
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка создания диалога')
+      return null
     }
   }
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return
-
-    setLoading(true)
-    setError(null)
+  const sendMessage = async () => {
+    const text = input.trim()
+    if (!text || loading) return
 
     try {
+      setLoading(true)
+      setError('')
+
       let conversationId = activeConversationId
 
-      // Если диалога ещё нет — создаём его на лету
+      // Если ещё нет диалога — создаём
       if (!conversationId) {
-        const title =
-          input.trim().length > 50 ? input.trim().slice(0, 47) + '...' : input.trim()
-        const resConv = await fetch('/api/owner/conversations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title }),
-        })
-        if (resConv.status === 403) {
-          setError('Нет доступа к owner-панели')
-          setLoading(false)
-          return
-        }
-        if (!resConv.ok) {
-          throw new Error('Не удалось создать диалог')
-        }
-        const conv = (await resConv.json()) as Conversation
-        setConversations((prev) => [conv, ...prev])
-        conversationId = conv.id
-        setActiveConversationId(conv.id)
+        const newId = await createConversation(text.length > 50 ? `${text.slice(0, 47)}...` : text)
+        if (!newId) return
+        conversationId = newId
       }
 
-      const content = input.trim()
       setInput('')
 
       const resMsg = await fetch(`/api/owner/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId, content }),
+        body: JSON.stringify({ content: text }),
       })
+
       if (resMsg.status === 403) {
         setError('Нет доступа к owner-панели')
         return
       }
-      if (!resMsg.ok) {
-        throw new Error('Не удалось сохранить сообщение')
-      }
+      if (!resMsg.ok) throw new Error('Не удалось сохранить сообщение')
 
       const data = (await resMsg.json()) as { messages: Message[] }
-      setMessages((prev) => [...prev, ...data.messages])
+      setMessages((prev) => [...prev, ...(data.messages || [])])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка отправки сообщения')
     } finally {
@@ -162,304 +156,228 @@ export default function OwnerAIPanel() {
     }
   }
 
+  // Свернутое состояние
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          borderLeft: '1px solid #e5e7eb',
+          background: '#fff',
+        }}
+      >
+        <div
+          style={{
+            padding: '10px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>AI Console</div>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>Advisory</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}
+          >
+            Открыть
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Полная панель
   return (
     <div
       style={{
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
-        border: '1px solid #e0e0e0',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        background: 'white',
+        borderLeft: '1px solid #e5e7eb',
+        background: '#fff',
       }}
     >
-      {/* Заголовок / управление */}
+      {/* Заголовок */}
       <div
         style={{
-          padding: '0.5rem 0.75rem',
-          borderBottom: '1px solid #e5e7eb',
+          padding: '10px 12px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '0.5rem',
+          gap: 8,
+          borderBottom: '1px solid #e5e7eb',
         }}
       >
         <div>
-          <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>AI Console</div>
-          <div
-            style={{
-              marginTop: '0.15rem',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.15rem 0.4rem',
-              borderRadius: '999px',
-              background: '#ecfdf5',
-              border: '1px solid #bbf7d0',
-              fontSize: '0.7rem',
-              color: '#15803d',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
-          >
-            <span
-              style={{
-                display: 'inline-block',
-                width: '6px',
-                height: '6px',
-                borderRadius: '999px',
-                background: '#22c55e',
-              }}
-            />
-            <span>Advisory</span>
-          </div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>AI Console</div>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>Advisory (только советы)</div>
         </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed((v) => !v)}
-          style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: '999px',
-            padding: '0.25rem 0.6rem',
-            background: '#f9fafb',
-            fontSize: '0.75rem',
-            cursor: 'pointer',
-          }}
-        >
-          {collapsed ? 'Открыть' : 'Свернуть'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => void createConversation()}
+            style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}
+          >
+            Новый
+          </button>
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}
+          >
+            Свернуть
+          </button>
+        </div>
       </div>
 
-      {!collapsed && (
-        <div
-          style={{
-            display: 'flex',
-            flex: 1,
-            minHeight: '320px',
-          }}
-        >
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* Список диалогов */}
         <div
           style={{
-            width: '220px',
-            borderRight: '1px solid #e0e0e0',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-        <div
-          style={{
-            padding: '0.75rem 1rem',
-            borderBottom: '1px solid #e0e0e0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span style={{ fontWeight: 600 }}>Диалоги</span>
-          <button
-            onClick={handleNewConversation}
-            style={{
-              padding: '0.25rem 0.5rem',
-              fontSize: '0.875rem',
-              borderRadius: '4px',
-              border: '1px solid #e0e0e0',
-              background: '#f5f5f5',
-              cursor: 'pointer',
-            }}
-          >
-            +
-          </button>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
+            width: 190,
+            borderRight: '1px solid #e5e7eb',
+            overflow: 'auto',
           }}
         >
           {conversations.length === 0 ? (
-            <div
-              style={{
-                padding: '1rem',
-                fontSize: '0.9rem',
-                color: '#777',
-              }}
-            >
-              Диалогов пока нет. Напишите первое сообщение, чтобы начать.
-            </div>
+            <div style={{ padding: 12, fontSize: 13, opacity: 0.7 }}>Нет диалогов</div>
           ) : (
-            conversations.map((conv) => (
+            conversations.map((c) => (
               <button
-                key={conv.id}
-                onClick={() => handleSelectConversation(conv.id)}
+                key={c.id}
+                type="button"
+                onClick={() => setActiveConversationId(c.id)}
                 style={{
                   width: '100%',
                   textAlign: 'left',
-                  padding: '0.75rem 1rem',
+                  padding: '10px 12px',
                   border: 'none',
-                  borderBottom: '1px solid #f0f0f0',
-                  background:
-                    conv.id === activeConversationId ? '#eef3ff' : 'transparent',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: c.id === activeConversationId ? '#f8fafc' : 'transparent',
                   cursor: 'pointer',
-                  fontSize: '0.95rem',
                 }}
               >
                 <div
                   style={{
-                    fontWeight: conv.id === activeConversationId ? 600 : 500,
-                    marginBottom: '0.25rem',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
-                  {conv.title || 'Без названия'}
+                  {c.title || 'Диалог'}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#888' }}>
-                  {new Date(conv.createdAt).toLocaleString()}
+                <div style={{ fontSize: 11, opacity: 0.6 }}>
+                  {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''}
                 </div>
               </button>
             ))
           )}
         </div>
-        </div>
 
-        {/* Сообщения */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '1rem',
-            background: '#fafafa',
-          }}
-        >
-          {error && (
-            <div
-              style={{
-                marginBottom: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '4px',
-                background: '#fee2e2',
-                color: '#b91c1c',
-                fontSize: '0.9rem',
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {messages.length === 0 && !error ? (
-            <div
-              style={{
-                marginTop: '2rem',
-                textAlign: 'center',
-                color: '#777',
-                fontSize: '0.95rem',
-              }}
-            >
-              История пока пуста. Напишите первое сообщение, чтобы зафиксировать
-              задачу или мысль.
-            </div>
-          ) : (
-            messages.map((msg) => (
+        {/* Чат */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ flex: 1, overflow: 'auto', padding: 12, background: '#fff' }}>
+            {error && (
               <div
-                key={msg.id}
                 style={{
-                  marginBottom: '0.75rem',
-                  textAlign: msg.role === 'user' ? 'right' : 'left',
+                  padding: 10,
+                  background: '#fff1f2',
+                  border: '1px solid #fecdd3',
+                  borderRadius: 8,
+                  marginBottom: 10,
+                  fontSize: 13,
                 }}
               >
+                {error}
+              </div>
+            )}
+
+            {messages.length === 0 && !error ? (
+              <div style={{ fontSize: 13, opacity: 0.7 }}>
+                Напиши задачу. Я в advisory-режиме: дам (1) диагноз, (2) шаги для Cursor, (3) шаги для Timeweb/SSH.
+              </div>
+            ) : (
+              messages.map((m) => (
                 <div
+                  key={m.id}
                   style={{
-                    display: 'inline-block',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '8px',
-                    background:
-                      msg.role === 'user' ? '#3b82f6' : 'white',
-                    color: msg.role === 'user' ? 'white' : '#111827',
-                    maxWidth: '80%',
-                    fontSize: '0.95rem',
-                    border:
-                      msg.role === 'user'
-                        ? 'none'
-                        : '1px solid #e5e7eb',
+                    display: 'flex',
+                    justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: 10,
                   }}
                 >
-                  {msg.content}
+                  <div
+                    style={{
+                      maxWidth: '85%',
+                      whiteSpace: 'pre-wrap',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      background: m.role === 'user' ? '#e0f2fe' : '#f8fafc',
+                      border: '1px solid #e5e7eb',
+                      fontSize: 13,
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {m.content}
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
 
-          {loading && (
-            <div
-              style={{
-                marginTop: '0.5rem',
-                textAlign: 'left',
-                color: '#777',
-                fontSize: '0.9rem',
-              }}
-            >
-              Сохранение...
-            </div>
-          )}
+            <div ref={messagesEndRef} />
+          </div>
+
           <div
             style={{
-              padding: '0.75rem 1rem',
-              borderTop: '1px solid #e0e0e0',
-              background: 'white',
+              borderTop: '1px solid #e5e7eb',
+              padding: 10,
+              display: 'flex',
+              gap: 8,
             }}
           >
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    void handleSend()
-                  }
-                }}
-                placeholder="Напишите задачу, мысль или запрос..."
-                style={{
-                  flex: 1,
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '4px',
-                  border: '1px solid #e0e0e0',
-                  fontSize: '0.95rem',
-                }}
-                disabled={loading}
-              />
-              <button
-                onClick={() => void handleSend()}
-                disabled={loading || !input.trim()}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '4px',
-                  border: 'none',
-                  background:
-                    loading || !input.trim() ? '#9ca3af' : '#2563eb',
-                  color: 'white',
-                  fontWeight: 500,
-                  cursor:
-                    loading || !input.trim() ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Отправить
-              </button>
-            </div>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={activeConversation ? 'Сообщение…' : 'Начни новый диалог…'}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                border: '1px solid #e5e7eb',
+                borderRadius: 10,
+                fontSize: 13,
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  if (!loading) void sendMessage()
+                }
+              }}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={() => void sendMessage()}
+              disabled={loading}
+              style={{
+                padding: '10px 12px',
+                fontSize: 13,
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {loading ? '...' : 'Отправить'}
+            </button>
           </div>
         </div>
       </div>
-      )}
     </div>
   )
 }
-
