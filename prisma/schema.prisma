@@ -176,3 +176,21 @@ model AuditLog {
   @@index([userId])
   @@index([action])
 }
+
+model AgentPlaybookItem {
+  id         String   @id @default(cuid())
+  scope      String   // PLATFORM | BUSINESS
+  businessId String?
+  title      String
+  move       String
+  context    String?
+  outcome    String?
+  confidence String   // LOW | MEDIUM | HIGH
+  tags       String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([scope])
+  @@index([businessId])
+  @@index([confidence])
+}
