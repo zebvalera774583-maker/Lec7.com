@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { openai } from '@/lib/openai'
 
 export type OwnerAgentMode = 'NEXT_STEP' | 'CURSOR_TASK' | 'RISK_CHECK'
 
@@ -11,38 +10,6 @@ export interface OwnerAgentResponse {
   mode: OwnerAgentMode
   answer: string
 }
-
-const SYSTEM_PROMPT = `Ты — Owner Agent платформы Lec7.
-
-Твоя роль:
-— помогать Генеральному владельцу Lec7 принимать архитектурные и продуктовые решения
-— ускорять разработку платформы
-— давать ровно один следующий шаг без разветвлений
-
-Контекст платформы:
-Lec7 — это не маркетплейс и не соцсеть.
-Это инфраструктура для взаимодействия бизнеса и клиентов:
-запрос → диалог → оплата → документы.
-
-Есть две стороны:
-— B2B: владельцы бизнесов
-— B2C: клиенты, приходящие на страницы бизнесов
-
-Твои ответы ДОЛЖНЫ быть строго одного из трёх режимов:
-1) NEXT_STEP — один конкретный следующий шаг, одно действие, без альтернатив
-2) CURSOR_TASK — готовое задание для Cursor: цель, файлы, критерии готовности, что не делать
-3) RISK_CHECK — кратко: что может сломаться и где проверить
-
-Правила:
-— не рассуждай вслух
-— не предлагай вариантов
-— не используй слова «можно», «возможно», «лучше»
-— если запрос расплывчатый — задай ОДИН уточняющий вопрос
-— если запрос ясен — сразу ответь в одном режиме
-
-Формат ответа:
-mode: NEXT_STEP | CURSOR_TASK | RISK_CHECK
-answer: markdown-текст`
 
 function parseAIResponse(text: string): { mode: OwnerAgentMode; answer: string } {
   const trimmedText = text.trim()
@@ -115,42 +82,47 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Проверяем наличие API ключа
-    if (!process.env.OPENAI_API_KEY) {
+    // Проверяем наличие env переменных для gateway
+    const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
+    const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
+
+    if (!gatewayUrl || !gatewaySecret) {
       return NextResponse.json(
-        { error: 'OPENAI_API_KEY is missing' },
+        { error: 'AI gateway configuration is missing' },
         { status: 500 }
       )
     }
 
-    if (!openai) {
-      return NextResponse.json(
-        { error: 'OPENAI_API_KEY is missing' },
-        { status: 500 }
-      )
-    }
-
-    // Вызываем AI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: message },
-      ],
-      temperature: 0.7,
+    // Вызываем gateway
+    const gatewayResponse = await fetch(`${gatewayUrl}/v1/owner-agent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-LEC7-GATEWAY-SECRET': gatewaySecret,
+      },
+      body: JSON.stringify({ message }),
     })
 
-    const aiResponse = completion.choices[0]?.message?.content || ''
+    if (!gatewayResponse.ok) {
+      const errorText = await gatewayResponse.text().catch(() => 'AI gateway error')
+      return NextResponse.json(
+        { error: 'AI gateway error' },
+        { status: 502 }
+      )
+    }
 
-    if (!aiResponse) {
+    const gatewayData = await gatewayResponse.json() as { reply?: string }
+    const reply = gatewayData.reply || ''
+
+    if (!reply) {
       return NextResponse.json(
         { error: 'Ошибка получения ответа от AI' },
         { status: 500 }
       )
     }
 
-    // Парсим ответ AI
-    const { mode, answer } = parseAIResponse(aiResponse)
+    // Парсим ответ AI через существующую функцию
+    const { mode, answer } = parseAIResponse(reply)
 
     const response: OwnerAgentResponse = {
       mode,
@@ -161,14 +133,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Owner Agent API error:', error)
     
-    // Не раскрываем детали ошибки (без утечки ключей)
-    const errorMessage = error instanceof Error ? error.message : 'Ошибка обработки запроса'
-    
-    // Если ошибка связана с API ключом, возвращаем понятное сообщение
-    if (errorMessage.includes('API key') || errorMessage.includes('OPENAI')) {
+    // Если ошибка связана с fetch (сетевая ошибка), возвращаем 502
+    if (error instanceof TypeError && error.message.includes('fetch')) {
       return NextResponse.json(
-        { error: 'Ошибка подключения к AI сервису' },
-        { status: 500 }
+        { error: 'AI gateway error' },
+        { status: 502 }
       )
     }
 
