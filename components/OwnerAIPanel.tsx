@@ -140,21 +140,67 @@ export default function OwnerAIPanel() {
 
       setInput('')
 
-      const resMsg = await fetch(`/api/owner/conversations/${conversationId}/messages`, {
+      // Вызываем /api/owner-agent для получения ответа
+      const url = '/api/owner-agent'
+      const payload = { message: text }
+
+      // Debug logging (только в dev)
+      const isDev = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production'
+      if (isDev) {
+        console.log('[OwnerAIPanel] POST', url, payload)
+      }
+
+      const resAgent = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'include',
+      })
+
+      if (resAgent.status === 403) {
+        setError('Нет доступа к owner-панели')
+        return
+      }
+      if (!resAgent.ok) {
+        const errorText = await resAgent.text().catch(() => 'Ошибка запроса к Owner Agent')
+        throw new Error(`Не удалось получить ответ: ${errorText}`)
+      }
+
+      const agentData = (await resAgent.json()) as { mode: string; answer: string }
+      
+      // Debug logging (только в dev)
+      if (isDev) {
+        console.log('[OwnerAIPanel] RESP', resAgent.status, agentData)
+      }
+
+      // Сохраняем сообщения в conversation
+      const userMessageRes = await fetch(`/api/owner/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text }),
         credentials: 'include',
       })
 
-      if (resMsg.status === 403) {
-        setError('Нет доступа к owner-панели')
-        return
+      if (!userMessageRes.ok) {
+        console.warn('Failed to save user message to conversation')
       }
-      if (!resMsg.ok) throw new Error('Не удалось сохранить сообщение')
 
-      const data = (await resMsg.json()) as { messages: Message[] }
-      setMessages((prev) => [...prev, ...(data.messages || [])])
+      // Добавляем сообщения в UI
+      const userMessage: Message = {
+        id: `temp-user-${Date.now()}`,
+        role: 'user',
+        content: text,
+        createdAt: new Date().toISOString(),
+      }
+
+      const assistantMessage: Message = {
+        id: `temp-assistant-${Date.now()}`,
+        role: 'assistant',
+        content: agentData.answer || 'Нет ответа',
+        createdAt: new Date().toISOString(),
+      }
+
+      setMessages((prev) => [...prev, userMessage, assistantMessage])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка отправки сообщения')
     } finally {
@@ -310,7 +356,7 @@ export default function OwnerAIPanel() {
 
             {messages.length === 0 && !error ? (
               <div style={{ fontSize: 13, opacity: 0.7 }}>
-                Напиши задачу. Я в advisory-режиме: дам (1) диагноз, (2) шаги для Cursor, (3) шаги для Timeweb/SSH.
+                Напиши сообщение Owner Agent. Он поможет с задачами, идеями или следующими шагами по Lec7.
               </div>
             ) : (
               messages.map((m) => (
