@@ -199,17 +199,18 @@ export default function OwnerAIPanel() {
     )
   }
 
-  // Полная панель
-  return (
-    <div
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        borderLeft: '1px solid #e5e7eb',
-        background: '#fff',
-      }}
-    >
+        // Полная панель
+        return (
+          <div
+            data-owner-ai-panel
+            style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              borderLeft: '1px solid #e5e7eb',
+              background: '#fff',
+            }}
+          >
       {/* Заголовок */}
       <div
         style={{
