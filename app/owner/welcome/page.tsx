@@ -49,7 +49,7 @@ export default function OwnerWelcomePage() {
 
         <div style={{ marginTop: '3rem' }}>
           <HoverLink 
-            href="/owner/admin"
+            href="/office"
             variant="primary"
           >
             <span>Создать бизнес</span>

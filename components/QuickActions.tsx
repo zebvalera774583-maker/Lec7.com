@@ -27,33 +27,6 @@ export default function QuickActions() {
           gap: '0.75rem',
         }}
       >
-        <a
-          href="/owner/admin"
-          style={{
-            display: 'block',
-            padding: '0.75rem 1rem',
-            background: '#f8fafc',
-            border: '1px solid #e5e7eb',
-            borderRadius: '6px',
-            textDecoration: 'none',
-            color: '#374151',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            transition: 'all 0.2s',
-            textAlign: 'center',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f1f5f9'
-            e.currentTarget.style.borderColor = '#cbd5e1'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#f8fafc'
-            e.currentTarget.style.borderColor = '#e5e7eb'
-          }}
-        >
-          Админ-панель
-        </a>
-
         <button
           type="button"
           onClick={() => {
