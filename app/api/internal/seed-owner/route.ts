@@ -3,6 +3,11 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
 export async function POST() {
+  // Seed-доступ только в development. В других окружениях — недоступен.
+  if (process.env.NODE_ENV !== 'development') {
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 })
+  }
+
   const rawEmail = process.env.LEC7_OWNER_EMAIL || ''
   const ownerEmail = rawEmail.replace(/"/g, '').trim()
   const ownerPass = process.env.LEC7_OWNER_PASSWORD || ''
