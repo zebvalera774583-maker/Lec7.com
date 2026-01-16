@@ -157,6 +157,100 @@ async function loadPlaybookContext(businessId?: string | null): Promise<string> 
 }
 
 /**
+ * Проверяет, является ли сообщение приветственным/бытовым
+ */
+function isGreetingMessage(message: string): boolean {
+  const normalized = message.toLowerCase().trim()
+  const greetings = [
+    'привет',
+    'здравствуй',
+    'здравствуйте',
+    'как дела',
+    'как дела?',
+    'добрый день',
+    'доброе утро',
+    'добрый вечер',
+    'hi',
+    'hello',
+    'hey',
+    'приветик',
+    'салют',
+  ]
+
+  // Проверяем точное совпадение или начало сообщения
+  for (const greeting of greetings) {
+    if (normalized === greeting || normalized.startsWith(greeting + ' ')) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Проверяет, содержит ли сообщение задачу (баг, фича, деплой, конкретный запрос)
+ */
+function hasTask(message: string): boolean {
+  const normalized = message.toLowerCase()
+  const taskKeywords = [
+    'баг',
+    'bug',
+    'ошибка',
+    'проблема',
+    'фича',
+    'feature',
+    'деплой',
+    'deploy',
+    'нужно',
+    'сделай',
+    'давай',
+    'помоги',
+    'помощь',
+    'вопрос',
+    'как сделать',
+    'как реализовать',
+    'как добавить',
+    'как исправить',
+    'задача',
+    'task',
+    'идея',
+    'предложение',
+  ]
+
+  return taskKeywords.some((keyword) => normalized.includes(keyword))
+}
+
+/**
+ * Генерирует человеческий ответ на приветствие
+ */
+function generateGreetingResponse(message: string): { mode: OwnerAgentMode; answer: string } {
+  const normalized = message.toLowerCase().trim()
+
+  // Если спрашивают "как дела"
+  if (normalized.includes('как дела') || normalized.includes('how are you')) {
+    return {
+      mode: 'RISK_CHECK',
+      answer: 'Нормально, рабочий режим 🙂\n\nГотов помочь — что сейчас важнее?',
+    }
+  }
+
+  // Стандартное приветствие
+  const responses = [
+    {
+      mode: 'RISK_CHECK' as OwnerAgentMode,
+      answer: 'Привет 🙂 Всё в порядке, на связи.\n\nЕсли хочешь — можем разобрать задачу, идею или следующий шаг по Lec7.',
+    },
+    {
+      mode: 'RISK_CHECK' as OwnerAgentMode,
+      answer: 'Привет. Рад продолжить 🙂\n\nСкажи, над чем сейчас думаем — продукт, агент или платформа?',
+    },
+  ]
+
+  // Выбираем случайный ответ для разнообразия
+  return responses[Math.floor(Math.random() * responses.length)]
+}
+
+/**
  * Валидирует playbook_item перед сохранением
  */
 function validatePlaybookItem(item: OwnerAgentRequest['playbook_item']): { valid: boolean; error?: string } {
@@ -201,6 +295,14 @@ export async function POST(request: NextRequest) {
         { error: 'Сообщение не может быть пустым' },
         { status: 400 }
       )
+    }
+
+    // Human Greeting Layer: проверка на приветственные/бытовые сообщения
+    const trimmedMessage = message.trim()
+    if (isGreetingMessage(trimmedMessage) && !hasTask(trimmedMessage)) {
+      // Если это приветствие без задачи - возвращаем человеческий ответ
+      const greetingResponse = generateGreetingResponse(trimmedMessage)
+      return NextResponse.json(greetingResponse)
     }
 
     // Валидация playbook_item если save_to_playbook=true
