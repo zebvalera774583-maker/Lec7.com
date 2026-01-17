@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { generateSlug } from '@/lib/slug'
+import { generateSlug, isLatinOnly } from '@/lib/slug'
 import { requireRole } from '@/lib/middleware'
 
 export async function GET(request: NextRequest) {
@@ -77,6 +77,14 @@ export const POST = requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], async (req: Ne
     if (!name) {
       return NextResponse.json(
         { error: 'Поле name обязательно' },
+        { status: 400 }
+      )
+    }
+
+    // Валидация: name должен содержать только латиницу, цифры, пробелы и дефисы
+    if (!isLatinOnly(name)) {
+      return NextResponse.json(
+        { error: 'INVALID_NAME_LATIN_ONLY', message: 'Название бизнеса должно содержать только латинские буквы, цифры, пробелы и дефисы' },
         { status: 400 }
       )
     }

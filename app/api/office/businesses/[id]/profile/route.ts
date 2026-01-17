@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/middleware'
+import { isLatinOnly } from '@/lib/slug'
 
 // Доступ для BUSINESS_OWNER и LEC7_ADMIN
 const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
@@ -93,6 +94,16 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       cities,
       services,
     } = body
+
+    // Валидация displayName: только латиница, цифры, пробелы, дефисы
+    if (displayName !== undefined && displayName !== null && displayName !== '') {
+      if (!isLatinOnly(displayName)) {
+        return NextResponse.json(
+          { error: 'INVALID_DISPLAY_NAME_LATIN_ONLY', message: 'Отображаемое имя должно содержать только латинские буквы, цифры, пробелы и дефисы' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Валидация
     if (statsCases !== undefined && (typeof statsCases !== 'number' || statsCases < 0)) {

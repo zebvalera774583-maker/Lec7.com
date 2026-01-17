@@ -3,18 +3,35 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { isLatinOnly } from '@/lib/slug'
 
 export default function NewBusinessPage() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [nameError, setNameError] = useState('')
+
+  const handleNameChange = (value: string) => {
+    setName(value)
+    if (value && !isLatinOnly(value)) {
+      setNameError('Название бизнеса должно содержать только латинские буквы, цифры, пробелы и дефисы')
+    } else {
+      setNameError('')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!name.trim()) {
       setError('Название бизнеса обязательно')
+      return
+    }
+
+    // Валидация латиницы
+    if (!isLatinOnly(name.trim())) {
+      setError('Название бизнеса должно содержать только латинские буквы, цифры, пробелы и дефисы')
       return
     }
 
@@ -33,6 +50,13 @@ export default function NewBusinessPage() {
 
       if (!response.ok) {
         const data = await response.json()
+        
+        // Обработка 400: неверное имя (латиница)
+        if (response.status === 400 && data.error === 'INVALID_NAME_LATIN_ONLY') {
+          setError(data.message || 'Название бизнеса должно содержать только латинские буквы, цифры, пробелы и дефисы')
+          setLoading(false)
+          return
+        }
         
         // Обработка 409: бизнес уже существует
         if (response.status === 409 && data.error === 'BUSINESS_ALREADY_EXISTS') {
@@ -126,25 +150,34 @@ export default function NewBusinessPage() {
           >
             Название бизнеса <span style={{ color: '#ef4444' }}>*</span>
           </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              outline: 'none',
-              transition: 'border-color 0.2s',
-            }}
-            onFocus={(e) => e.currentTarget.style.borderColor = '#0070f3'}
-            onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
-          />
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              required
+              disabled={loading}
+              placeholder="My Business"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: nameError ? '1px solid #ef4444' : '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '1rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = nameError ? '#ef4444' : '#0070f3'}
+              onBlur={(e) => e.currentTarget.style.borderColor = nameError ? '#ef4444' : '#d1d5db'}
+            />
+            {nameError && (
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#ef4444' }}>
+                {nameError}
+              </p>
+            )}
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
+              Только латинские буквы, цифры, пробелы и дефисы
+            </p>
         </div>
 
         <button

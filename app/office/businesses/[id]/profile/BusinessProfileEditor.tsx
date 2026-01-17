@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { isLatinOnly } from '@/lib/slug'
 
 interface BusinessProfileEditorProps {
   businessId: string
@@ -41,6 +42,7 @@ export default function BusinessProfileEditor({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [displayNameError, setDisplayNameError] = useState('')
 
   // Загрузка профиля при монтировании
   useEffect(() => {
@@ -79,7 +81,22 @@ export default function BusinessProfileEditor({
   const pageWeight =
     (avatarUrl ? 0.3 : 0) + portfolioCount * 0.5 + (displayName ? 0.2 : 0)
 
+  const handleDisplayNameChange = (value: string) => {
+    setDisplayName(value)
+    if (value && !isLatinOnly(value)) {
+      setDisplayNameError('Отображаемое имя должно содержать только латинские буквы, цифры, пробелы и дефисы')
+    } else {
+      setDisplayNameError('')
+    }
+  }
+
   const handleSave = async () => {
+    // Валидация перед сохранением
+    if (displayName && !isLatinOnly(displayName)) {
+      setError('Отображаемое имя должно содержать только латинские буквы, цифры, пробелы и дефисы')
+      return
+    }
+
     setSaving(true)
     setError('')
     setSuccess(false)
@@ -292,16 +309,24 @@ export default function BusinessProfileEditor({
               <input
                 type="text"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Валерий Зебелян"
+                onChange={(e) => handleDisplayNameChange(e.target.value)}
+                placeholder="Valeriy Zebelyan"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  border: '1px solid #d1d5db',
+                  border: displayNameError ? '1px solid #ef4444' : '1px solid #d1d5db',
                   borderRadius: '4px',
                   fontSize: '1rem',
                 }}
               />
+              {displayNameError && (
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#ef4444' }}>
+                  {displayNameError}
+                </p>
+              )}
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
+                Только латинские буквы, цифры, пробелы и дефисы
+              </p>
             </div>
           </section>
 
