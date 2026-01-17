@@ -1,5 +1,5 @@
 import { headers, cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { getAuthUserFromContext } from '@/lib/middleware'
 import PlaybookList from '@/components/PlaybookList'
 import QuickActions from '@/components/QuickActions'
@@ -24,9 +24,9 @@ export default function OwnerHomePage() {
     redirect('/login?redirect=/owner')
   }
 
-  // Для LEC7_ADMIN показываем Owner Home, для остальных - редирект
+  // Доступ только для LEC7_ADMIN
   if (user!.role !== 'LEC7_ADMIN') {
-    redirect('/owner/welcome')
+    notFound()
   }
 
   return (

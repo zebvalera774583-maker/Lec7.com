@@ -53,7 +53,7 @@ export default function HomePage() {
           </HoverLink>
           
           <HoverLink 
-            href="/owner/welcome"
+            href="/office"
             variant="primary"
           >
             <span>Создать свой бизнес</span>
