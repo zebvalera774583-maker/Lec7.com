@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import BusinessMenu from './BusinessMenu'
 
 interface PageProps {
   params: {
@@ -36,10 +37,11 @@ export default async function BusinessDetailPage({ params }: PageProps) {
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/office" style={{ color: '#666', textDecoration: 'underline' }}>
           ← Назад к списку
         </Link>
+        <BusinessMenu businessId={business.id} slug={business.slug} />
       </div>
 
       <h1 style={{ marginBottom: '1rem' }}>{business.name}</h1>
