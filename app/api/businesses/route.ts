@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateSlug } from '@/lib/slug'
+import { requireRole } from '@/lib/middleware'
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,9 +69,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], async (req: NextRequest, user: any) => {
   try {
-    const body = await request.json()
+    const body = await req.json()
     const { name, city, category } = body
 
     if (!name) {
@@ -91,30 +92,15 @@ export async function POST(request: NextRequest) {
       counter++
     }
 
-    // Временно: создаём или получаем тестового пользователя для бизнесов без авторизации
-    // В продакшене ownerId должен приходить из сессии/токена
-    let testUser = await prisma.user.findFirst({
-      where: { email: 'test@lec7.com' },
-    })
-
-    if (!testUser) {
-      testUser = await prisma.user.create({
-        data: {
-          email: 'test@lec7.com',
-          password: 'temp', // В продакшене не используется без авторизации
-          name: 'Test User',
-          role: 'BUSINESS_OWNER',
-        },
-      })
-    }
-
     const business = await prisma.business.create({
       data: {
         name,
         slug,
         city: city || null,
         category: category || null,
-        ownerId: testUser.id,
+        ownerId: user.id,
+        lifecycleStatus: 'DRAFT',
+        billingStatus: 'UNPAID',
       },
       select: {
         id: true,
@@ -122,6 +108,8 @@ export async function POST(request: NextRequest) {
         name: true,
         city: true,
         category: true,
+        lifecycleStatus: true,
+        billingStatus: true,
         createdAt: true,
       },
     })
@@ -134,4 +122,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

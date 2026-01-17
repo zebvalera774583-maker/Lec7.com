@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Business" ADD COLUMN "lifecycleStatus" TEXT NOT NULL DEFAULT 'DRAFT',
+ADD COLUMN "billingStatus" TEXT NOT NULL DEFAULT 'UNPAID';
