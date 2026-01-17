@@ -4,55 +4,119 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-interface Portfolio {
-  id: string
-  title: string
-  imageUrl: string
-  order: number
-}
-
-interface Business {
-  id: string
-  name: string
-  slug: string
-  description: string | null
-  logoUrl: string | null
-  coverUrl: string | null
-  portfolios: Portfolio[]
-  _count: {
-    portfolios: number
-  }
-}
-
 interface BusinessProfileEditorProps {
-  business: Business
+  businessId: string
+  businessSlug: string
+  portfolioCount: number
 }
 
-export default function BusinessProfileEditor({ business: initialBusiness }: BusinessProfileEditorProps) {
+interface BusinessProfile {
+  id: string
+  businessId: string
+  displayName: string | null
+  avatarUrl: string | null
+  statsCases: number
+  statsProjects: number
+  statsCities: number
+  cities: string[]
+  services: string[]
+}
+
+export default function BusinessProfileEditor({
+  businessId,
+  businessSlug: initialSlug,
+  portfolioCount,
+}: BusinessProfileEditorProps) {
   const router = useRouter()
-  const [business, setBusiness] = useState(initialBusiness)
-  const [name, setName] = useState(initialBusiness.name)
-  const [avatar, setAvatar] = useState(initialBusiness.logoUrl || '')
-  const [photos, setPhotos] = useState<Portfolio[]>(initialBusiness.portfolios)
-  const [cities, setCities] = useState<string[]>(['Москва', 'Санкт-Петербург'])
-  const [services, setServices] = useState<string[]>(['Проектная реализация', 'Дизайн интерьера'])
+  const [displayName, setDisplayName] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [cities, setCities] = useState<string[]>([])
+  const [services, setServices] = useState<string[]>([])
   const [metrics, setMetrics] = useState({
     cases: 40,
     projects: 2578,
     cities: 4,
   })
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  // Загрузка профиля при монтировании
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/office/businesses/${businessId}/profile`, {
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          throw new Error('Не удалось загрузить профиль')
+        }
+
+        const profile: BusinessProfile = await response.json()
+        setDisplayName(profile.displayName || '')
+        setAvatarUrl(profile.avatarUrl || '')
+        setCities(profile.cities || [])
+        setServices(profile.services || [])
+        setMetrics({
+          cases: profile.statsCases,
+          projects: profile.statsProjects,
+          cities: profile.statsCities,
+        })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Ошибка загрузки профиля')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [businessId])
 
   // Индикатор веса страницы (MVP)
-  const pageWeight = photos.length * 0.5 + (avatar ? 0.3 : 0) + (name ? 0.2 : 0)
+  const pageWeight =
+    (avatarUrl ? 0.3 : 0) + portfolioCount * 0.5 + (displayName ? 0.2 : 0)
 
   const handleSave = async () => {
-    setLoading(true)
-    // TODO: API для сохранения
-    setTimeout(() => {
-      setLoading(false)
-      router.refresh()
-    }, 500)
+    setSaving(true)
+    setError('')
+    setSuccess(false)
+
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          displayName: displayName || null,
+          avatarUrl: avatarUrl || null,
+          statsCases: metrics.cases,
+          statsProjects: metrics.projects,
+          statsCities: metrics.cities,
+          cities,
+          services,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка сохранения профиля')
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+        router.refresh()
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка сохранения профиля')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleAddCity = () => {
@@ -74,16 +138,22 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
     }
   }
 
-  const handleDeletePhoto = (photoId: string) => {
-    setPhotos(photos.filter((p) => p.id !== photoId))
-  }
-
   const availableServices = [
     'Проектная реализация',
     'Дизайн интерьера',
     'Мебель на заказ',
     'Комплектация',
   ]
+
+  if (loading) {
+    return (
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+        <div style={{ textAlign: 'center', padding: '3rem' }}>
+          <p>Загрузка профиля...</p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
@@ -95,19 +165,19 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
               width: '60px',
               height: '60px',
               borderRadius: '50%',
-              background: avatar ? `url(${avatar})` : '#e5e7eb',
+              background: avatarUrl ? `url(${avatarUrl})` : '#e5e7eb',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               border: '2px solid #e5e7eb',
             }}
           />
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{business.name}</h1>
-            <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>/{business.slug}</p>
+            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{displayName || 'Бизнес'}</h1>
+            <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>/{initialSlug}</p>
           </div>
         </div>
         <Link
-          href={`/~${business.slug}`}
+          href={`/~${initialSlug}`}
           target="_blank"
           style={{
             padding: '0.5rem 1rem',
@@ -121,6 +191,38 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
           Открыть витрину →
         </Link>
       </div>
+
+      {/* Сообщения об ошибках/успехе */}
+      {error && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            marginBottom: '1rem',
+            background: '#fff1f2',
+            border: '1px solid #fecdd3',
+            borderRadius: '4px',
+            color: '#be123c',
+            fontSize: '0.875rem',
+          }}
+        >
+          {error}
+        </div>
+      )}
+      {success && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            marginBottom: '1rem',
+            background: '#d1fae5',
+            border: '1px solid #86efac',
+            borderRadius: '4px',
+            color: '#065f46',
+            fontSize: '0.875rem',
+          }}
+        >
+          Профиль успешно сохранён
+        </div>
+      )}
 
       {/* Индикатор веса */}
       <div
@@ -152,29 +254,29 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
                   width: '100px',
                   height: '100px',
                   borderRadius: '50%',
-                  background: avatar ? `url(${avatar})` : '#e5e7eb',
+                  background: avatarUrl ? `url(${avatarUrl})` : '#e5e7eb',
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   border: '2px solid #e5e7eb',
                 }}
               />
               <div>
-                <button
+                <input
+                  type="text"
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="URL аватара"
                   style={{
-                    padding: '0.5rem 1rem',
-                    background: '#0070f3',
-                    color: 'white',
-                    border: 'none',
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #d1d5db',
                     borderRadius: '4px',
-                    cursor: 'pointer',
                     fontSize: '0.875rem',
                     marginBottom: '0.5rem',
                   }}
-                >
-                  Загрузить фото
-                </button>
+                />
                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
-                  Круглый аватар для витрины
+                  URL аватара (загрузка фото — позже)
                 </p>
               </div>
             </div>
@@ -189,8 +291,8 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
               </label>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Валерий Зебелян"
                 style={{
                   width: '100%',
@@ -207,68 +309,23 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Фото портфолио</h2>
             <button
+              disabled
               style={{
                 padding: '0.75rem 1.5rem',
                 background: '#f3f4f6',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
-                cursor: 'pointer',
+                cursor: 'not-allowed',
                 fontSize: '0.875rem',
                 marginBottom: '1rem',
+                opacity: 0.6,
               }}
             >
-              + Загрузить фото
+              + Загрузить фото (скоро)
             </button>
-            {photos.length > 0 ? (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: '1rem',
-                }}
-              >
-                {photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    style={{
-                      position: 'relative',
-                      aspectRatio: '1',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <img
-                      src={photo.imageUrl}
-                      alt={photo.title}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <button
-                      onClick={() => handleDeletePhoto(photo.id)}
-                      style={{
-                        position: 'absolute',
-                        top: '0.5rem',
-                        right: '0.5rem',
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.25rem 0.5rem',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ color: '#666', fontSize: '0.875rem' }}>Нет загруженных фото</p>
-            )}
+            <p style={{ color: '#666', fontSize: '0.875rem' }}>
+              Фото портфолио: {portfolioCount} шт. (загрузка — позже)
+            </p>
           </section>
 
           {/* Метрики */}
@@ -420,24 +477,24 @@ export default function BusinessProfileEditor({ business: initialBusiness }: Bus
           >
             <button
               onClick={handleSave}
-              disabled={loading}
+              disabled={saving || loading}
               style={{
                 width: '100%',
                 padding: '0.75rem',
-                background: loading ? '#94a3b8' : '#0070f3',
+                background: saving || loading ? '#94a3b8' : '#0070f3',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer',
+                cursor: saving || loading ? 'not-allowed' : 'pointer',
                 fontSize: '1rem',
                 fontWeight: 500,
                 marginBottom: '1rem',
               }}
             >
-              {loading ? 'Сохранение...' : 'Сохранить изменения'}
+              {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
             <Link
-              href={`/office/businesses/${business.id}`}
+              href={`/office/businesses/${businessId}`}
               style={{
                 display: 'block',
                 textAlign: 'center',

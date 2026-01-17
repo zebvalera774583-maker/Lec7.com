@@ -11,13 +11,12 @@ interface PageProps {
 export default async function BusinessProfilePage({ params }: PageProps) {
   const business = await prisma.business.findUnique({
     where: { id: params.id },
-    include: {
+    select: {
+      id: true,
+      slug: true,
       portfolios: {
-        orderBy: { order: 'asc' },
-      },
-      _count: {
         select: {
-          portfolios: true,
+          id: true,
         },
       },
     },
@@ -27,5 +26,11 @@ export default async function BusinessProfilePage({ params }: PageProps) {
     notFound()
   }
 
-  return <BusinessProfileEditor business={business} />
+  return (
+    <BusinessProfileEditor
+      businessId={business.id}
+      businessSlug={business.slug}
+      portfolioCount={business.portfolios.length}
+    />
+  )
 }

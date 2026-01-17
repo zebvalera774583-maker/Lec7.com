@@ -21,17 +21,11 @@ export default async function PublicBusinessPage({ params }: PageProps) {
   }
   slug = slug.normalize('NFC')
 
-  // Находим бизнес по slug
+  // Находим бизнес по slug с профилем
   const business = await prisma.business.findUnique({
     where: { slug },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      city: true,
-      category: true,
-      lifecycleStatus: true,
-      billingStatus: true,
+    include: {
+      profile: true,
     },
   })
 
@@ -46,12 +40,26 @@ export default async function PublicBusinessPage({ params }: PageProps) {
     notFound()
   }
 
-  // Формируем подзаголовок (город/категория)
+  // Используем данные из профиля или fallback на бизнес
+  const displayName = business.profile?.displayName || business.name
+  const profileCities = business.profile?.cities || []
+  const profileServices = business.profile?.services || []
+  const stats = business.profile
+    ? {
+        cases: business.profile.statsCases,
+        projects: business.profile.statsProjects,
+        cities: business.profile.statsCities,
+      }
+    : null
+
+  // Формируем подзаголовок (города из профиля или fallback на city/category)
   const subtitleParts: string[] = []
-  if (business.city) {
+  if (profileCities.length > 0) {
+    subtitleParts.push(...profileCities)
+  } else if (business.city) {
     subtitleParts.push(business.city)
   }
-  if (business.category) {
+  if (!profileCities.length && business.category) {
     subtitleParts.push(business.category)
   }
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' • ') : null
@@ -83,6 +91,21 @@ export default async function PublicBusinessPage({ params }: PageProps) {
             ← На главную
           </Link>
 
+          {business.profile?.avatarUrl && (
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                borderRadius: '50%',
+                background: `url(${business.profile.avatarUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                margin: '0 auto 1.5rem',
+                border: '3px solid #e5e7eb',
+              }}
+            />
+          )}
+
           <h1
             style={{
               fontSize: '2.5rem',
@@ -92,7 +115,7 @@ export default async function PublicBusinessPage({ params }: PageProps) {
               lineHeight: '1.2',
             }}
           >
-            {business.name}
+            {displayName}
           </h1>
 
           {subtitle && (
@@ -100,12 +123,67 @@ export default async function PublicBusinessPage({ params }: PageProps) {
               style={{
                 color: '#666',
                 fontSize: '1.1rem',
-                margin: 0,
+                margin: '0 0 2rem 0',
                 lineHeight: '1.6',
               }}
             >
               {subtitle}
             </p>
+          )}
+
+          {/* Метрики */}
+          {stats && (
+            <div
+              style={{
+                display: 'flex',
+                gap: '2rem',
+                justifyContent: 'center',
+                marginBottom: '2rem',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
+                  {stats.cases}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#666' }}>уникальных кейсов</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
+                  {stats.projects}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#666' }}>проектов</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
+                  {stats.cities}
+                </div>
+                <div style={{ fontSize: '0.875rem', color: '#666' }}>городов</div>
+              </div>
+            </div>
+          )}
+
+          {/* Услуги */}
+          {profileServices.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>Услуги</h2>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
+                {profileServices.map((service) => (
+                  <span
+                    key={service}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#f3f4f6',
+                      borderRadius: '20px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                    }}
+                  >
+                    {service}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
         </header>
 
