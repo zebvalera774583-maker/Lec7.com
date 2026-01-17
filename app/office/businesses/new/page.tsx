@@ -33,6 +33,25 @@ export default function NewBusinessPage() {
 
       if (!response.ok) {
         const data = await response.json()
+        
+        // Обработка 409: бизнес уже существует
+        if (response.status === 409 && data.error === 'BUSINESS_ALREADY_EXISTS') {
+          // Показываем сообщение
+          setError('У вас уже есть бизнес. Открываем кабинет.')
+          
+          // Редирект на существующий бизнес или в кабинет
+          if (data.businessId) {
+            setTimeout(() => {
+              router.push(`/office/businesses/${data.businessId}`)
+            }, 1500)
+          } else {
+            setTimeout(() => {
+              router.push('/office')
+            }, 1500)
+          }
+          return
+        }
+        
         throw new Error(data.error || 'Ошибка создания бизнеса')
       }
 

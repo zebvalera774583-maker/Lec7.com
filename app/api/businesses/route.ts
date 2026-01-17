@@ -81,6 +81,19 @@ export const POST = requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], async (req: Ne
       )
     }
 
+    // Проверяем, есть ли уже бизнес у этого пользователя (1 резидент = 1 бизнес)
+    const existing = await prisma.business.findFirst({
+      where: { ownerId: user.id },
+      select: { id: true },
+    })
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'BUSINESS_ALREADY_EXISTS', businessId: existing.id },
+        { status: 409 }
+      )
+    }
+
     // Генерируем уникальный slug
     let baseSlug = generateSlug(name)
     let slug = baseSlug
