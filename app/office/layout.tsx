@@ -21,7 +21,7 @@ export default async function OfficeLayout({
   })
 
   if (!user || !['BUSINESS_OWNER', 'LEC7_ADMIN'].includes(user.role)) {
-    redirect('/login?redirect=/office')
+    redirect('/resident/login?redirect=/office')
   }
 
   return (
