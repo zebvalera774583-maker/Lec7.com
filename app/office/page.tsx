@@ -23,7 +23,12 @@ export default async function OfficePage() {
 
   const businesses = await prisma.business.findMany({
     where: { ownerId: user.id },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      lifecycleStatus: true,
+      billingStatus: true,
       _count: {
         select: {
           requests: true,
@@ -31,6 +36,7 @@ export default async function OfficePage() {
         },
       },
     },
+    orderBy: { createdAt: 'desc' },
   })
 
   return (
@@ -55,30 +61,71 @@ export default async function OfficePage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          {businesses.map((business) => (
-            <Link
-              key={business.id}
-              href={`/office/businesses/${business.id}`}
-              style={{
-                display: 'block',
-                padding: '1.5rem',
-                background: 'white',
-                borderRadius: '8px',
-                border: '1px solid #e0e0e0',
-                textDecoration: 'none',
-                color: 'inherit',
-              }}
-            >
-              <h3 style={{ marginBottom: '0.5rem' }}>{business.name}</h3>
-              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                {business.slug}
-              </p>
-              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#888' }}>
-                <span>Заявок: {business._count.requests}</span>
-                <span>Счетов: {business._count.invoices}</span>
-              </div>
-            </Link>
-          ))}
+          {businesses.map((business) => {
+            const identifier = business.slug || business.id.slice(0, 8)
+            const lifecycleLabel = business.lifecycleStatus === 'ACTIVE' ? 'ACTIVE' : business.lifecycleStatus === 'DRAFT' ? 'DRAFT' : business.lifecycleStatus || 'DRAFT'
+            const billingLabel = business.billingStatus === 'PAID' ? 'PAID' : business.billingStatus === 'UNPAID' ? 'UNPAID' : business.billingStatus || 'UNPAID'
+            
+            return (
+              <Link
+                key={business.id}
+                href={`/office/businesses/${business.id}`}
+                style={{
+                  display: 'block',
+                  padding: '1.5rem',
+                  background: 'white',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                }}
+              >
+                <h3 style={{ marginBottom: '0.5rem', fontSize: '1.25rem', fontWeight: '600' }}>
+                  {business.name}
+                </h3>
+                
+                <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#666' }}>
+                  <span style={{ fontFamily: 'monospace', background: '#f5f5f5', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                    /{identifier}
+                  </span>
+                </div>
+
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '0.5rem', 
+                  marginBottom: '1rem',
+                  flexWrap: 'wrap'
+                }}>
+                  <span style={{
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    background: lifecycleLabel === 'ACTIVE' ? '#d1fae5' : '#fef3c7',
+                    color: lifecycleLabel === 'ACTIVE' ? '#065f46' : '#92400e'
+                  }}>
+                    {lifecycleLabel}
+                  </span>
+                  <span style={{
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    background: billingLabel === 'PAID' ? '#dbeafe' : '#fee2e2',
+                    color: billingLabel === 'PAID' ? '#1e40af' : '#991b1b'
+                  }}>
+                    {billingLabel}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#888', borderTop: '1px solid #f0f0f0', paddingTop: '0.75rem' }}>
+                  <span>Заявок: {business._count.requests}</span>
+                  <span>Счетов: {business._count.invoices}</span>
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
     </main>
