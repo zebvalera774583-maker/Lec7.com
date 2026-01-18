@@ -8,54 +8,55 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  email      String   @unique
-  password   String
-  name       String?
-  role       String   @default("BUSINESS_OWNER") // BUSINESS_OWNER | LEC7_ADMIN
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  avatarUrl String?
+  role      String   @default("BUSINESS_OWNER") // BUSINESS_OWNER | LEC7_ADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  businesses        Business[]        @relation("BusinessOwner")
+  businesses         Business[]          @relation("BusinessOwner")
   ownerConversations OwnerConversation[]
-  auditLogs         AuditLog[]
+  auditLogs          AuditLog[]
 }
 
 model Business {
-  id             String   @id @default(cuid())
-  name           String
-  slug           String   @unique
-  description    String?
-  city           String?
-  category       String?
-  logoUrl        String?
-  coverUrl       String?
-  ownerId        String
-  lifecycleStatus String  @default("DRAFT") // DRAFT | ACTIVE | SUSPENDED | ARCHIVED
-  billingStatus  String   @default("UNPAID") // UNPAID | PAID | TRIAL | EXPIRED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  city            String?
+  category        String?
+  logoUrl         String?
+  coverUrl        String?
+  ownerId         String
+  lifecycleStatus String   @default("DRAFT") // DRAFT | ACTIVE | SUSPENDED | ARCHIVED
+  billingStatus   String   @default("UNPAID") // UNPAID | PAID | TRIAL | EXPIRED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  owner     User       @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner      User             @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   portfolios Portfolio[]
   requests   Request[]
   invoices   Invoice[]
   events     Event[]
-  profile   BusinessProfile?
+  profile    BusinessProfile?
 }
 
 model BusinessProfile {
-  id           String   @id @default(cuid())
-  businessId   String   @unique
-  displayName  String?
-  avatarUrl    String?
-  statsCases   Int      @default(40)
-  statsProjects Int     @default(2578)
-  statsCities  Int      @default(4)
-  cities       String[]
-  services     String[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  businessId    String   @unique
+  displayName   String?
+  avatarUrl     String?
+  statsCases    Int      @default(40)
+  statsProjects Int      @default(2578)
+  statsCities   Int      @default(4)
+  cities        String[]
+  services      String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -121,7 +122,7 @@ model Invoice {
 model Event {
   id          String   @id @default(cuid())
   businessId  String
-  type        String   // EVENT_TYPE
+  type        String // EVENT_TYPE
   title       String
   description String?
   metadata    Json?
@@ -134,15 +135,15 @@ model Event {
 }
 
 model Document {
-  id          String   @id @default(cuid())
-  businessId  String?
-  invoiceId   String?
-  type        String   // INVOICE_PDF | CONTRACT | OTHER
-  fileName    String
-  fileUrl     String
-  mimeType    String?
-  size        Int?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  businessId String?
+  invoiceId  String?
+  type       String // INVOICE_PDF | CONTRACT | OTHER
+  fileName   String
+  fileUrl    String
+  mimeType   String?
+  size       Int?
+  createdAt  DateTime @default(now())
 
   @@index([businessId])
   @@index([invoiceId])
@@ -167,7 +168,7 @@ model OwnerConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages OwnerMessage[]
 
   @@index([userId])
@@ -176,7 +177,7 @@ model OwnerConversation {
 model OwnerMessage {
   id             String   @id @default(cuid())
   conversationId String
-  role           String   // 'user' | 'assistant'
+  role           String // 'user' | 'assistant'
   content        String
   createdAt      DateTime @default(now())
 
@@ -200,13 +201,13 @@ model AuditLog {
 
 model AgentPlaybookItem {
   id         String   @id @default(cuid())
-  scope      String   // PLATFORM | BUSINESS
+  scope      String // PLATFORM | BUSINESS
   businessId String?
   title      String
   move       String
   context    String?
   outcome    String?
-  confidence String   // LOW | MEDIUM | HIGH
+  confidence String // LOW | MEDIUM | HIGH
   tags       String[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
