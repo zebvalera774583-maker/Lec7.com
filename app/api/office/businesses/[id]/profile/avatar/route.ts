@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthUser } from '@/lib/middleware'
-import { uploadPublicFile } from '@/lib/s3'
+import { uploadPublicFile, deletePublicFileByUrl } from '@/lib/s3'
 
 /**
  * POST /api/office/businesses/[id]/profile/avatar
@@ -37,6 +37,13 @@ export async function POST(request: NextRequest) {
     if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    // Получаем текущий профиль и старый avatarUrl (если есть)
+    const existingProfile = await prisma.businessProfile.findUnique({
+      where: { businessId },
+      select: { avatarUrl: true },
+    })
+    const oldAvatarUrl = existingProfile?.avatarUrl || null
 
     // Получаем multipart/form-data
     const formData = await request.formData()
@@ -81,6 +88,16 @@ export async function POST(request: NextRequest) {
         avatarUrl,
       },
     })
+
+    // Удаляем старый файл аватара из S3 (если он был и отличается от нового)
+    if (oldAvatarUrl && oldAvatarUrl !== avatarUrl) {
+      try {
+        await deletePublicFileByUrl(oldAvatarUrl)
+      } catch (error) {
+        // Ошибки удаления не пробрасываем - только логируем
+        console.warn('Failed to delete old avatar file:', error)
+      }
+    }
 
     return NextResponse.json({ avatarUrl })
   } catch (error) {

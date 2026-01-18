@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
 /**
  * Инициализация S3 клиента для Timeweb S3
@@ -54,4 +54,48 @@ export async function uploadPublicFile(
   const fileKey = key.startsWith('/') ? key : `/${key}`
 
   return `${baseUrl}${fileKey}`
+}
+
+/**
+ * Удаление файла из S3 bucket по публичному URL
+ * @param publicUrl - Публичный URL файла (например, "https://bucket.s3.timeweb.com/path/to/file.jpg")
+ * @returns true при успехе, false при ошибке
+ */
+export async function deletePublicFileByUrl(publicUrl: string): Promise<boolean> {
+  const bucketName = process.env.S3_BUCKET_NAME
+  const s3PublicUrl = process.env.S3_PUBLIC_URL
+
+  if (!bucketName || !s3PublicUrl) {
+    console.warn('S3_BUCKET_NAME or S3_PUBLIC_URL environment variable is not set')
+    return false
+  }
+
+  // Убираем trailing slash если есть
+  const baseUrl = s3PublicUrl.replace(/\/$/, '')
+
+  // Проверяем, что URL принадлежит нашему S3
+  if (!publicUrl.startsWith(`${baseUrl}/`)) {
+    console.warn(`URL does not belong to our S3: ${publicUrl}`)
+    return false
+  }
+
+  // Извлекаем key из URL (часть после baseUrl/)
+  const keyWithLeadingSlash = publicUrl.substring(baseUrl.length)
+  const key = keyWithLeadingSlash.startsWith('/') ? keyWithLeadingSlash.substring(1) : keyWithLeadingSlash
+
+  // Декодируем key на всякий случай
+  const decodedKey = decodeURIComponent(key)
+
+  try {
+    const command = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: decodedKey,
+    })
+
+    await s3Client.send(command)
+    return true
+  } catch (error) {
+    console.warn(`Failed to delete file from S3: ${decodedKey}`, error)
+    return false
+  }
 }
