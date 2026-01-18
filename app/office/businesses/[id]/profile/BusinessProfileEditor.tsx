@@ -315,28 +315,54 @@ export default function BusinessProfileEditor({
                 style={{
                   width: '100px',
                   height: '100px',
-                  borderRadius: '50%',
-                  background: avatarUrl ? `url(${avatarUrl})` : '#e5e7eb',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
+                  borderRadius: '9999px',
                   border: '2px solid #e5e7eb',
                   cursor: uploadingAvatar ? 'wait' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   position: 'relative',
-                  opacity: uploadingAvatar ? 0.6 : 1,
+                  overflow: 'hidden',
+                  background: avatarUrl ? 'transparent' : '#e5e7eb',
+                  flexShrink: 0,
                 }}
               >
-                {uploadingAvatar && (
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt="Аватар бизнеса"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      borderRadius: '9999px',
+                    }}
+                  />
+                ) : (
                   <span style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', padding: '0.5rem' }}>
-                    Загрузка...
+                    {uploadingAvatar ? 'Загрузка...' : 'А'}
                   </span>
                 )}
-                {!uploadingAvatar && !avatarUrl && (
-                  <span style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', padding: '0.5rem' }}>
-                    Клик для загрузки
-                  </span>
+                {uploadingAvatar && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '9999px',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.75rem', color: 'white', textAlign: 'center', fontWeight: 500 }}>
+                      Загрузка...
+                    </span>
+                  </div>
                 )}
                 <input
                   id="avatar-upload"
@@ -355,6 +381,24 @@ export default function BusinessProfileEditor({
                 />
               </label>
               <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <label
+                    htmlFor="avatar-upload"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: uploadingAvatar ? '#94a3b8' : '#0070f3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '0.875rem',
+                      cursor: uploadingAvatar ? 'wait' : 'pointer',
+                      textDecoration: 'none',
+                      display: 'inline-block',
+                    }}
+                  >
+                    {uploadingAvatar ? 'Загрузка...' : 'Загрузить аватар'}
+                  </label>
+                </div>
                 <input
                   type="text"
                   value={avatarUrl}
@@ -371,7 +415,7 @@ export default function BusinessProfileEditor({
                   }}
                 />
                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
-                  Кликните на круг для загрузки фото или вставьте URL вручную
+                  Нажмите кнопку выше или вставьте URL вручную
                 </p>
               </div>
             </div>
