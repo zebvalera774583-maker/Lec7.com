@@ -43,6 +43,7 @@ export default function BusinessProfileEditor({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [displayNameError, setDisplayNameError] = useState('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   // Загрузка профиля при монтировании
   useEffect(() => {
@@ -152,6 +153,49 @@ export default function BusinessProfileEditor({
       setServices(services.filter((s) => s !== service))
     } else {
       setServices([...services, service])
+    }
+  }
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Проверка типа файла
+    if (!file.type.startsWith('image/')) {
+      setError('Файл должен быть изображением')
+      return
+    }
+
+    setUploadingAvatar(true)
+    setError('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(`/api/office/businesses/${businessId}/profile/avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка загрузки аватара')
+      }
+
+      const data = await response.json()
+      setAvatarUrl(data.avatarUrl)
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка загрузки аватара')
+    } finally {
+      setUploadingAvatar(false)
+      // Сбрасываем input, чтобы можно было загрузить тот же файл снова
+      event.target.value = ''
     }
   }
 
@@ -266,7 +310,8 @@ export default function BusinessProfileEditor({
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Аватар бизнеса</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div
+              <label
+                htmlFor="avatar-upload"
                 style={{
                   width: '100px',
                   height: '100px',
@@ -275,14 +320,47 @@ export default function BusinessProfileEditor({
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   border: '2px solid #e5e7eb',
+                  cursor: uploadingAvatar ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  opacity: uploadingAvatar ? 0.6 : 1,
                 }}
-              />
-              <div>
+              >
+                {uploadingAvatar && (
+                  <span style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', padding: '0.5rem' }}>
+                    Загрузка...
+                  </span>
+                )}
+                {!uploadingAvatar && !avatarUrl && (
+                  <span style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', padding: '0.5rem' }}>
+                    Клик для загрузки
+                  </span>
+                )}
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                  style={{
+                    position: 'absolute',
+                    width: 0,
+                    height: 0,
+                    opacity: 0,
+                    overflow: 'hidden',
+                    zIndex: -1,
+                  }}
+                />
+              </label>
+              <div style={{ flex: 1 }}>
                 <input
                   type="text"
                   value={avatarUrl}
                   onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="URL аватара"
+                  placeholder="URL аватара (или загрузите файл)"
+                  readOnly={false}
                   style={{
                     width: '100%',
                     padding: '0.5rem',
@@ -293,7 +371,7 @@ export default function BusinessProfileEditor({
                   }}
                 />
                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>
-                  URL аватара (загрузка фото — позже)
+                  Кликните на круг для загрузки фото или вставьте URL вручную
                 </p>
               </div>
             </div>
