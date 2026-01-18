@@ -7,10 +7,7 @@ import { uploadPublicFile } from '@/lib/s3'
  * POST /api/office/businesses/[id]/profile/avatar
  * Загрузка аватара бизнеса в S3
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest) {
   try {
     // Проверка авторизации
     const user = getAuthUser(request)
@@ -18,7 +15,9 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const businessId = params.id
+    // Получаем businessId из URL (как в других office API)
+    const url = new URL(request.url)
+    const businessId = url.pathname.split('/').slice(-3, -2)[0] // /api/office/businesses/[id]/profile/avatar
 
     if (!businessId) {
       return NextResponse.json({ error: 'Business ID is required' }, { status: 400 })
