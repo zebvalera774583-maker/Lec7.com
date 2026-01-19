@@ -1,10 +1,10 @@
 name: Deploy to Timeweb
 
 on:
-  workflow_dispatch:  # Только ручной запуск
-  # push:  # Автоматический запуск отключен - запрашиваем разрешение
-  #   branches:
-  #     - main
+  workflow_dispatch:  # Ручной запуск через GitHub UI
+  push:  # Автоматический деплой при push в main
+    branches:
+      - main
 
 concurrency:
   group: deploy-prod
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Fresh deployment
+      - name: Deploy to server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
@@ -23,41 +23,58 @@ jobs:
           key: ${{ secrets.TIMEWEB_SSH_KEY }}
           command_timeout: 30m
           script: |
-            # Clean up old deployment
-            cd ~/Lec7.com 2>/dev/null && docker-compose down -v 2>/dev/null || true
-            cd ~ && rm -rf Lec7.com 2>/dev/null || true
-            docker system prune -af --volumes 2>/dev/null || true
+            echo "🚀 Starting deployment..."
             
-            # Clone fresh project
-            git clone https://github.com/zebvalera774583-maker/Lec7.com.git
-            cd Lec7.com
+            # Переходим в директорию проекта
+            cd ~/Lec7.com || {
+              echo "⚠️  Project directory not found, cloning..."
+              cd ~
+              git clone https://github.com/zebvalera774583-maker/Lec7.com.git
+              cd Lec7.com
+            }
             
-            # Create .env
-            cat > .env <<'ENVEOF'
-            DATABASE_URL=postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
-            NEXT_PUBLIC_APP_URL=http://194.87.104.179:3000
-            JWT_SECRET=lec7-super-secret-jwt-key-minimum-32-characters-long-2024-change-in-production
-            OPENAI_API_KEY=sk-your-openai-api-key-here
-            S3_ENDPOINT=https://s3.timeweb.com
-            S3_ACCESS_KEY_ID=your-timeweb-s3-access-key
-            S3_SECRET_ACCESS_KEY=your-timeweb-s3-secret-key
-            S3_BUCKET_NAME=lec7-storage
-            S3_REGION=ru-1
-            S3_PUBLIC_URL=https://lec7-storage.s3.timeweb.com
-            ENVEOF
+            # Обновляем код
+            echo "📥 Pulling latest code..."
+            git pull || {
+              echo "⚠️  Git pull failed, trying to reset..."
+              git fetch origin
+              git reset --hard origin/main
+            }
             
-            # Build and start
-            docker-compose up -d --build
+            # Убеждаемся, что скрипт деплоя исполняемый
+            chmod +x scripts/deploy.sh scripts/deploy-simple.sh 2>/dev/null || true
             
-            # Wait for postgres
-            sleep 15
+            # Используем скрипт деплоя (если есть) или выполняем команды напрямую
+            if [ -f scripts/deploy-simple.sh ]; then
+              echo "📦 Using deploy-simple.sh script..."
+              bash scripts/deploy-simple.sh
+            else
+              echo "📦 Running deployment commands..."
+              
+              # Останавливаем контейнеры
+              echo "🛑 Stopping containers..."
+              docker-compose down || true
+              
+              # Собираем и запускаем
+              echo "🔨 Building and starting containers..."
+              docker-compose build app
+              docker-compose up -d
+              
+              # Ждём запуска БД
+              echo "⏳ Waiting for database..."
+              sleep 15
+              
+              # Применяем миграции
+              echo "📊 Running database migrations..."
+              docker-compose exec -T app npx prisma migrate deploy || echo "⚠️  Migrations skipped"
+            fi
             
-            # Run migrations
-            docker-compose exec -T app npx prisma migrate deploy || echo "⚠️  Migrations skipped"
-            
-            # Show status
+            # Показываем статус
+            echo ""
+            echo "✅ Deployment complete!"
+            echo ""
             echo "📊 Container status:"
             docker-compose ps
             echo ""
-            echo "📋 App logs (last 10 lines):"
-            docker-compose logs --tail=10 app || echo "⚠️  App not running"
+            echo "📋 App logs (last 20 lines):"
+            docker-compose logs --tail=20 app || echo "⚠️  App not running"
