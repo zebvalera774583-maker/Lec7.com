@@ -93,6 +93,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       statsCities,
       cities,
       services,
+      featuredServices,
     } = body
 
     // Валидация displayName: только латиница, цифры, пробелы, дефисы
@@ -121,6 +122,18 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
     if (services !== undefined && !Array.isArray(services)) {
       return NextResponse.json({ error: 'Invalid services' }, { status: 400 })
     }
+    if (featuredServices !== undefined && !Array.isArray(featuredServices)) {
+      return NextResponse.json({ error: 'Invalid featuredServices' }, { status: 400 })
+    }
+
+    // Если передан featuredServices, используем его (максимум 4, без пустых)
+    // Иначе используем старый services для обратной совместимости
+    const servicesToSave =
+      featuredServices !== undefined
+        ? featuredServices.filter((s: string) => s && s.trim() !== '').slice(0, 4)
+        : services !== undefined
+          ? services
+          : undefined
 
     // Обновляем или создаём профиль (upsert)
     const profile = await prisma.businessProfile.upsert({
@@ -133,7 +146,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         statsProjects: statsProjects ?? 2578,
         statsCities: statsCities ?? 4,
         cities: cities || [],
-        services: services || [],
+        services: servicesToSave || [],
       },
       update: {
         displayName: displayName !== undefined ? displayName || null : undefined,
@@ -142,7 +155,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         statsProjects: statsProjects !== undefined ? statsProjects : undefined,
         statsCities: statsCities !== undefined ? statsCities : undefined,
         cities: cities !== undefined ? cities : undefined,
-        services: services !== undefined ? services : undefined,
+        services: servicesToSave !== undefined ? servicesToSave : undefined,
       },
     })
 

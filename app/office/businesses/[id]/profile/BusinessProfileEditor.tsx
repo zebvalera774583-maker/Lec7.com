@@ -58,6 +58,7 @@ export default function BusinessProfileEditor({
   const [avatarUrl, setAvatarUrl] = useState('')
   const [cities, setCities] = useState<string[]>([])
   const [services, setServices] = useState<string[]>([])
+  const [featuredServices, setFeaturedServices] = useState<string[]>(['', '', '', ''])
   const [metrics, setMetrics] = useState({
     cases: 40,
     projects: 2578,
@@ -99,6 +100,10 @@ export default function BusinessProfileEditor({
         setAvatarUrl(profile.avatarUrl || '')
         setCities(profile.cities || [])
         setServices(profile.services || [])
+        // Заполняем featuredServices из старых данных (обратная совместимость)
+        const existingServices = profile.services || []
+        const featured = [...existingServices.slice(0, 4), '', '', '', ''].slice(0, 4)
+        setFeaturedServices(featured)
         setMetrics({
           cases: profile.statsCases,
           projects: profile.statsProjects,
@@ -451,6 +456,7 @@ export default function BusinessProfileEditor({
           statsCities: metrics.cities,
           cities,
           services,
+          featuredServices: featuredServices.filter((s) => s.trim() !== '').slice(0, 4),
         }),
       })
 
@@ -488,6 +494,12 @@ export default function BusinessProfileEditor({
     } else {
       setServices([...services, service])
     }
+  }
+
+  const handleFeaturedServiceChange = (index: number, value: string) => {
+    const newServices = [...featuredServices]
+    newServices[index] = value
+    setFeaturedServices(newServices)
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -735,12 +747,6 @@ export default function BusinessProfileEditor({
     }
   }
 
-  const availableServices = [
-    'Проектная реализация',
-    'Дизайн интерьера',
-    'Мебель на заказ',
-    'Комплектация',
-  ]
 
   if (loading) {
     return (
@@ -1320,29 +1326,36 @@ export default function BusinessProfileEditor({
             </div>
           </section>
 
-          {/* Услуги */}
+          {/* Услуги или товары */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-            <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Услуги</h2>
+            <h2 style={{ marginBottom: '0.5rem', fontSize: '1.125rem' }}>Услуги или товары</h2>
+            <p
+              style={{
+                margin: '0 0 1rem 0',
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                lineHeight: 1.5,
+              }}
+            >
+              Добавьте до 4 основных услуг или товаров — они будут показаны на главном экране вашей страницы
+            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {availableServices.map((service) => (
-                <label
-                  key={service}
+              {[0, 1, 2, 3].map((index) => (
+                <input
+                  key={index}
+                  type="text"
+                  value={featuredServices[index] || ''}
+                  onChange={(e) => handleFeaturedServiceChange(index, e.target.value)}
+                  placeholder={`Услуга или товар ${index + 1}`}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    cursor: 'pointer',
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
                     fontSize: '0.875rem',
+                    fontFamily: 'inherit',
                   }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={services.includes(service)}
-                    onChange={() => handleToggleService(service)}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
-                  <span>{service}</span>
-                </label>
+                />
               ))}
             </div>
           </section>
