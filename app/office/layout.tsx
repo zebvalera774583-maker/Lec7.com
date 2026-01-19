@@ -21,7 +21,26 @@ export default async function OfficeLayout({
   })
 
   if (!user || !['BUSINESS_OWNER', 'LEC7_ADMIN'].includes(user.role)) {
-    redirect('/resident/login?redirect=/office')
+    // Получаем текущий pathname из заголовков
+    // Пробуем x-pathname (если установлен middleware), затем x-invoke-path, затем referer
+    let pathname = headersList.get('x-pathname') || headersList.get('x-invoke-path')
+    
+    if (!pathname) {
+      // Fallback: извлекаем из referer
+      const referer = headersList.get('referer')
+      if (referer) {
+        try {
+          const url = new URL(referer)
+          pathname = url.pathname + url.search
+        } catch {
+          pathname = '/office'
+        }
+      } else {
+        pathname = '/office'
+      }
+    }
+    
+    redirect(`/resident/login?redirect=${encodeURIComponent(pathname)}`)
   }
 
   return (
