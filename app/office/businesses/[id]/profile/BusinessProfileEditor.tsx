@@ -8,7 +8,6 @@ import { isLatinOnly } from '@/lib/slug'
 interface BusinessProfileEditorProps {
   businessId: string
   businessSlug: string
-  portfolioCount: number
 }
 
 interface BusinessProfile {
@@ -23,10 +22,16 @@ interface BusinessProfile {
   services: string[]
 }
 
+interface BusinessPhoto {
+  id: string
+  url: string
+  sortOrder: number
+  createdAt: string
+}
+
 export default function BusinessProfileEditor({
   businessId,
   businessSlug: initialSlug,
-  portfolioCount,
 }: BusinessProfileEditorProps) {
   const router = useRouter()
   const [displayName, setDisplayName] = useState('')
@@ -44,6 +49,10 @@ export default function BusinessProfileEditor({
   const [success, setSuccess] = useState(false)
   const [displayNameError, setDisplayNameError] = useState('')
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [photos, setPhotos] = useState<BusinessPhoto[]>([])
+  const [loadingPhotos, setLoadingPhotos] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
 
   // Загрузка профиля при монтировании
   useEffect(() => {
@@ -76,11 +85,33 @@ export default function BusinessProfileEditor({
     }
 
     loadProfile()
+    loadPhotos()
   }, [businessId])
+
+  // Загрузка фото портфолио
+  const loadPhotos = async () => {
+    try {
+      setLoadingPhotos(true)
+      const response = await fetch(`/api/office/businesses/${businessId}/photos`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Не удалось загрузить фото')
+      }
+
+      const photosData: BusinessPhoto[] = await response.json()
+      setPhotos(photosData)
+    } catch (err) {
+      console.error('Failed to load photos:', err)
+    } finally {
+      setLoadingPhotos(false)
+    }
+  }
 
   // Индикатор веса страницы (MVP)
   const pageWeight =
-    (avatarUrl ? 0.3 : 0) + portfolioCount * 0.5 + (displayName ? 0.2 : 0)
+    (avatarUrl ? 0.3 : 0) + photos.length * 0.5 + (displayName ? 0.2 : 0)
 
   const handleDisplayNameChange = (value: string) => {
     setDisplayName(value)
@@ -196,6 +227,91 @@ export default function BusinessProfileEditor({
       setUploadingAvatar(false)
       // Сбрасываем input, чтобы можно было загрузить тот же файл снова
       event.target.value = ''
+    }
+  }
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Проверка типа файла
+    if (!file.type.startsWith('image/')) {
+      setError('Файл должен быть изображением')
+      return
+    }
+
+    // Проверка размера файла (максимум 5MB)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      setError('Размер файла не должен превышать 5MB')
+      return
+    }
+
+    // Проверка лимита фото (максимум 12)
+    if (photos.length >= 12) {
+      setError('Максимум 12 фото')
+      return
+    }
+
+    setUploadingPhoto(true)
+    setError('')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(`/api/office/businesses/${businessId}/photos`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка загрузки фото')
+      }
+
+      const newPhoto: BusinessPhoto = await response.json()
+      setPhotos([...photos, newPhoto])
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка загрузки фото')
+    } finally {
+      setUploadingPhoto(false)
+      // Сбрасываем input
+      event.target.value = ''
+    }
+  }
+
+  const handlePhotoDelete = async (photoId: string) => {
+    if (!confirm('Удалить это фото?')) return
+
+    setDeletingPhotoId(photoId)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/photos/${photoId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка удаления фото')
+      }
+
+      setPhotos(photos.filter((p) => p.id !== photoId))
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления фото')
+    } finally {
+      setDeletingPhotoId(null)
     }
   }
 
@@ -454,24 +570,109 @@ export default function BusinessProfileEditor({
 
           {/* Загрузка фото */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-            <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Фото портфолио</h2>
-            <button
-              disabled
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                cursor: 'not-allowed',
-                fontSize: '0.875rem',
-                marginBottom: '1rem',
-                opacity: 0.6,
-              }}
-            >
-              + Загрузить фото (скоро)
-            </button>
-            <p style={{ color: '#666', fontSize: '0.875rem' }}>
-              Фото портфолио: {portfolioCount} шт. (загрузка — позже)
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.125rem' }}>Портфолио</h2>
+              <label
+                htmlFor="photo-upload"
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: uploadingPhoto || photos.length >= 12 ? '#94a3b8' : '#0070f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.875rem',
+                  cursor: uploadingPhoto || photos.length >= 12 ? 'not-allowed' : 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                }}
+              >
+                {uploadingPhoto ? 'Загрузка...' : photos.length >= 12 ? 'Лимит: 12 фото' : '+ Загрузить фото'}
+              </label>
+              <input
+                id="photo-upload"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                disabled={uploadingPhoto || photos.length >= 12}
+                style={{
+                  position: 'absolute',
+                  width: 0,
+                  height: 0,
+                  opacity: 0,
+                  overflow: 'hidden',
+                  zIndex: -1,
+                }}
+              />
+            </div>
+            {photos.length >= 12 && (
+              <p style={{ margin: '0 0 1rem 0', fontSize: '0.75rem', color: '#ef4444' }}>
+                Достигнут лимит в 12 фото. Удалите одно из существующих фото, чтобы загрузить новое.
+              </p>
+            )}
+            {loadingPhotos ? (
+              <p style={{ color: '#666', fontSize: '0.875rem' }}>Загрузка фото...</p>
+            ) : photos.length === 0 ? (
+              <p style={{ color: '#666', fontSize: '0.875rem' }}>Нет загруженных фото</p>
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                  gap: '1rem',
+                }}
+              >
+                {photos.map((photo) => (
+                  <div
+                    key={photo.id}
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '1',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '1px solid #e5e7eb',
+                      background: '#f3f4f6',
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photo.url}
+                      alt={`Фото ${photo.sortOrder + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <button
+                      onClick={() => handlePhotoDelete(photo.id)}
+                      disabled={deletingPhotoId === photo.id}
+                      style={{
+                        position: 'absolute',
+                        top: '0.5rem',
+                        right: '0.5rem',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: deletingPhotoId === photo.id ? '#94a3b8' : 'rgba(0, 0, 0, 0.7)',
+                        color: 'white',
+                        border: 'none',
+                        cursor: deletingPhotoId === photo.id ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1rem',
+                        lineHeight: 1,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {deletingPhotoId === photo.id ? '...' : '×'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p style={{ marginTop: '1rem', marginBottom: 0, fontSize: '0.75rem', color: '#666' }}>
+              Загружено: {photos.length} / 12 фото. Максимальный размер файла: 5MB
             </p>
           </section>
 

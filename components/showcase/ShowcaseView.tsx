@@ -9,6 +9,11 @@ interface ShowcaseBusiness {
   city?: string | null
   category?: string | null
   avatarUrl?: string | null
+  photos?: Array<{
+    id: string
+    url: string
+    sortOrder: number
+  }>
 }
 
 type ShowcaseMode = 'public' | 'resident'
@@ -224,18 +229,62 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               fontWeight: 600,
             }}
           >
-            Портфолио (скоро)
+            Портфолио
           </h3>
-          <p
-            style={{
-              margin: 0,
-              color: '#6b7280',
-              fontSize: '0.9rem',
-              lineHeight: 1.6,
-            }}
-          >
-            В этом блоке будут отображаться реализованные проекты: фото, краткие описания и результаты для клиентов.
-          </p>
+          {business.photos && business.photos.length > 0 ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                gap: '0.75rem',
+                marginTop: '0.75rem',
+              }}
+            >
+              {business.photos.map((photo) => (
+                <div
+                  key={photo.id}
+                  style={{
+                    position: 'relative',
+                    aspectRatio: '1',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    border: '1px solid #e5e7eb',
+                    background: '#f3f4f6',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.02)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt={`Фото проекта ${photo.sortOrder + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p
+              style={{
+                margin: 0,
+                color: '#6b7280',
+                fontSize: '0.9rem',
+                lineHeight: 1.6,
+              }}
+            >
+              В этом блоке будут отображаться реализованные проекты: фото, краткие описания и результаты для клиентов.
+            </p>
+          )}
         </div>
       </section>
     </div>

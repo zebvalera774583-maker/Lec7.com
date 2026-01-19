@@ -14,11 +14,6 @@ export default async function BusinessProfilePage({ params }: PageProps) {
     select: {
       id: true,
       slug: true,
-      portfolios: {
-        select: {
-          id: true,
-        },
-      },
     },
   })
 
@@ -30,7 +25,6 @@ export default async function BusinessProfilePage({ params }: PageProps) {
     <BusinessProfileEditor
       businessId={business.id}
       businessSlug={business.slug}
-      portfolioCount={business.portfolios.length}
     />
   )
 }

@@ -21,6 +21,15 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
       profile: {
         select: { avatarUrl: true },
       },
+      photos: {
+        select: {
+          id: true,
+          url: true,
+          sortOrder: true,
+        },
+        orderBy: { sortOrder: 'asc' },
+        take: 12,
+      },
     },
   })
 
@@ -35,6 +44,7 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
     city: business.city,
     category: business.category,
     avatarUrl: business.profile?.avatarUrl ?? null,
+    photos: business.photos,
   }
 
   return (
