@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import ShowcaseView from '@/components/showcase/ShowcaseView'
 
@@ -14,14 +14,21 @@ interface PageProps {
 
 export default async function BizPage({ params }: PageProps) {
   const raw = params.slug
-  let slug = raw
+
+  // 1) decodeURIComponent и нормализация
+  let decoded = raw
   try {
-    slug = decodeURIComponent(raw)
-  } catch {}
-  slug = slug.normalize('NFC')
+    decoded = decodeURIComponent(raw)
+  } catch {
+    // если decode ломается, продолжаем с raw
+  }
+  const normalized = decoded.normalize('NFC')
+
+  // 2) Кандидат для поиска в БД — всегда в нижнем регистре
+  const candidate = normalized.toLowerCase()
 
   const business = await prisma.business.findUnique({
-    where: { slug },
+    where: { slug: candidate },
     select: {
       id: true,
       slug: true,
@@ -34,8 +41,15 @@ export default async function BizPage({ params }: PageProps) {
     },
   })
 
+  // 3) Если не найдено — 404
   if (!business) {
     notFound()
+  }
+
+  // 4) Если нормализованное значение не совпадает с каноническим slug в БД,
+  // делаем redirect на канонический URL (всегда нижний регистр)
+  if (normalized !== business.slug) {
+    redirect(`/biz/${business.slug}`)
   }
 
   const viewBusiness = {
