@@ -44,6 +44,7 @@ model Business {
   events     Event[]
   profile    BusinessProfile?
   photos     BusinessPhoto[]
+  portfolioItems BusinessPortfolioItem[]
 }
 
 model BusinessProfile {
@@ -74,6 +75,36 @@ model BusinessPhoto {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
+  @@index([sortOrder])
+}
+
+model BusinessPortfolioItem {
+  id         String   @id @default(cuid())
+  businessId String
+  title      String?
+  comment    String?
+  coverUrl   String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  photos   BusinessPortfolioPhoto[]
+
+  @@index([businessId])
+  @@index([sortOrder])
+}
+
+model BusinessPortfolioPhoto {
+  id         String   @id @default(cuid())
+  itemId     String
+  url        String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  item BusinessPortfolioItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
   @@index([sortOrder])
 }
 

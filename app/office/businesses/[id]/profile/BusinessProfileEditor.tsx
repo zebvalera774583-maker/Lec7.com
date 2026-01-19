@@ -30,6 +30,25 @@ interface BusinessPhoto {
   createdAt: string
 }
 
+interface PortfolioItemPhoto {
+  id: string
+  url: string
+  sortOrder: number
+  createdAt: string
+}
+
+interface PortfolioItem {
+  id: string
+  businessId: string
+  title: string | null
+  comment: string | null
+  coverUrl: string | null
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  photos: PortfolioItemPhoto[]
+}
+
 export default function BusinessProfileEditor({
   businessId,
   businessSlug: initialSlug,
@@ -55,6 +74,12 @@ export default function BusinessProfileEditor({
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [compressingPhoto, setCompressingPhoto] = useState(false)
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
+  const [loadingPortfolioItems, setLoadingPortfolioItems] = useState(false)
+  const [savingCommentItemId, setSavingCommentItemId] = useState<string | null>(null)
+  const [uploadingPhotosItemId, setUploadingPhotosItemId] = useState<string | null>(null)
+  const [compressingPhotosItemId, setCompressingPhotosItemId] = useState<string | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
   // Загрузка профиля при монтировании
   useEffect(() => {
@@ -88,6 +113,7 @@ export default function BusinessProfileEditor({
 
     loadProfile()
     loadPhotos()
+    loadPortfolioItems()
   }, [businessId])
 
   // Загрузка фото портфолио
@@ -108,6 +134,281 @@ export default function BusinessProfileEditor({
       console.error('Failed to load photos:', err)
     } finally {
       setLoadingPhotos(false)
+    }
+  }
+
+  // Загрузка кейсов портфолио
+  const loadPortfolioItems = async () => {
+    try {
+      setLoadingPortfolioItems(true)
+      const response = await fetch(`/api/office/businesses/${businessId}/portfolio-items`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Не удалось загрузить кейсы')
+      }
+
+      const itemsData: PortfolioItem[] = await response.json()
+      setPortfolioItems(itemsData)
+    } catch (err) {
+      console.error('Failed to load portfolio items:', err)
+    } finally {
+      setLoadingPortfolioItems(false)
+    }
+  }
+
+  // Создание нового кейса
+  const handleCreatePortfolioItem = async () => {
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/portfolio-items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ comment: '' }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка создания кейса')
+      }
+
+      const newItem: PortfolioItem = await response.json()
+      setPortfolioItems([...portfolioItems, newItem])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка создания кейса')
+    }
+  }
+
+  // Сохранение комментария кейса (с debounce)
+  const commentSaveTimeouts = new Map<string, NodeJS.Timeout>()
+
+  const handleCommentChange = (itemId: string, comment: string) => {
+    // Обновляем локальное состояние сразу
+    setPortfolioItems((items) =>
+      items.map((item) => (item.id === itemId ? { ...item, comment } : item))
+    )
+
+    // Очищаем предыдущий timeout
+    const existingTimeout = commentSaveTimeouts.get(itemId)
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+    }
+
+    // Устанавливаем новый timeout для сохранения через 800ms
+    const timeout = setTimeout(async () => {
+      setSavingCommentItemId(itemId)
+      try {
+        const response = await fetch(`/api/office/businesses/${businessId}/portfolio-items/${itemId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ comment }),
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Ошибка сохранения комментария')
+        }
+
+        const updatedItem: PortfolioItem = await response.json()
+        setPortfolioItems((items) => items.map((item) => (item.id === itemId ? updatedItem : item)))
+      } catch (err) {
+        console.error('Failed to save comment:', err)
+      } finally {
+        setSavingCommentItemId(null)
+        commentSaveTimeouts.delete(itemId)
+      }
+    }, 800)
+
+    commentSaveTimeouts.set(itemId, timeout)
+  }
+
+  // Удаление кейса
+  const handleDeletePortfolioItem = async (itemId: string) => {
+    if (!confirm('Удалить этот кейс? Все фото будут удалены.')) return
+
+    setDeletingItemId(itemId)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/portfolio-items/${itemId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка удаления кейса')
+      }
+
+      setPortfolioItems(portfolioItems.filter((item) => item.id !== itemId))
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления кейса')
+    } finally {
+      setDeletingItemId(null)
+    }
+  }
+
+  // Загрузка фото в кейс (multiple)
+  const handlePortfolioItemPhotosUpload = async (itemId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
+
+    // Проверка типов файлов
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        setError('Все файлы должны быть изображениями')
+        return
+      }
+    }
+
+    // Проверка лимита фото на кейс
+    const item = portfolioItems.find((i) => i.id === itemId)
+    if (item && item.photos.length + files.length > 12) {
+      setError(`Максимум 12 фото на кейс. Уже загружено: ${item.photos.length}`)
+      return
+    }
+
+    setCompressingPhotosItemId(itemId)
+    setError('')
+
+    try {
+      // Сжимаем все файлы
+      const compressedFiles: File[] = []
+      for (const file of files) {
+        // Используем отдельную функцию сжатия для множественных файлов
+        const maxSize = 5 * 1024 * 1024 // 5MB
+        let fileToCompress = file
+
+        if (file.size > maxSize) {
+          const hasAlpha = await checkPngAlpha(file)
+          const fileType = hasAlpha ? 'image/png' : 'image/jpeg'
+          const originalName = file.name
+          const nameWithoutExt = originalName.replace(/\.[^/.]+$/, '')
+          const newFileName = fileType === 'image/jpeg' ? `${nameWithoutExt}.jpg` : originalName
+
+          const qualityLevels = [0.82, 0.72, 0.65]
+          let compressed = null
+
+          for (const quality of qualityLevels) {
+            const options = {
+              maxSizeMB: 5,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+              fileType: fileType,
+              initialQuality: quality,
+            }
+
+            const compressedFile = await imageCompression(file, options)
+            if (compressedFile.size <= maxSize) {
+              compressed = new File([compressedFile], newFileName, {
+                type: fileType,
+                lastModified: Date.now(),
+              })
+              break
+            }
+          }
+
+          if (!compressed || compressed.size > maxSize) {
+            throw new Error('Фото слишком большое даже после сжатия, выберите другое')
+          }
+
+          fileToCompress = compressed
+        }
+
+        compressedFiles.push(fileToCompress)
+      }
+
+      setCompressingPhotosItemId(null)
+      setUploadingPhotosItemId(itemId)
+
+      // Загружаем все файлы
+      const formData = new FormData()
+      compressedFiles.forEach((file) => {
+        formData.append('files', file)
+      })
+
+      const response = await fetch(`/api/office/businesses/${businessId}/portfolio-items/${itemId}/photos`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка загрузки фото')
+      }
+
+      const result = await response.json()
+      const newPhotos: PortfolioItemPhoto[] = result.photos
+
+      // Обновляем кейс с новыми фото
+      setPortfolioItems((items) =>
+        items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                photos: [...item.photos, ...newPhotos].sort((a, b) => a.sortOrder - b.sortOrder),
+              }
+            : item
+        )
+      )
+
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка загрузки фото')
+    } finally {
+      setCompressingPhotosItemId(null)
+      setUploadingPhotosItemId(null)
+      event.target.value = ''
+    }
+  }
+
+  // Удаление фото из кейса
+  const handleDeletePortfolioItemPhoto = async (itemId: string, photoId: string) => {
+    setDeletingPhotoId(photoId)
+    setError('')
+
+    try {
+      const response = await fetch(
+        `/api/office/businesses/${businessId}/portfolio-items/${itemId}/photos/${photoId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Ошибка удаления фото')
+      }
+
+      setPortfolioItems((items) =>
+        items.map((item) =>
+          item.id === itemId ? { ...item, photos: item.photos.filter((p) => p.id !== photoId) } : item
+        )
+      )
+
+      setSuccess(true)
+      setTimeout(() => {
+        setSuccess(false)
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка удаления фото')
+    } finally {
+      setDeletingPhotoId(null)
     }
   }
 
@@ -687,118 +988,229 @@ export default function BusinessProfileEditor({
             </div>
           </section>
 
-          {/* Загрузка фото */}
+          {/* Портфолио кейсы */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.125rem' }}>Портфолио</h2>
-              <label
-                htmlFor="photo-upload"
+              <button
+                onClick={handleCreatePortfolioItem}
                 style={{
                   padding: '0.5rem 1rem',
-                  background: uploadingPhoto || compressingPhoto || photos.length >= 12 ? '#94a3b8' : '#0070f3',
+                  background: '#0070f3',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
                   fontSize: '0.875rem',
-                  cursor: uploadingPhoto || compressingPhoto || photos.length >= 12 ? 'not-allowed' : 'pointer',
-                  textDecoration: 'none',
-                  display: 'inline-block',
+                  cursor: 'pointer',
                 }}
               >
-                {compressingPhoto
-                  ? 'Сжимаем фото...'
-                  : uploadingPhoto
-                    ? 'Загрузка...'
-                    : photos.length >= 12
-                      ? 'Лимит: 12 фото'
-                      : '+ Загрузить фото'}
-              </label>
-              <input
-                id="photo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                disabled={uploadingPhoto || compressingPhoto || photos.length >= 12}
-                style={{
-                  position: 'absolute',
-                  width: 0,
-                  height: 0,
-                  opacity: 0,
-                  overflow: 'hidden',
-                  zIndex: -1,
-                }}
-              />
+                + Добавить кейс
+              </button>
             </div>
-            {photos.length >= 12 && (
-              <p style={{ margin: '0 0 1rem 0', fontSize: '0.75rem', color: '#ef4444' }}>
-                Достигнут лимит в 12 фото. Удалите одно из существующих фото, чтобы загрузить новое.
-              </p>
-            )}
-            {loadingPhotos ? (
-              <p style={{ color: '#666', fontSize: '0.875rem' }}>Загрузка фото...</p>
-            ) : photos.length === 0 ? (
-              <p style={{ color: '#666', fontSize: '0.875rem' }}>Нет загруженных фото</p>
+            {loadingPortfolioItems ? (
+              <p style={{ color: '#666', fontSize: '0.875rem' }}>Загрузка кейсов...</p>
+            ) : portfolioItems.length === 0 ? (
+              <p style={{ color: '#666', fontSize: '0.875rem' }}>Нет кейсов. Добавьте первый кейс.</p>
             ) : (
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                  gap: '1rem',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: '1.5rem',
                 }}
               >
-                {photos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    style={{
-                      position: 'relative',
-                      aspectRatio: '1',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      border: '1px solid #e5e7eb',
-                      background: '#f3f4f6',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={photo.url}
-                      alt={`Фото ${photo.sortOrder + 1}`}
+                {portfolioItems.map((item) => {
+                  const coverPhoto = item.coverUrl
+                    ? item.photos.find((p) => p.url === item.coverUrl) || null
+                    : item.photos[0] || null
+                  const previewPhotos = item.photos.slice(0, 4)
+
+                  return (
+                    <div
+                      key={item.id}
                       style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <button
-                      onClick={() => handlePhotoDelete(photo.id)}
-                      disabled={deletingPhotoId === photo.id}
-                      style={{
-                        position: 'absolute',
-                        top: '0.5rem',
-                        right: '0.5rem',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        background: deletingPhotoId === photo.id ? '#94a3b8' : 'rgba(0, 0, 0, 0.7)',
-                        color: 'white',
-                        border: 'none',
-                        cursor: deletingPhotoId === photo.id ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1rem',
-                        lineHeight: 1,
-                        fontWeight: 600,
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        background: '#f9fafb',
                       }}
                     >
-                      {deletingPhotoId === photo.id ? '...' : '×'}
-                    </button>
-                  </div>
-                ))}
+                      {/* Превью фото (первые 4) */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: '0.5rem',
+                          marginBottom: '1rem',
+                          aspectRatio: '1',
+                        }}
+                      >
+                        {previewPhotos.length > 0 ? (
+                          previewPhotos.map((photo, idx) => (
+                            <div
+                              key={photo.id}
+                              style={{
+                                position: 'relative',
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                background: '#e5e7eb',
+                                border: coverPhoto && coverPhoto.id === photo.id ? '2px solid #0070f3' : '1px solid #d1d5db',
+                              }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={photo.url}
+                                alt={`Фото ${idx + 1}`}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                              <button
+                                onClick={() => handleDeletePortfolioItemPhoto(item.id, photo.id)}
+                                disabled={deletingPhotoId === photo.id}
+                                style={{
+                                  position: 'absolute',
+                                  top: '0.25rem',
+                                  right: '0.25rem',
+                                  width: '20px',
+                                  height: '20px',
+                                  borderRadius: '50%',
+                                  background: deletingPhotoId === photo.id ? '#94a3b8' : 'rgba(0, 0, 0, 0.7)',
+                                  color: 'white',
+                                  border: 'none',
+                                  cursor: deletingPhotoId === photo.id ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '0.75rem',
+                                  lineHeight: 1,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div
+                            style={{
+                              gridColumn: '1 / -1',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: '#e5e7eb',
+                              borderRadius: '4px',
+                              color: '#6b7280',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            Нет фото
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Комментарий */}
+                      <textarea
+                        value={item.comment || ''}
+                        onChange={(e) => handleCommentChange(item.id, e.target.value)}
+                        placeholder="Добавьте комментарий к кейсу..."
+                        disabled={savingCommentItemId === item.id}
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '0.5rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '0.875rem',
+                          resize: 'vertical',
+                          marginBottom: '0.75rem',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      {savingCommentItemId === item.id && (
+                        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', color: '#666' }}>Сохранение...</p>
+                      )}
+
+                      {/* Загрузка фото */}
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <label
+                          htmlFor={`portfolio-photos-${item.id}`}
+                          style={{
+                            display: 'block',
+                            padding: '0.5rem',
+                            background:
+                              uploadingPhotosItemId === item.id || compressingPhotosItemId === item.id
+                                ? '#94a3b8'
+                                : '#f3f4f6',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            cursor:
+                              uploadingPhotosItemId === item.id || compressingPhotosItemId === item.id
+                                ? 'not-allowed'
+                                : 'pointer',
+                            textAlign: 'center',
+                            color: '#374151',
+                          }}
+                        >
+                          {compressingPhotosItemId === item.id
+                            ? 'Сжимаем фото...'
+                            : uploadingPhotosItemId === item.id
+                              ? 'Загрузка...'
+                              : item.photos.length >= 12
+                                ? 'Лимит: 12 фото'
+                                : '+ Загрузить фото'}
+                        </label>
+                        <input
+                          id={`portfolio-photos-${item.id}`}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => handlePortfolioItemPhotosUpload(item.id, e)}
+                          disabled={
+                            uploadingPhotosItemId === item.id ||
+                            compressingPhotosItemId === item.id ||
+                            item.photos.length >= 12
+                          }
+                          style={{
+                            position: 'absolute',
+                            width: 0,
+                            height: 0,
+                            opacity: 0,
+                            overflow: 'hidden',
+                            zIndex: -1,
+                          }}
+                        />
+                      </div>
+
+                      {/* Удалить кейс */}
+                      <button
+                        onClick={() => handleDeletePortfolioItem(item.id)}
+                        disabled={deletingItemId === item.id}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          background: deletingItemId === item.id ? '#94a3b8' : '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          cursor: deletingItemId === item.id ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {deletingItemId === item.id ? 'Удаление...' : 'Удалить кейс'}
+                      </button>
+
+                      <p style={{ marginTop: '0.5rem', marginBottom: 0, fontSize: '0.75rem', color: '#666' }}>
+                        Фото: {item.photos.length} / 12
+                      </p>
+                    </div>
+                  )
+                })}
               </div>
             )}
-            <p style={{ marginTop: '1rem', marginBottom: 0, fontSize: '0.75rem', color: '#666' }}>
-              Загружено: {photos.length} / 12 фото. Максимальный размер файла: 5MB
-            </p>
           </section>
 
           {/* Метрики */}

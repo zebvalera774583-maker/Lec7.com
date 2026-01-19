@@ -47,6 +47,24 @@ export default async function BizPage({ params }: PageProps) {
         orderBy: { sortOrder: 'asc' },
         take: 12,
       },
+      portfolioItems: {
+        select: {
+          id: true,
+          comment: true,
+          coverUrl: true,
+          sortOrder: true,
+          photos: {
+            select: {
+              id: true,
+              url: true,
+              sortOrder: true,
+            },
+            orderBy: { sortOrder: 'asc' },
+            take: 12,
+          },
+        },
+        orderBy: { sortOrder: 'asc' },
+      },
     },
   })
 
@@ -69,6 +87,7 @@ export default async function BizPage({ params }: PageProps) {
     category: business.category,
     avatarUrl: business.profile?.avatarUrl ?? null,
     photos: business.photos,
+    portfolioItems: business.portfolioItems,
   }
 
   return (

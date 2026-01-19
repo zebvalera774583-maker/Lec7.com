@@ -2,6 +2,19 @@
 
 import React, { useState, useEffect } from 'react'
 
+interface PortfolioItemPhoto {
+  id: string
+  url: string
+  sortOrder: number
+}
+
+interface PortfolioItem {
+  id: string
+  comment: string | null
+  coverUrl: string | null
+  photos: PortfolioItemPhoto[]
+}
+
 interface ShowcaseBusiness {
   id: string
   slug: string
@@ -14,6 +27,7 @@ interface ShowcaseBusiness {
     url: string
     sortOrder: number
   }>
+  portfolioItems?: PortfolioItem[]
 }
 
 type ShowcaseMode = 'public' | 'resident'
@@ -26,6 +40,7 @@ interface ShowcaseViewProps {
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
 
   const subtitleParts = []
   if (business.city) subtitleParts.push(business.city)
@@ -39,6 +54,11 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
       : business.slug.charAt(0).toUpperCase()
 
   const photos = business.photos || []
+  const portfolioItems = business.portfolioItems || []
+
+  // Получаем активный кейс и его фото
+  const activeItem = activeItemId ? portfolioItems.find((item) => item.id === activeItemId) : null
+  const activePhotos = activeItem ? activeItem.photos : []
 
   // Блокировка скролла body при открытом просмотрщике
   useEffect(() => {
@@ -60,24 +80,35 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsOpen(false)
-      } else if (e.key === 'ArrowLeft' && photos.length > 1) {
-        setActiveIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))
-      } else if (e.key === 'ArrowRight' && photos.length > 1) {
-        setActiveIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))
+        setActiveItemId(null)
+      } else if (e.key === 'ArrowLeft' && activePhotos.length > 1) {
+        setActiveIndex((prev) => (prev === 0 ? activePhotos.length - 1 : prev - 1))
+      } else if (e.key === 'ArrowRight' && activePhotos.length > 1) {
+        setActiveIndex((prev) => (prev === activePhotos.length - 1 ? 0 : prev + 1))
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, photos.length])
+  }, [isOpen, activePhotos.length])
 
   const handleThumbnailClick = (index: number) => {
     setActiveIndex(index)
     setIsOpen(true)
   }
 
+  const handlePortfolioItemClick = (itemId: string) => {
+    const item = portfolioItems.find((i) => i.id === itemId)
+    if (item && item.photos.length > 0) {
+      setActiveItemId(itemId)
+      setActiveIndex(0)
+      setIsOpen(true)
+    }
+  }
+
   const handleClose = () => {
     setIsOpen(false)
+    setActiveItemId(null)
   }
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -88,12 +119,16 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setActiveIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))
+    if (activePhotos.length > 1) {
+      setActiveIndex((prev) => (prev === 0 ? activePhotos.length - 1 : prev - 1))
+    }
   }
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setActiveIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))
+    if (activePhotos.length > 1) {
+      setActiveIndex((prev) => (prev === activePhotos.length - 1 ? 0 : prev + 1))
+    }
   }
 
   return (
@@ -292,7 +327,93 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           >
             Портфолио
           </h3>
-          {business.photos && business.photos.length > 0 ? (
+          {portfolioItems.length > 0 ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '1rem',
+                marginTop: '0.75rem',
+              }}
+            >
+              {portfolioItems.map((item) => {
+                const coverPhoto = item.coverUrl
+                  ? item.photos.find((p) => p.url === item.coverUrl)
+                  : item.photos[0]
+                const commentPreview = item.comment
+                  ? item.comment.split('\n').slice(0, 2).join(' ').substring(0, 100) + (item.comment.length > 100 ? '...' : '')
+                  : null
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handlePortfolioItemClick(item.id)}
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '1',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      border: '1px solid #e5e7eb',
+                      background: '#f3f4f6',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)'
+                    }}
+                  >
+                    {coverPhoto ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={coverPhoto.url}
+                          alt="Обложка кейса"
+                          style={{
+                            width: '100%',
+                            flex: 1,
+                            objectFit: 'cover',
+                          }}
+                        />
+                        {commentPreview && (
+                          <div
+                            style={{
+                              padding: '0.5rem',
+                              background: 'rgba(0, 0, 0, 0.7)',
+                              color: 'white',
+                              fontSize: '0.75rem',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {commentPreview}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        Нет фото
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : photos.length > 0 ? (
+            // Fallback на старые фото, если кейсов нет
             <div
               style={{
                 display: 'grid',
@@ -351,7 +472,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
       </section>
 
       {/* Fullscreen Photo Viewer */}
-      {isOpen && photos.length > 0 && (
+      {isOpen && activePhotos.length > 0 && (
         <div
           onClick={handleOverlayClick}
           style={{
@@ -400,7 +521,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           </button>
 
           {/* Navigation Arrows */}
-          {photos.length > 1 && (
+          {activePhotos.length > 1 && (
             <>
               <button
                 onClick={handlePrev}
@@ -473,25 +594,44 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               maxWidth: '92vw',
               maxHeight: '86vh',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '1rem',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={photos[activeIndex].url}
-              alt={`Фото проекта ${photos[activeIndex].sortOrder + 1}`}
+              src={activePhotos[activeIndex].url}
+              alt={`Фото ${activeIndex + 1}`}
               style={{
                 maxWidth: '100%',
-                maxHeight: '86vh',
+                maxHeight: '70vh',
                 objectFit: 'contain',
                 borderRadius: '8px',
               }}
             />
+            {/* Comment */}
+            {activeItem && activeItem.comment && (
+              <div
+                style={{
+                  maxWidth: '600px',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  color: '#111827',
+                  fontSize: '0.95rem',
+                  lineHeight: 1.6,
+                  textAlign: 'center',
+                }}
+              >
+                {activeItem.comment}
+              </div>
+            )}
           </div>
 
           {/* Counter */}
-          {photos.length > 1 && (
+          {activePhotos.length > 1 && (
             <div
               style={{
                 position: 'absolute',
@@ -506,7 +646,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                 fontWeight: 500,
               }}
             >
-              {activeIndex + 1} / {photos.length}
+              {activeIndex + 1} / {activePhotos.length}
             </div>
           )}
         </div>
