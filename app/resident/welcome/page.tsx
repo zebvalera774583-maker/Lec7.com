@@ -54,7 +54,7 @@ export default function ResidentWelcomePage() {
           alignItems: 'center'
         }}>
           <HoverLink 
-            href="/office"
+            href="/office/businesses/new"
             variant="primary"
           >
             <span>Создать бизнес</span>
