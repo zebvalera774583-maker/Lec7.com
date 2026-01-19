@@ -13,8 +13,14 @@ function clearAuthCookie(response: NextResponse): NextResponse {
  * Очищает сессию и редиректит на /login
  */
 export async function GET(request: NextRequest) {
-  const baseUrl = new URL(request.url).origin
-  const response = NextResponse.redirect(new URL('/login', baseUrl))
+  // Получаем правильный хост из заголовка Host или используем относительный путь
+  const host = request.headers.get('host') || request.headers.get('x-forwarded-host')
+  const protocol = request.headers.get('x-forwarded-proto') || (request.url.startsWith('https') ? 'https' : 'http')
+  
+  // Используем относительный путь, если хост недоступен
+  const redirectUrl = host ? `${protocol}://${host}/login` : '/login'
+  
+  const response = NextResponse.redirect(redirectUrl)
   return clearAuthCookie(response)
 }
 
