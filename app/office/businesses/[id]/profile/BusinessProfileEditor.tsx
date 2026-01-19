@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isLatinOnly } from '@/lib/slug'
+import imageCompression from 'browser-image-compression'
 
 interface BusinessProfileEditorProps {
   businessId: string
@@ -52,6 +53,7 @@ export default function BusinessProfileEditor({
   const [photos, setPhotos] = useState<BusinessPhoto[]>([])
   const [loadingPhotos, setLoadingPhotos] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [compressingPhoto, setCompressingPhoto] = useState(false)
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
 
   // Загрузка профиля при монтировании
@@ -230,6 +232,125 @@ export default function BusinessProfileEditor({
     }
   }
 
+  /**
+   * Проверяет, есть ли у PNG изображения альфа-канал (прозрачность)
+   */
+  const checkPngAlpha = async (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (file.type !== 'image/png') {
+        resolve(false)
+        return
+      }
+
+      const img = new Image()
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+
+      if (!ctx) {
+        resolve(false)
+        return
+      }
+
+      const objectUrl = URL.createObjectURL(file)
+
+      img.onload = () => {
+        try {
+          canvas.width = img.width
+          canvas.height = img.height
+          ctx.drawImage(img, 0, 0)
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const data = imageData.data
+
+          // Проверяем альфа-канал (каждый 4-й байт, начиная с индекса 3)
+          // Проверяем только первые 10000 пикселей для производительности
+          const maxPixelsToCheck = Math.min(10000, data.length / 4)
+          for (let i = 0; i < maxPixelsToCheck; i++) {
+            const alphaIndex = i * 4 + 3
+            if (data[alphaIndex] < 255) {
+              // Найдена прозрачность
+              URL.revokeObjectURL(objectUrl)
+              resolve(true)
+              return
+            }
+          }
+          URL.revokeObjectURL(objectUrl)
+          resolve(false)
+        } catch (error) {
+          URL.revokeObjectURL(objectUrl)
+          resolve(false)
+        }
+      }
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        resolve(false)
+      }
+
+      img.src = objectUrl
+    })
+  }
+
+  /**
+   * Сжимает изображение, если оно больше 5MB
+   */
+  const compressIfNeeded = async (file: File): Promise<File> => {
+    const maxSize = 5 * 1024 * 1024 // 5MB
+
+    // Если файл уже <= 5MB, возвращаем как есть
+    if (file.size <= maxSize) {
+      return file
+    }
+
+    setCompressingPhoto(true)
+
+    try {
+      // Проверяем, есть ли у PNG альфа-канал
+      const hasAlpha = await checkPngAlpha(file)
+      const fileType = hasAlpha ? 'image/png' : 'image/jpeg'
+
+      // Определяем имя файла с правильным расширением
+      const originalName = file.name
+      const nameWithoutExt = originalName.replace(/\.[^/.]+$/, '')
+      const newFileName = fileType === 'image/jpeg' ? `${nameWithoutExt}.jpg` : originalName
+
+      // Пробуем разные уровни качества
+      const qualityLevels = [0.82, 0.72, 0.65]
+
+      for (const quality of qualityLevels) {
+        const options = {
+          maxSizeMB: 5,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          fileType: fileType,
+          initialQuality: quality,
+        }
+
+        const compressedFile = await imageCompression(file, options)
+
+        // Если получилось уложиться в 5MB, возвращаем
+        if (compressedFile.size <= maxSize) {
+          // Создаём новый File с правильным именем
+          const finalFile = new File([compressedFile], newFileName, {
+            type: fileType,
+            lastModified: Date.now(),
+          })
+          setCompressingPhoto(false)
+          return finalFile
+        }
+      }
+
+      // Если не удалось уложиться даже с минимальным качеством
+      setCompressingPhoto(false)
+      throw new Error('Фото слишком большое даже после сжатия, выберите другое')
+    } catch (error) {
+      setCompressingPhoto(false)
+      if (error instanceof Error && error.message.includes('слишком большое')) {
+        throw error
+      }
+      throw new Error('Ошибка сжатия изображения: ' + (error instanceof Error ? error.message : 'неизвестная ошибка'))
+    }
+  }
+
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -240,25 +361,22 @@ export default function BusinessProfileEditor({
       return
     }
 
-    // Проверка размера файла (максимум 5MB)
-    const maxSize = 5 * 1024 * 1024 // 5MB
-    if (file.size > maxSize) {
-      setError('Размер файла не должен превышать 5MB')
-      return
-    }
-
     // Проверка лимита фото (максимум 12)
     if (photos.length >= 12) {
       setError('Максимум 12 фото')
       return
     }
 
-    setUploadingPhoto(true)
     setError('')
 
     try {
+      // Сжимаем фото, если нужно
+      const fileToUpload = await compressIfNeeded(file)
+
+      setUploadingPhoto(true)
+
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', fileToUpload)
 
       const response = await fetch(`/api/office/businesses/${businessId}/photos`, {
         method: 'POST',
@@ -281,6 +399,7 @@ export default function BusinessProfileEditor({
       setError(err instanceof Error ? err.message : 'Ошибка загрузки фото')
     } finally {
       setUploadingPhoto(false)
+      setCompressingPhoto(false)
       // Сбрасываем input
       event.target.value = ''
     }
@@ -576,24 +695,30 @@ export default function BusinessProfileEditor({
                 htmlFor="photo-upload"
                 style={{
                   padding: '0.5rem 1rem',
-                  background: uploadingPhoto || photos.length >= 12 ? '#94a3b8' : '#0070f3',
+                  background: uploadingPhoto || compressingPhoto || photos.length >= 12 ? '#94a3b8' : '#0070f3',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
                   fontSize: '0.875rem',
-                  cursor: uploadingPhoto || photos.length >= 12 ? 'not-allowed' : 'pointer',
+                  cursor: uploadingPhoto || compressingPhoto || photos.length >= 12 ? 'not-allowed' : 'pointer',
                   textDecoration: 'none',
                   display: 'inline-block',
                 }}
               >
-                {uploadingPhoto ? 'Загрузка...' : photos.length >= 12 ? 'Лимит: 12 фото' : '+ Загрузить фото'}
+                {compressingPhoto
+                  ? 'Сжимаем фото...'
+                  : uploadingPhoto
+                    ? 'Загрузка...'
+                    : photos.length >= 12
+                      ? 'Лимит: 12 фото'
+                      : '+ Загрузить фото'}
               </label>
               <input
                 id="photo-upload"
                 type="file"
                 accept="image/*"
                 onChange={handlePhotoUpload}
-                disabled={uploadingPhoto || photos.length >= 12}
+                disabled={uploadingPhoto || compressingPhoto || photos.length >= 12}
                 style={{
                   position: 'absolute',
                   width: 0,
