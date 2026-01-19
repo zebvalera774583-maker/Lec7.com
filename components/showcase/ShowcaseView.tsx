@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface ShowcaseBusiness {
   id: string
@@ -24,6 +24,9 @@ interface ShowcaseViewProps {
 }
 
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+
   const subtitleParts = []
   if (business.city) subtitleParts.push(business.city)
   if (business.category) subtitleParts.push(business.category)
@@ -34,6 +37,64 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
     business.name && business.name.trim().length > 0
       ? business.name.trim().charAt(0).toUpperCase()
       : business.slug.charAt(0).toUpperCase()
+
+  const photos = business.photos || []
+
+  // Блокировка скролла body при открытом просмотрщике
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
+  // Обработка клавиатуры
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      } else if (e.key === 'ArrowLeft' && photos.length > 1) {
+        setActiveIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))
+      } else if (e.key === 'ArrowRight' && photos.length > 1) {
+        setActiveIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, photos.length])
+
+  const handleThumbnailClick = (index: number) => {
+    setActiveIndex(index)
+    setIsOpen(true)
+  }
+
+  const handleClose = () => {
+    setIsOpen(false)
+  }
+
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      handleClose()
+    }
+  }
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setActiveIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1))
+  }
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setActiveIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1))
+  }
 
   return (
     <div
@@ -240,9 +301,10 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                 marginTop: '0.75rem',
               }}
             >
-              {business.photos.map((photo) => (
+              {photos.map((photo, index) => (
                 <div
                   key={photo.id}
+                  onClick={() => handleThumbnailClick(index)}
                   style={{
                     position: 'relative',
                     aspectRatio: '1',
@@ -287,6 +349,168 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           )}
         </div>
       </section>
+
+      {/* Fullscreen Photo Viewer */}
+      {isOpen && photos.length > 0 && (
+        <div
+          onClick={handleOverlayClick}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2rem',
+          }}
+        >
+          {/* Close Button */}
+          <button
+            onClick={handleClose}
+            style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.9)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.5rem',
+              fontWeight: 600,
+              color: '#111827',
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
+            }}
+          >
+            ×
+          </button>
+
+          {/* Navigation Arrows */}
+          {photos.length > 1 && (
+            <>
+              <button
+                onClick={handlePrev}
+                style={{
+                  position: 'absolute',
+                  left: '1.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
+                }}
+              >
+                ←
+              </button>
+              <button
+                onClick={handleNext}
+                style={{
+                  position: 'absolute',
+                  right: '1.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  fontWeight: 600,
+                  color: '#111827',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
+                }}
+              >
+                →
+              </button>
+            </>
+          )}
+
+          {/* Image Container */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '92vw',
+              maxHeight: '86vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photos[activeIndex].url}
+              alt={`Фото проекта ${photos[activeIndex].sortOrder + 1}`}
+              style={{
+                maxWidth: '100%',
+                maxHeight: '86vh',
+                objectFit: 'contain',
+                borderRadius: '8px',
+              }}
+            />
+          </div>
+
+          {/* Counter */}
+          {photos.length > 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '2rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '0.5rem 1rem',
+                borderRadius: '999px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}
+            >
+              {activeIndex + 1} / {photos.length}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
