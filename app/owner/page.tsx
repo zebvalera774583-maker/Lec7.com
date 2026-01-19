@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getAuthUserFromContext } from '@/lib/middleware'
 import PlaybookList from '@/components/PlaybookList'
 import QuickActions from '@/components/QuickActions'
+import Link from 'next/link'
 
 export default function OwnerHomePage() {
   const headersList = headers()
@@ -38,6 +39,23 @@ export default function OwnerHomePage() {
         <p style={{ margin: 0, color: '#6b7280', fontSize: '1rem' }}>
           Центр управления и принятия решений для платформы Lec7
         </p>
+        <div style={{ marginTop: '1rem' }}>
+          <Link
+            href="/owner/businesses"
+            style={{
+              display: 'inline-block',
+              padding: '0.5rem 1rem',
+              background: '#3b82f6',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            Мои бизнесы
+          </Link>
+        </div>
       </div>
 
       <div
