@@ -238,7 +238,7 @@ export default function BusinessProfileEditor({
           </div>
         </div>
         <Link
-          href={`/~${initialSlug}`}
+          href={`/biz/${initialSlug}`}
           target="_blank"
           style={{
             padding: '0.5rem 1rem',
