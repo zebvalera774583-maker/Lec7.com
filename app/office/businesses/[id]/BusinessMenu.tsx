@@ -18,7 +18,7 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
   }
 
   const handleOpenShowcase = () => {
-    window.open(`/biz/${slug}`, '_blank')
+    window.open(`/office/businesses/${businessId}/preview`, '_blank')
     setIsOpen(false)
   }
 
