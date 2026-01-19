@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
     }
 
-    // Проверка размера файла (максимум 5MB)
-    const maxSize = 5 * 1024 * 1024 // 5MB
+    // Проверка размера файла (максимум 20MB)
+    const maxSize = 20 * 1024 * 1024 // 20MB
     if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 })
+      return NextResponse.json({ error: 'Файл слишком большой. Максимум 20 МБ.' }, { status: 400 })
     }
 
     // Конвертируем File в Buffer
