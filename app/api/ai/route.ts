@@ -8,6 +8,7 @@ interface AIRequestBody {
   message: string
   intent: AIIntent
   businessId?: string | null
+  conversationId?: string | null
 }
 
 export async function POST(request: NextRequest) {
@@ -26,7 +27,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { message, intent, businessId } = body
+  const { message, intent, businessId, conversationId } = body
+  const continued = Boolean(conversationId)
 
   if (!message || typeof message !== 'string' || !message.trim()) {
     return NextResponse.json({ error: 'message is required' }, { status: 400 })
@@ -45,6 +47,33 @@ export async function POST(request: NextRequest) {
   }
 
   let targetBusinessId: string | null = null
+  let existingConversation:
+    | (Awaited<ReturnType<typeof prisma.conversation.findUnique>> & { messages?: any[] })
+    | null = null
+
+  // Если передан conversationId — работаем с существующей беседой
+  if (continued) {
+    existingConversation = await prisma.conversation.findUnique({
+      where: { id: conversationId as string },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    })
+
+    if (!existingConversation) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    if (existingConversation.userId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (existingConversation.intent !== intent) {
+      return NextResponse.json({ error: 'Intent mismatch for this conversation' }, { status: 400 })
+    }
+  }
 
   if (intent === 'resident_marketing') {
     // Резидент = владелец бизнеса
@@ -52,11 +81,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    targetBusinessId = businessId || user.businessId || null
+    // При продолжении диалога учитываем businessId из беседы
+    const conversationBusinessId = existingConversation?.businessId || null
+    targetBusinessId = businessId || user.businessId || conversationBusinessId
 
     if (!targetBusinessId) {
       return NextResponse.json(
         { error: 'businessId is required for resident_marketing intent' },
+        { status: 400 }
+      )
+    }
+
+    // Если в существующей беседе закреплён businessId, он должен совпадать
+    if (conversationBusinessId && conversationBusinessId !== targetBusinessId) {
+      return NextResponse.json(
+        { error: 'businessId does not match existing conversation' },
         { status: 400 }
       )
     }
@@ -76,9 +115,10 @@ export async function POST(request: NextRequest) {
 
   // Готовим system prompt
   let systemPrompt = ''
-  let gatewayMessages: Array<{ role: 'system' | 'user'; content: string }> = []
+  let gatewayMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = []
 
   try {
+    // 1. Формируем system prompt
     if (intent === 'owner') {
       systemPrompt = `
 Ты — AI-помощник владельца платформы Lec7.
@@ -95,10 +135,6 @@ export async function POST(request: NextRequest) {
 - если уместно — формулируй задание в виде короткого PROMPT для Cursor.
 `.trim()
 
-      gatewayMessages = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message.trim() },
-      ]
     } else {
       // resident_marketing
       if (!targetBusinessId) {
@@ -168,11 +204,58 @@ ${businessContext}
 Отвечай структурированно, по шагам, на деловом русском языке.
 `.trim()
 
-      gatewayMessages = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message.trim() },
-      ]
     }
+
+    // 2. Создаём/обновляем Conversation и сообщения
+    let conversationIdToUse: string
+
+    if (continued && existingConversation) {
+      conversationIdToUse = existingConversation.id
+
+      // Добавляем новое юзерское сообщение в существующую беседу
+      await prisma.message.create({
+        data: {
+          conversationId: conversationIdToUse,
+          role: 'user',
+          content: message.trim(),
+        },
+      })
+    } else {
+      // Создаём новую беседу
+      const newConversation = await prisma.conversation.create({
+        data: {
+          userId: user.id,
+          intent,
+          businessId: targetBusinessId,
+        },
+      })
+      conversationIdToUse = newConversation.id
+
+      // Первое юзерское сообщение
+      await prisma.message.create({
+        data: {
+          conversationId: conversationIdToUse,
+          role: 'user',
+          content: message.trim(),
+        },
+      })
+    }
+
+    // 3. Читаем историю последних N сообщений для передачи в gateway
+    const HISTORY_LIMIT = 12
+    const historyMessages = await prisma.message.findMany({
+      where: { conversationId: conversationIdToUse },
+      orderBy: { createdAt: 'asc' },
+      take: HISTORY_LIMIT,
+    })
+
+    gatewayMessages = [
+      { role: 'system', content: systemPrompt },
+      ...historyMessages.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+    ]
 
     // Вызов AI gateway
     const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
@@ -188,6 +271,7 @@ ${businessContext}
             businessId: targetBusinessId,
             success: false,
             error: 'AI gateway configuration is missing',
+            continued,
           },
         },
       })
@@ -221,6 +305,7 @@ ${businessContext}
             error: 'AI gateway error',
             status: gatewayResponse.status,
             errorText,
+            continued,
           },
         },
       })
@@ -241,6 +326,7 @@ ${businessContext}
             businessId: targetBusinessId,
             success: false,
             error: 'Empty AI reply',
+            continued,
           },
         },
       })
@@ -248,29 +334,16 @@ ${businessContext}
       return NextResponse.json({ error: 'Empty AI reply' }, { status: 500 })
     }
 
-    // Сохраняем диалог
-    const conversation = await prisma.conversation.create({
+    // Сохраняем ответ ассистента в беседу
+    await prisma.message.create({
       data: {
-        userId: user.id,
-        intent,
-        businessId: targetBusinessId,
-        messages: {
-          create: [
-            {
-              role: 'user',
-              content: message.trim(),
-            },
-            {
-              role: 'assistant',
-              content: reply,
-            },
-          ],
-        },
-      },
-      include: {
-        messages: true,
+        conversationId: conversationIdToUse,
+        role: 'assistant',
+        content: reply,
       },
     })
+
+    const finalConversationId = conversationIdToUse
 
     await prisma.auditLog.create({
       data: {
@@ -280,15 +353,23 @@ ${businessContext}
           intent,
           businessId: targetBusinessId,
           success: true,
-          conversationId: conversation.id,
+          conversationId: finalConversationId,
           durationMs: Date.now() - startedAt,
+          continued,
         },
       },
     })
 
+    // Читаем последние N сообщений для отдачи клиенту
+    const latestMessages = await prisma.message.findMany({
+      where: { conversationId: finalConversationId },
+      orderBy: { createdAt: 'asc' },
+      take: 12,
+    })
+
     return NextResponse.json({
-      conversationId: conversation.id,
-      messages: conversation.messages,
+      conversationId: finalConversationId,
+      messages: latestMessages,
       reply,
     })
   } catch (error) {
@@ -303,6 +384,7 @@ ${businessContext}
           businessId: targetBusinessId,
           success: false,
           error: error instanceof Error ? error.message : String(error),
+          continued,
         },
       },
     })
