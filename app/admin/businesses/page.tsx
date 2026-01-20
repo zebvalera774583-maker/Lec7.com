@@ -20,8 +20,8 @@ export default async function OwnerBusinessesPage() {
     <div>
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ marginBottom: '1rem' }}>
-          <Link
-            href="/owner"
+            <Link
+            href="/admin"
             style={{
               display: 'inline-block',
               padding: '0.5rem 1rem',
