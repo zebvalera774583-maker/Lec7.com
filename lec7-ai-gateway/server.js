@@ -59,6 +59,36 @@ app.post("/v1/owner-agent", async (req, res) => {
   }
 });
 
+// Универсальный чат-эндпоинт: принимает массив messages и проксирует в OpenAI
+app.post("/v1/chat", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  if (!openai) {
+    return res.status(500).json({ error: "OPENAI_API_KEY missing" });
+  }
+
+  try {
+    const { messages } = req.body || {};
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages array is required" });
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature: 0,
+    });
+
+    const reply =
+      completion.choices?.[0]?.message?.content?.trim() || "";
+
+    res.json({ reply });
+  } catch (err) {
+    console.error("AI gateway /v1/chat error:", err);
+    res.status(500).json({ error: "gateway_failed" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log("lec7-ai-gateway listening on port", PORT);
 });
