@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/office'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,7 +32,20 @@ function LoginContent() {
         return
       }
 
-      router.push(redirect)
+      // Safe redirect: разрешаем только относительные пути внутри приложения
+      const raw = searchParams.get('redirect')
+      const safeRedirect =
+        raw &&
+        raw.startsWith('/') &&
+        !raw.startsWith('//') &&
+        !raw.toLowerCase().startsWith('http')
+          ? raw
+          : null
+
+      const role = data?.user?.role
+      const target = safeRedirect ?? (role === 'LEC7_ADMIN' ? '/admin' : '/office')
+
+      router.push(target)
       router.refresh()
     } catch {
       setError('Ошибка соединения')
