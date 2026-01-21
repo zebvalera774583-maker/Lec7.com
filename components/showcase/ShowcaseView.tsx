@@ -148,7 +148,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           alignItems: 'center',
           gap: '1.5rem',
           padding: '1.5rem',
-          borderRadius: 12,
+          borderRadius: 0,
           background: '#ffffff',
           border: '1px solid #e5e7eb',
         }}
@@ -203,7 +203,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
             <span
               style={{
                 padding: '0.1rem 0.5rem',
-                borderRadius: 999,
+                borderRadius: 0,
                 background: '#eff6ff',
                 color: '#1d4ed8',
                 fontSize: '0.75rem',
@@ -223,18 +223,18 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               {subtitle}
             </p>
           )}
-          {mode === 'resident' && (
-            <p
-              style={{
-                marginTop: '0.5rem',
-                marginBottom: 0,
-                fontSize: '0.8rem',
-                color: '#4b5563',
-              }}
-            >
-              Это превью витрины для резидента. Клиенты увидят этот экран по ссылке на публичную витрину.
-            </p>
-          )}
+
+          {/* Плейсхолдер метрик витрины в каноническом формате */}
+          <p
+            style={{
+              marginTop: '0.75rem',
+              marginBottom: 0,
+              color: '#4b5563',
+              fontSize: '0.9rem',
+            }}
+          >
+            40 уникальных кейсов&nbsp;| 2578 проектов&nbsp;| 4 города
+          </p>
         </div>
       </section>
 
@@ -242,7 +242,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
       <section
         style={{
           padding: '1.5rem',
-          borderRadius: 12,
+          borderRadius: 0,
           background: '#ffffff',
           border: '1px solid #e5e7eb',
         }}
@@ -281,7 +281,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         <div
           style={{
             padding: '1.5rem',
-            borderRadius: 12,
+            borderRadius: 0,
             background: '#ffffff',
             border: '1px solid #e5e7eb',
           }}
@@ -312,7 +312,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         <div
           style={{
             padding: '1.5rem',
-            borderRadius: 12,
+            borderRadius: 0,
             background: '#ffffff',
             border: '1px solid #e5e7eb',
           }}

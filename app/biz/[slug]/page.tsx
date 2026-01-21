@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import ShowcaseView from '@/components/showcase/ShowcaseView'
+import ShowcaseShell from '@/components/showcase/ShowcaseShell'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -91,31 +91,8 @@ export default async function BizPage({ params }: PageProps) {
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: '#f3f4f6',
-        padding: '2rem',
-      }}
-    >
-      <div style={{ maxWidth: '960px', margin: '0 auto' }}>
-        <header style={{ marginBottom: '1.5rem' }}>
-          <Link
-            href="/visitor"
-            style={{
-              display: 'inline-block',
-              marginBottom: '1rem',
-              color: '#2563eb',
-              textDecoration: 'none',
-              fontSize: '0.95rem',
-            }}
-          >
-            ← Назад к списку бизнесов
-          </Link>
-        </header>
-
-        <ShowcaseView business={viewBusiness} mode="public" />
-      </div>
-    </main>
+    <ShowcaseShell>
+      <ShowcaseView business={viewBusiness} mode="public" />
+    </ShowcaseShell>
   )
 }
