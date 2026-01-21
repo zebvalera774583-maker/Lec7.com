@@ -13,6 +13,14 @@ export default async function BusinessDetailPage({ params }: PageProps) {
   const business = await prisma.business.findUnique({
     where: { id: params.id },
     include: {
+      portfolioItems: {
+        select: {
+          id: true,
+          photos: {
+            select: { id: true },
+          },
+        },
+      },
       requests: {
         orderBy: { createdAt: 'desc' },
         take: 10,
@@ -23,7 +31,6 @@ export default async function BusinessDetailPage({ params }: PageProps) {
       },
       _count: {
         select: {
-          portfolios: true,
           requests: true,
           invoices: true,
         },
@@ -34,6 +41,11 @@ export default async function BusinessDetailPage({ params }: PageProps) {
   if (!business) {
     notFound()
   }
+
+  const portfolioCount = business.portfolioItems.reduce(
+    (acc, item) => acc + item.photos.length,
+    0,
+  )
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
@@ -49,7 +61,7 @@ export default async function BusinessDetailPage({ params }: PageProps) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
         <div style={{ padding: '1rem', background: 'white', borderRadius: '8px' }}>
-          <h3 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{business._count.portfolios}</h3>
+          <h3 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{portfolioCount}</h3>
           <p style={{ color: '#666' }}>Портфолио</p>
         </div>
         <div style={{ padding: '1rem', background: 'white', borderRadius: '8px' }}>
