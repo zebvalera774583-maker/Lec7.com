@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 
 interface PortfolioItemPhoto {
   id: string
@@ -38,15 +38,11 @@ interface ShowcaseViewProps {
 }
 
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [activeItemId, setActiveItemId] = useState<string | null>(null)
-
-  const subtitleParts = []
-  if (business.city) subtitleParts.push(business.city)
-  if (business.category) subtitleParts.push(business.category)
-
-  const subtitle = subtitleParts.join(' • ')
+  const cityLabel =
+    business.city && business.city.trim().length > 0 ? business.city : 'Город не указан'
+  const categoryLabel =
+    business.category && business.category.trim().length > 0 ? business.category : 'Категория не указана'
+  const subtitle = `${cityLabel} • ${categoryLabel}`
 
   const initials =
     business.name && business.name.trim().length > 0
@@ -56,80 +52,18 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const photos = business.photos || []
   const portfolioItems = business.portfolioItems || []
 
-  // Получаем активный кейс и его фото
-  const activeItem = activeItemId ? portfolioItems.find((item) => item.id === activeItemId) : null
-  const activePhotos = activeItem ? activeItem.photos : []
+  // Все фото из portfolioItems, если они есть, иначе — прямые фото бизнеса
+  const galleryPhotos: PortfolioItemPhoto[] = (() => {
+    const fromItems: PortfolioItemPhoto[] = []
+    portfolioItems.forEach((item) => {
+      item.photos.forEach((p) => fromItems.push(p))
+    })
+    if (fromItems.length > 0) return fromItems
+    return photos
+  })()
 
-  // Блокировка скролла body при открытом просмотрщике
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
-
-  // Обработка клавиатуры
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false)
-        setActiveItemId(null)
-      } else if (e.key === 'ArrowLeft' && activePhotos.length > 1) {
-        setActiveIndex((prev) => (prev === 0 ? activePhotos.length - 1 : prev - 1))
-      } else if (e.key === 'ArrowRight' && activePhotos.length > 1) {
-        setActiveIndex((prev) => (prev === activePhotos.length - 1 ? 0 : prev + 1))
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, activePhotos.length])
-
-  const handleThumbnailClick = (index: number) => {
-    setActiveIndex(index)
-    setIsOpen(true)
-  }
-
-  const handlePortfolioItemClick = (itemId: string) => {
-    const item = portfolioItems.find((i) => i.id === itemId)
-    if (item && item.photos.length > 0) {
-      setActiveItemId(itemId)
-      setActiveIndex(0)
-      setIsOpen(true)
-    }
-  }
-
-  const handleClose = () => {
-    setIsOpen(false)
-    setActiveItemId(null)
-  }
-
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      handleClose()
-    }
-  }
-
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (activePhotos.length > 1) {
-      setActiveIndex((prev) => (prev === 0 ? activePhotos.length - 1 : prev - 1))
-    }
-  }
-
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (activePhotos.length > 1) {
-      setActiveIndex((prev) => (prev === activePhotos.length - 1 ? 0 : prev + 1))
-    }
-  }
+  const displayPhotos = galleryPhotos.slice(0, 6)
+  const totalPages = Math.max(1, Math.ceil(Math.max(galleryPhotos.length, 1) / 6))
 
   return (
     <div
@@ -141,516 +75,269 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         gap: '2rem',
       }}
     >
-      {/* Header */}
+      {/* Карточка витрины по макету P3 */}
       <section
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.5rem',
-          padding: '1.5rem',
-          borderRadius: 0,
           background: '#ffffff',
           border: '1px solid #e5e7eb',
+          borderRadius: 0,
+          padding: '3rem 3rem 2.5rem',
         }}
       >
+        {/* Hero */}
         <div
           style={{
-            width: 80,
-            height: 80,
-            borderRadius: '9999px',
-            backgroundColor: '#e5e7eb',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
+            textAlign: 'center',
           }}
         >
-          {business.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={business.avatarUrl}
-              alt={business.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          ) : (
-            <span style={{ fontSize: '2rem', fontWeight: 600, color: '#4b5563' }}>{initials}</span>
-          )}
-        </div>
-        <div style={{ flex: 1 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '2.4rem',
+              fontWeight: 500,
+              letterSpacing: '0.03em',
+              color: '#111827',
+            }}
+          >
+            {business.name}
+          </h1>
+
           <div
             style={{
+              marginTop: '1.9rem',
               display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              marginBottom: '0.25rem',
+              justifyContent: 'center',
             }}
           >
-            <h1
-              style={{
-                margin: 0,
-                fontSize: '2rem',
-                fontWeight: 700,
-                color: '#111827',
-              }}
-            >
-              {business.name}
-            </h1>
-            <span
-              style={{
-                padding: '0.1rem 0.5rem',
-                borderRadius: 0,
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                fontSize: '0.75rem',
-              }}
-            >
-              /{business.slug}
-            </span>
-          </div>
-          {subtitle && (
-            <p
-              style={{
-                margin: 0,
-                color: '#6b7280',
-                fontSize: '0.95rem',
-              }}
-            >
-              {subtitle}
-            </p>
-          )}
-
-          {/* Плейсхолдер метрик витрины в каноническом формате */}
-          <p
-            style={{
-              marginTop: '0.75rem',
-              marginBottom: 0,
-              color: '#4b5563',
-              fontSize: '0.9rem',
-            }}
-          >
-            40 уникальных кейсов&nbsp;| 2578 проектов&nbsp;| 4 города
-          </p>
-        </div>
-      </section>
-
-      {/* About section */}
-      <section
-        style={{
-          padding: '1.5rem',
-          borderRadius: 0,
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            marginBottom: '0.75rem',
-            fontSize: '1.25rem',
-            fontWeight: 600,
-          }}
-        >
-          О бизнесе
-        </h2>
-        <p
-          style={{
-            margin: 0,
-            color: '#4b5563',
-            lineHeight: 1.6,
-            fontSize: '0.95rem',
-          }}
-        >
-          Здесь в будущем будет подробное описание вашей компании, ключевые услуги и преимущества для клиентов.
-          Пока это базовый шаблон витрины, который уже можно использовать для первых показов.
-        </p>
-      </section>
-
-      {/* Services and gallery placeholders */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-          gap: '1.5rem',
-        }}
-      >
-        <div
-          style={{
-            padding: '1.5rem',
-            borderRadius: 0,
-            background: '#ffffff',
-            border: '1px solid #e5e7eb',
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              marginBottom: '0.75rem',
-              fontSize: '1.1rem',
-              fontWeight: 600,
-            }}
-          >
-            Услуги (скоро)
-          </h3>
-          <p
-            style={{
-              margin: 0,
-              color: '#6b7280',
-              fontSize: '0.9rem',
-              lineHeight: 1.6,
-            }}
-          >
-            Здесь появится список ключевых услуг с краткими описаниями и примерами. Вы сможете выделить основные
-            направления работы компании.
-          </p>
-        </div>
-
-        <div
-          style={{
-            padding: '1.5rem',
-            borderRadius: 0,
-            background: '#ffffff',
-            border: '1px solid #e5e7eb',
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              marginBottom: '0.75rem',
-              fontSize: '1.1rem',
-              fontWeight: 600,
-            }}
-          >
-            Портфолио
-          </h3>
-          {portfolioItems.length > 0 ? (
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: '1rem',
-                marginTop: '0.75rem',
+                width: 120,
+                height: 120,
+                borderRadius: '50%',
+                backgroundColor: '#dde1e7',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {portfolioItems.map((item) => {
-                const coverPhoto = item.coverUrl
-                  ? item.photos.find((p) => p.url === item.coverUrl)
-                  : item.photos[0]
-                const commentPreview = item.comment
-                  ? item.comment.split('\n').slice(0, 2).join(' ').substring(0, 100) + (item.comment.length > 100 ? '...' : '')
-                  : null
-
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handlePortfolioItemClick(item.id)}
-                    style={{
-                      position: 'relative',
-                      aspectRatio: '1',
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      border: '1px solid #e5e7eb',
-                      background: '#f3f4f6',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'scale(1.02)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)'
-                    }}
-                  >
-                    {coverPhoto ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={coverPhoto.url}
-                          alt="Обложка кейса"
-                          style={{
-                            width: '100%',
-                            flex: 1,
-                            objectFit: 'cover',
-                          }}
-                        />
-                        {commentPreview && (
-                          <div
-                            style={{
-                              padding: '0.5rem',
-                              background: 'rgba(0, 0, 0, 0.7)',
-                              color: 'white',
-                              fontSize: '0.75rem',
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            {commentPreview}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div
-                        style={{
-                          width: '100%',
-                          flex: 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#6b7280',
-                          fontSize: '0.875rem',
-                        }}
-                      >
-                        Нет фото
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : photos.length > 0 ? (
-            // Fallback на старые фото, если кейсов нет
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                gap: '0.75rem',
-                marginTop: '0.75rem',
-              }}
-            >
-              {photos.map((photo, index) => (
-                <div
-                  key={photo.id}
-                  onClick={() => handleThumbnailClick(index)}
+              {business.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={business.avatarUrl}
+                  alt={business.name}
                   style={{
-                    position: 'relative',
-                    aspectRatio: '1',
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    border: '1px solid #e5e7eb',
-                    background: '#f3f4f6',
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.02)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)'
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photo.url}
-                    alt={`Фото проекта ${photo.sortOrder + 1}`}
+                />
+              ) : (
+                <span style={{ fontSize: '3rem', fontWeight: 500, color: '#ffffff' }}>{initials}</span>
+              )}
+            </div>
+          </div>
+
+          <p
+            style={{
+              marginTop: '1.75rem',
+              marginBottom: 0,
+              fontSize: '0.98rem',
+              color: '#4b5563',
+            }}
+          >
+            {subtitle}
+          </p>
+
+          <p
+            style={{
+              marginTop: '1.1rem',
+              marginBottom: 0,
+              fontSize: '0.95rem',
+              color: '#111827',
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>40</span> уникальных кейсов&nbsp;|{' '}
+            <span style={{ fontWeight: 600 }}>2578</span> проектов&nbsp;|{' '}
+            <span style={{ fontWeight: 600 }}>4</span> города
+          </p>
+        </div>
+
+        {/* Разделитель */}
+        <div
+          style={{
+            marginTop: '2.25rem',
+            marginBottom: '2rem',
+            height: 1,
+            background: 'rgba(15, 23, 42, 0.06)',
+          }}
+        />
+
+        {/* Сферы деятельности */}
+        <div>
+          <h2
+            style={{
+              margin: 0,
+              marginBottom: '0.75rem',
+              fontSize: '1rem',
+              fontWeight: 600,
+              color: '#111827',
+            }}
+          >
+            Сферы деятельности
+          </h2>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: '1.2rem',
+              color: '#4b5563',
+              fontSize: '0.95rem',
+              lineHeight: 1.7,
+            }}
+          >
+            <li>Проектная реализация</li>
+            <li>Дизайн интерьера</li>
+            <li>Мебель на заказ</li>
+            <li>Комплектация</li>
+          </ul>
+        </div>
+
+        {/* Города */}
+        <div
+          style={{
+            marginTop: '2.25rem',
+            textAlign: 'center',
+            fontSize: '0.95rem',
+            color: '#4b5563',
+          }}
+        >
+          Москва — Питер — Сочи — Краснодар
+        </div>
+
+        {/* CTA-кнопки */}
+        <div
+          style={{
+            marginTop: '1.9rem',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '1rem',
+          }}
+        >
+          <button
+            type="button"
+            style={{
+              minWidth: 150,
+              padding: '0.8rem 1.2rem',
+              borderRadius: 0,
+              border: '1px solid #d1d5db',
+              background: '#f9fafb',
+              color: '#111827',
+              fontSize: '0.9rem',
+              cursor: 'default',
+            }}
+          >
+            Расчёт
+          </button>
+          <button
+            type="button"
+            style={{
+              minWidth: 170,
+              padding: '0.8rem 1.2rem',
+              borderRadius: 0,
+              border: '1px solid #4b5563',
+              background: '#4b6fae',
+              color: '#ffffff',
+              fontSize: '0.9rem',
+              cursor: 'default',
+            }}
+          >
+            Связаться
+          </button>
+          <button
+            type="button"
+            style={{
+              minWidth: 170,
+              padding: '0.8rem 1.2rem',
+              borderRadius: 0,
+              border: '1px solid #d1d5db',
+              background: '#f9fafb',
+              color: '#111827',
+              fontSize: '0.9rem',
+              cursor: 'default',
+            }}
+          >
+            Поделиться
+          </button>
+        </div>
+
+        {/* Галерея 3x2 */}
+        <div
+          style={{
+            marginTop: '2.5rem',
+          }}
+        >
+          {displayPhotos.length > 0 ? (
+            <>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: '0.9rem',
+                }}
+              >
+                {displayPhotos.map((photo) => (
+                  <div
+                    key={photo.id}
                     style={{
                       width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
+                      paddingTop: '66%',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      background: '#e5e7eb',
                     }}
-                  />
-                </div>
-              ))}
-            </div>
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photo.url}
+                      alt="Фото проекта"
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  marginTop: '1.75rem',
+                  textAlign: 'center',
+                  fontSize: '0.9rem',
+                  color: '#4b5563',
+                }}
+              >
+                1 / {totalPages}
+              </div>
+            </>
           ) : (
             <p
               style={{
                 margin: 0,
                 color: '#6b7280',
                 fontSize: '0.9rem',
-                lineHeight: 1.6,
+                textAlign: 'center',
               }}
             >
-              В этом блоке будут отображаться реализованные проекты: фото, краткие описания и результаты для клиентов.
+              В этом блоке будут отображаться реализованные проекты вашего бизнеса.
             </p>
           )}
         </div>
       </section>
-
-      {/* Fullscreen Photo Viewer */}
-      {isOpen && activePhotos.length > 0 && (
-        <div
-          onClick={handleOverlayClick}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '2rem',
-          }}
-        >
-          {/* Close Button */}
-          <button
-            onClick={handleClose}
-            style={{
-              position: 'absolute',
-              top: '1.5rem',
-              right: '1.5rem',
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.9)',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1.5rem',
-              fontWeight: 600,
-              color: '#111827',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
-            }}
-          >
-            ×
-          </button>
-
-          {/* Navigation Arrows */}
-          {activePhotos.length > 1 && (
-            <>
-              <button
-                onClick={handlePrev}
-                style={{
-                  position: 'absolute',
-                  left: '1.5rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.5rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
-                }}
-              >
-                ←
-              </button>
-              <button
-                onClick={handleNext}
-                style={{
-                  position: 'absolute',
-                  right: '1.5rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.5rem',
-                  fontWeight: 600,
-                  color: '#111827',
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)'
-                }}
-              >
-                →
-              </button>
-            </>
-          )}
-
-          {/* Image Container */}
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'relative',
-              maxWidth: '92vw',
-              maxHeight: '86vh',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '1rem',
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activePhotos[activeIndex].url}
-              alt={`Фото ${activeIndex + 1}`}
-              style={{
-                maxWidth: '100%',
-                maxHeight: '70vh',
-                objectFit: 'contain',
-                borderRadius: '8px',
-              }}
-            />
-            {/* Comment */}
-            {activeItem && activeItem.comment && (
-              <div
-                style={{
-                  maxWidth: '600px',
-                  padding: '1rem',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  color: '#111827',
-                  fontSize: '0.95rem',
-                  lineHeight: 1.6,
-                  textAlign: 'center',
-                }}
-              >
-                {activeItem.comment}
-              </div>
-            )}
-          </div>
-
-          {/* Counter */}
-          {activePhotos.length > 1 && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '2rem',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                padding: '0.5rem 1rem',
-                borderRadius: '999px',
-                background: 'rgba(0, 0, 0, 0.7)',
-                color: 'white',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-              }}
-            >
-              {activeIndex + 1} / {activePhotos.length}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
