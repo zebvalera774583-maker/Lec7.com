@@ -174,7 +174,7 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/office"
+                href="/office/welcome"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
