@@ -93,7 +93,7 @@ export default async function BizPage({ params }: PageProps) {
     city: business.city,
     category: business.category,
     avatarUrl: business.profile?.avatarUrl ?? null,
-    profile: business.profile
+    profile: business.profile,
     photos: business.photos,
     portfolioItems: business.portfolioItems,
   }
