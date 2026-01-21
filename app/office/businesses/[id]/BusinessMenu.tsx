@@ -22,6 +22,11 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
     setIsOpen(false)
   }
 
+  const handleOpenAds = () => {
+    router.push(`/office/ads?businessId=${businessId}`)
+    setIsOpen(false)
+  }
+
   return (
     <div style={{ position: 'relative' }}>
       <button
@@ -115,6 +120,29 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
               }}
             >
               Редактировать профиль
+            </button>
+            <button
+              onClick={handleOpenAds}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderTop: '1px solid #e5e7eb',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: '#111827',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+            >
+              Реклама и продвижение
             </button>
             <button
               onClick={handleOpenShowcase}
