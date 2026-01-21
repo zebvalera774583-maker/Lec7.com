@@ -241,7 +241,7 @@ export default function VisitorClient() {
             <p style={{ fontSize: '1.1rem' }}>
               {search || city || category 
                 ? 'Ничего не найдено по заданным фильтрам'
-                : 'Пока нет зарегистрированных бизнесов'}
+                : 'Пока нет предложений. Вы можете стать первым бизнесом на Lec7.'}
             </p>
           </div>
         )}
