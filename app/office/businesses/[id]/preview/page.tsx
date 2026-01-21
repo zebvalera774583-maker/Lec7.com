@@ -19,7 +19,14 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
       city: true,
       category: true,
       profile: {
-        select: { avatarUrl: true },
+        select: {
+          avatarUrl: true,
+          statsCases: true,
+          statsProjects: true,
+          statsCities: true,
+          cities: true,
+          services: true,
+        },
       },
       photos: {
         select: {
@@ -62,6 +69,7 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
     city: business.city,
     category: business.category,
     avatarUrl: business.profile?.avatarUrl ?? null,
+    profile: business.profile,
     photos: business.photos,
     portfolioItems: business.portfolioItems,
   }

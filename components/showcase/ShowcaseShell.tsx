@@ -81,7 +81,16 @@ export default function ShowcaseShell({ children, backLink }: ShowcaseShellProps
             margin: '0 auto',
           }}
         >
-          {children}
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 0,
+              border: '1px solid rgba(15, 23, 42, 0.06)',
+              padding: '3rem 3rem 2.5rem',
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </main>

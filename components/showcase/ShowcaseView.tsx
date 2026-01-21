@@ -22,6 +22,13 @@ interface ShowcaseBusiness {
   city?: string | null
   category?: string | null
   avatarUrl?: string | null
+  profile?: {
+    statsCases: number
+    statsProjects: number
+    statsCities: number
+    cities: string[]
+    services: string[]
+  } | null
   photos?: Array<{
     id: string
     url: string
@@ -43,6 +50,13 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const categoryLabel =
     business.category && business.category.trim().length > 0 ? business.category : 'Категория не указана'
   const subtitle = `${cityLabel} • ${categoryLabel}`
+
+  const statsCases = business.profile?.statsCases ?? 40
+  const statsProjects = business.profile?.statsProjects ?? 2578
+  const statsCities = business.profile?.statsCities ?? 4
+
+  const profileCities = business.profile?.cities ?? []
+  const profileServices = business.profile?.services ?? []
 
   const initials =
     business.name && business.name.trim().length > 0
@@ -157,9 +171,9 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               color: '#111827',
             }}
           >
-            <span style={{ fontWeight: 600 }}>40</span> уникальных кейсов&nbsp;|{' '}
-            <span style={{ fontWeight: 600 }}>2578</span> проектов&nbsp;|{' '}
-            <span style={{ fontWeight: 600 }}>4</span> города
+            <span style={{ fontWeight: 600 }}>{statsCases}</span> уникальных кейсов&nbsp;|{' '}
+            <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов&nbsp;|{' '}
+            <span style={{ fontWeight: 600 }}>{statsCities}</span> города
           </p>
         </div>
 
@@ -186,33 +200,46 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           >
             Сферы деятельности
           </h2>
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: '1.2rem',
-              color: '#4b5563',
-              fontSize: '0.95rem',
-              lineHeight: 1.7,
-            }}
-          >
-            <li>Проектная реализация</li>
-            <li>Дизайн интерьера</li>
-            <li>Мебель на заказ</li>
-            <li>Комплектация</li>
-          </ul>
+          {profileServices.length > 0 ? (
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: '1.2rem',
+                color: '#4b5563',
+                fontSize: '0.95rem',
+                lineHeight: 1.7,
+              }}
+            >
+              {profileServices.map((service) => (
+                <li key={service}>{service}</li>
+              ))}
+            </ul>
+          ) : (
+            <p
+              style={{
+                margin: 0,
+                color: '#6b7280',
+                fontSize: '0.9rem',
+              }}
+            >
+              Список сфер деятельности ещё не заполнен.
+            </p>
+          )}
         </div>
 
         {/* Города */}
-        <div
-          style={{
-            marginTop: '2.25rem',
-            textAlign: 'center',
-            fontSize: '0.95rem',
-            color: '#4b5563',
-          }}
-        >
-          Москва — Питер — Сочи — Краснодар
-        </div>
+        {profileCities.length > 0 && (
+          <div
+            style={{
+              marginTop: '2.25rem',
+              textAlign: 'center',
+              fontSize: '0.95rem',
+              color: '#4b5563',
+            }}
+          >
+            {profileCities.join(' — ')}
+          </div>
+        )}
 
         {/* CTA-кнопки */}
         <div
