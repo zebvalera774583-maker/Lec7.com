@@ -153,18 +153,39 @@ export default function VisitorClient() {
             margin: '0 auto',
           }}
         >
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <span
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '1rem',
+            }}
+          >
+            <Link href="/" style={{ textDecoration: 'none' }}>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: '1.15rem',
+                  letterSpacing: '0.02em',
+                  color: '#0f172a',
+                }}
+              >
+                Lec7
+              </span>
+            </Link>
+
+            <Link
+              href="/resident/welcome"
               style={{
-                fontWeight: 700,
-                fontSize: '1.15rem',
-                letterSpacing: '0.02em',
-                color: '#0f172a',
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                color: '#111827',
+                whiteSpace: 'nowrap',
               }}
             >
-              Lec7
-            </span>
-          </Link>
+              Создать свой бизнес →
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -190,7 +211,7 @@ export default function VisitorClient() {
             <div
               style={{
                 background: '#ffffff',
-                borderRadius: '999px',
+                borderRadius: 0,
                 boxShadow: '0 18px 45px rgba(15, 23, 42, 0.08)',
                 padding: '0.35rem 1.75rem',
                 display: 'flex',
@@ -307,7 +328,7 @@ export default function VisitorClient() {
                   style={{
                     marginLeft: 'auto',
                     padding: '0.25rem 0.75rem',
-                    borderRadius: '999px',
+                    borderRadius: 0,
                     border: '1px solid rgba(148, 163, 184, 0.6)',
                     background: 'transparent',
                     fontSize: '0.8rem',
@@ -375,6 +396,22 @@ export default function VisitorClient() {
                     ? 'Ничего не найдено по заданным фильтрам'
                     : 'Пока нет предложений. Вы можете стать первым бизнесом на Lec7.'}
                 </p>
+
+                {(businesses.length === 0 && category) ||
+                (businesses.length === 0 && !search && !city && !category) ? (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <Link
+                      href="/resident/welcome"
+                      style={{
+                        fontSize: '0.95rem',
+                        color: '#111827',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Создать свой бизнес →
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             </section>
           )}

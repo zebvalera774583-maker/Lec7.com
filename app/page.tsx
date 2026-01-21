@@ -216,7 +216,7 @@ export default function HomePage() {
                   key={card.title}
                   style={{
                     background: '#f9fafb',
-                    borderRadius: '18px',
+                    borderRadius: 0,
                     boxShadow: '0 18px 45px rgba(15, 23, 42, 0.08)',
                     overflow: 'hidden',
                   }}
@@ -233,7 +233,7 @@ export default function HomePage() {
                       style={{
                         position: 'absolute',
                         inset: '18px 20px 18px 20px',
-                        borderRadius: '14px',
+                        borderRadius: 0,
                         background:
                           'radial-gradient(circle at 0% 0%, rgba(156,163,175,0.35), transparent 55%), radial-gradient(circle at 100% 100%, rgba(148,163,184,0.2), transparent 50%)',
                       }}
