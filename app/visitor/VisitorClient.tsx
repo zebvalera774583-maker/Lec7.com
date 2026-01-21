@@ -5,6 +5,31 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import BusinessCardLink from '@/components/BusinessCardLink'
 
+const FALLBACK_CITIES = [
+  'Москва',
+  'Санкт-Петербург',
+  'Казань',
+  'Екатеринбург',
+  'Новосибирск',
+  'Самара',
+  'Сочи',
+  'Ростов-на-Дону',
+  'Пермь',
+  'Тюмень',
+] as const
+
+const FALLBACK_CATEGORIES = [
+  'Дизайн и интерьер',
+  'Одежда и аксессуары',
+  'ИТ и технологии',
+  'Юридические услуги',
+  'Маркетинг и консалтинг',
+  'Туризм и отдых',
+  'Фотосъёмка',
+  'Ремонт и строительство',
+  'Рестораны и доставка',
+] as const
+
 export default function VisitorClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -16,21 +41,24 @@ export default function VisitorClient() {
   const [city, setCity] = useState(searchParams.get('city') || '')
   const [category, setCategory] = useState(searchParams.get('category') || '')
 
-  // Получаем уникальные города и категории из всех бизнесов (не отфильтрованных)
+  // Получаем уникальные города и категории из всех бизнесов (не отфильтрованных),
+  // если их нет — используем фиксированные списки из UI kit.
   const cities = useMemo(() => {
     const citySet = new Set<string>()
-    allBusinesses.forEach(b => {
+    allBusinesses.forEach((b) => {
       if (b.city) citySet.add(b.city.trim())
     })
-    return Array.from(citySet).sort()
+    const result = Array.from(citySet).sort()
+    return result.length > 0 ? result : Array.from(FALLBACK_CITIES)
   }, [allBusinesses])
 
   const categories = useMemo(() => {
     const categorySet = new Set<string>()
-    allBusinesses.forEach(b => {
+    allBusinesses.forEach((b) => {
       if (b.category) categorySet.add(b.category.trim())
     })
-    return Array.from(categorySet).sort()
+    const result = Array.from(categorySet).sort()
+    return result.length > 0 ? result : Array.from(FALLBACK_CATEGORIES)
   }, [allBusinesses])
 
   // Загружаем все бизнесы для формирования списков городов/категорий

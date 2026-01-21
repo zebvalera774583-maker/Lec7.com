@@ -13,6 +13,10 @@ interface BusinessCardLinkProps {
 }
 
 export default function BusinessCardLink({ business }: BusinessCardLinkProps) {
+  const cityLabel = business.city && business.city.trim().length > 0 ? business.city : 'Город не указан'
+  const categoryLabel =
+    business.category && business.category.trim().length > 0 ? business.category : 'Категория не указана'
+
   return (
     <Link
       href={`/biz/${business.slug}`}
@@ -48,7 +52,7 @@ export default function BusinessCardLink({ business }: BusinessCardLinkProps) {
         margin: '0.5rem 0',
         fontSize: '0.9rem'
       }}>
-        {business.city} • {business.category}
+        {cityLabel} • {categoryLabel}
       </p>
     </Link>
   )
