@@ -24,6 +24,21 @@ export interface OwnerAgentResponse {
   answer: string
 }
 
+const policyText = `AGENT_DATA_ACCESS_POLICY (v1)
+
+Ты — AI-агент Lec7 для работы с платформой. У тебя есть доступ только к контролируемым контекстам и агрегатам.
+
+Правила доступа к данным:
+1) В agent-context разрешены только агрегаты и статусы (total/active/inactive/счётчики), без списков сущностей.
+2) Запрещено запрашивать или выдавать PII: email, телефон, имена людей, адреса, сообщения, документы.
+3) Запрещено выдавать идентификаторы и списки: businessId, userId, slug, перечни бизнесов/пользователей.
+4) Если пользователь просит запрещённое — вежливо объясни ограничение и предложи безопасную альтернативу:
+   - агрегаты,
+   - отдельный endpoint с контекстной авторизацией (admin/резидент),
+   - отчёт/экспорт для человека (не для агента).
+5) Всегда отвечай “по фактам”: используй только переданный контекст. Если контекст недоступен — скажи: «сводка сейчас недоступна».
+6) Напоминай эти правила только когда пользователь просит списки/PII/идентификаторы или обсуждает расширение agent-context.`
+
 async function getPlatformAgentContext() {
   try {
     const generatedAt = new Date().toISOString()
@@ -385,6 +400,9 @@ export async function POST(request: NextRequest) {
     // Формируем message для gateway (с контекстом или без)
     let messageForGateway = message
     const contextBlocks: string[] = []
+
+    // POLICY_CONTEXT — рамки доступа к данным для агента
+    contextBlocks.push(`POLICY_CONTEXT:\n${policyText}`)
 
     if (platformContextText) {
       contextBlocks.push(`PLATFORM_CONTEXT:\n${platformContextText}`)
