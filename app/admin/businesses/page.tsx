@@ -34,7 +34,7 @@ export default async function OwnerBusinessesPage() {
               border: '1px solid #e5e7eb',
             }}
           >
-            ← Назад
+            ← Назад в админку
           </Link>
         </div>
         <h1 style={{ margin: '0 0 0.5rem 0', fontSize: '1.875rem', fontWeight: 700 }}>

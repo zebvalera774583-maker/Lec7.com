@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -33,6 +34,33 @@ export default async function AdminPage() {
           <p style={{ color: '#666' }}>Счетов</p>
         </div>
       </div>
+
+      <section aria-label="Управление бизнесами" style={{ marginTop: '2rem' }}>
+        <Link
+          href="/admin/businesses"
+          style={{
+            display: 'inline-flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            padding: '1.25rem 1.5rem',
+            background: 'white',
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb',
+            textDecoration: 'none',
+            gap: '0.35rem',
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Навигация
+          </span>
+          <span style={{ fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
+            Управление бизнесами
+          </span>
+          <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            Перейти к списку бизнесов, их активации и статусам.
+          </span>
+        </Link>
+      </section>
     </main>
   )
 }
