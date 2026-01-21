@@ -24,6 +24,37 @@ export interface OwnerAgentResponse {
   answer: string
 }
 
+async function getPlatformAgentContext() {
+  try {
+    const generatedAt = new Date().toISOString()
+
+    const [businessTotal, businessActive, usersTotal] = await Promise.all([
+      prisma.business.count(),
+      prisma.business.count({
+        where: { lifecycleStatus: 'ACTIVE' },
+      }),
+      prisma.user.count(),
+    ])
+
+    const businessesInactive = Math.max(businessTotal - businessActive, 0)
+
+    return {
+      generatedAt,
+      businesses: {
+        total: businessTotal,
+        active: businessActive,
+        inactive: businessesInactive,
+      },
+      users: {
+        total: usersTotal,
+      },
+    }
+  } catch (error) {
+    console.warn('Failed to load platform agent context:', error)
+    return null
+  }
+}
+
 function parseAIResponse(text: string): { mode: OwnerAgentMode; answer: string } {
   const trimmedText = text.trim()
   
@@ -322,10 +353,49 @@ export async function POST(request: NextRequest) {
     // Загружаем контекст из playbook
     const playbookContext = await loadPlaybookContext(contextBusinessId)
 
+    // Загружаем агрегированный контекст платформы (для админ-агента)
+    const platformContext = await getPlatformAgentContext()
+
+    // Формируем текстовый блок с агрегатами, если они доступны
+    let platformContextText = ''
+    if (platformContext) {
+      const { generatedAt, businesses, users } = platformContext
+      const lines: string[] = [
+        `Контекст платформы Lec7 (актуально на ${generatedAt}):`,
+        `- Всего бизнесов: ${businesses.total}`,
+      ]
+
+      if (typeof businesses.active === 'number') {
+        lines.push(`- Активных бизнесов: ${businesses.active}`)
+      }
+
+      if (typeof businesses.inactive === 'number') {
+        lines.push(`- Неактивных бизнесов: ${businesses.inactive}`)
+      }
+
+      lines.push(`- Пользователей: ${users.total}`)
+      lines.push('')
+      lines.push('Правила для ответов по статистике:')
+      lines.push('- Если спрашивают про количество страниц/бизнесов — отвечай цифрами из этого контекста.')
+      lines.push('- Если данных нет — честно скажи: «сводка сейчас недоступна».')
+
+      platformContextText = lines.join('\n')
+    }
+
     // Формируем message для gateway (с контекстом или без)
     let messageForGateway = message
+    const contextBlocks: string[] = []
+
+    if (platformContextText) {
+      contextBlocks.push(`PLATFORM_CONTEXT:\n${platformContextText}`)
+    }
+
     if (playbookContext) {
-      messageForGateway = `PLAYBOOK_CONTEXT:\n${playbookContext}\n---\nUSER:\n${message}`
+      contextBlocks.push(`PLAYBOOK_CONTEXT:\n${playbookContext}`)
+    }
+
+    if (contextBlocks.length > 0) {
+      messageForGateway = `${contextBlocks.join('\n---\n')}\n---\nUSER:\n${message}`
     }
 
     // Проверяем наличие env переменных для gateway
