@@ -24,36 +24,64 @@ export default function BusinessCardLink({ business }: BusinessCardLinkProps) {
         display: 'block',
         textDecoration: 'none',
         color: 'inherit',
-        padding: '1.5rem',
-        borderRadius: '8px',
-        background: 'white',
-        border: '1px solid #e0e0e0',
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        borderRadius: '18px',
+        background: '#f9fafb',
+        boxShadow: '0 18px 45px rgba(15, 23, 42, 0.08)',
+        overflow: 'hidden',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-4px)'
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+        e.currentTarget.style.boxShadow = '0 22px 55px rgba(15, 23, 42, 0.14)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.boxShadow = '0 18px 45px rgba(15, 23, 42, 0.08)'
       }}
     >
-      <h2 style={{
-        fontSize: '1.5rem',
-        fontWeight: '600',
-        margin: '0 0 0.5rem 0',
-        color: '#1a1a1a'
-      }}>
-        {business.name}
-      </h2>
-      <p style={{
-        color: '#666',
-        margin: '0.5rem 0',
-        fontSize: '0.9rem'
-      }}>
-        {cityLabel} • {categoryLabel}
-      </p>
+      <div
+        style={{
+          height: '140px',
+          background: 'linear-gradient(135deg, #e5e7eb 0%, #f3f4f6 40%, #e5e7eb 100%)',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: '18px 20px 18px 20px',
+            borderRadius: '14px',
+            background:
+              'radial-gradient(circle at 0% 0%, rgba(156,163,175,0.35), transparent 55%), radial-gradient(circle at 100% 100%, rgba(148,163,184,0.2), transparent 50%)',
+          }}
+        />
+      </div>
+      <div
+        style={{
+          padding: '0.9rem 1.1rem 1.05rem',
+          backgroundColor: '#fdfdfd',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: '0.98rem',
+            fontWeight: 600,
+            margin: '0 0 0.3rem 0',
+            color: '#111827',
+          }}
+        >
+          {business.name}
+        </h2>
+        <p
+          style={{
+            color: '#6b7280',
+            margin: 0,
+            fontSize: '0.82rem',
+          }}
+        >
+          {cityLabel} • {categoryLabel}
+        </p>
+      </div>
     </Link>
   )
 }
