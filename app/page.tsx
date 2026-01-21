@@ -38,7 +38,7 @@ export default function HomePage() {
     <main
       style={{
         minHeight: '100vh',
-        background: '#f9fafb',
+        background: '#f7f2ee',
         display: 'flex',
         flexDirection: 'column',
       }}
