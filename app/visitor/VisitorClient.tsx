@@ -104,148 +104,279 @@ export default function VisitorClient() {
   }
 
   return (
-    <main style={{ 
-      minHeight: '100vh',
-      background: '#ffffff',
-      padding: '2rem'
-    }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <header style={{ marginBottom: '3rem' }}>
-          <Link 
-            href="/"
+    <main
+      style={{
+        minHeight: '100vh',
+        background: '#f7f2ee',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Верхняя полоса с логотипом */}
+      <div
+        style={{
+          borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+          padding: '1.25rem 1.5rem',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '1120px',
+            margin: '0 auto',
+          }}
+        >
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: '1.15rem',
+                letterSpacing: '0.02em',
+                color: '#0f172a',
+              }}
+            >
+              Lec7
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Контент */}
+      <div
+        style={{
+          flex: 1,
+          padding: '2.5rem 1.5rem 3rem',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '1120px',
+            margin: '0 auto',
+          }}
+        >
+          {/* Поисковая строка */}
+          <section
             style={{
-              display: 'inline-block',
-              marginBottom: '2rem',
-              color: '#0070f3',
-              textDecoration: 'none',
-              fontSize: '1rem'
+              marginBottom: '2.25rem',
             }}
           >
-            ← На главную
-          </Link>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: '#1a1a1a',
-            margin: 0
-          }}>
-            Предложения бизнесов
-          </h1>
-        </header>
-
-        {/* Фильтры */}
-        <div style={{
-          marginBottom: '2rem',
-          padding: '1.5rem',
-          background: '#f5f5f5',
-          borderRadius: '8px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem'
-        }}>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Поиск (название, город, категория)..."
-              value={search}
-              onChange={handleSearchChange}
+            <div
               style={{
-                flex: '1',
-                minWidth: '200px',
-                padding: '0.75rem',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                fontSize: '1rem',
-                boxSizing: 'border-box'
-              }}
-            />
-            
-            <select
-              value={city}
-              onChange={handleCityChange}
-              style={{
-                padding: '0.75rem',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                fontSize: '1rem',
-                minWidth: '150px',
-                background: 'white',
-                boxSizing: 'border-box'
+                background: '#ffffff',
+                borderRadius: '999px',
+                boxShadow: '0 18px 45px rgba(15, 23, 42, 0.08)',
+                padding: '0.35rem 1.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
               }}
             >
-              <option value="">Все города</option>
-              {cities.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-
-            <select
-              value={category}
-              onChange={handleCategoryChange}
-              style={{
-                padding: '0.75rem',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                fontSize: '1rem',
-                minWidth: '150px',
-                background: 'white',
-                boxSizing: 'border-box'
-              }}
-            >
-              <option value="">Все категории</option>
-              {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-
-            {(search || city || category) && (
-              <button
-                onClick={clearFilters}
+              <input
+                type="text"
+                placeholder="Мебель, дизайн, услуги… и город"
+                value={search}
+                onChange={handleSearchChange}
                 style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#666',
-                  color: 'white',
+                  flex: 1,
                   border: 'none',
-                  borderRadius: '6px',
+                  outline: 'none',
+                  padding: '0.9rem 0',
                   fontSize: '1rem',
-                  cursor: 'pointer'
+                  color: '#111827',
+                  background: 'transparent',
+                }}
+              />
+              <button
+                type="button"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#111827',
+                  cursor: 'default',
+                }}
+                aria-hidden="true"
+              >
+                <span style={{ fontSize: '1.4rem' }}>🔍</span>
+              </button>
+            </div>
+          </section>
+
+          {/* Фильтры / навигация */}
+          <section
+            style={{
+              marginBottom: '1.75rem',
+              borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '1.5rem',
+                paddingBottom: '0.85rem',
+                fontSize: '0.9rem',
+                color: '#6b7280',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>Город</span>
+                <select
+                  value={city}
+                  onChange={handleCityChange}
+                  style={{
+                    border: 'none',
+                    borderBottom: '1px solid rgba(148, 163, 184, 0.6)',
+                    background: 'transparent',
+                    padding: '0.1rem 0.25rem',
+                    fontSize: '0.9rem',
+                    color: '#374151',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="">Любой</option>
+                  {cities.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>Сфера</span>
+                <select
+                  value={category}
+                  onChange={handleCategoryChange}
+                  style={{
+                    border: 'none',
+                    borderBottom: '1px solid rgba(148, 163, 184, 0.6)',
+                    background: 'transparent',
+                    padding: '0.1rem 0.25rem',
+                    fontSize: '0.9rem',
+                    color: '#374151',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="">Любая</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
+                Формат: Магазин / Агентство / Сервис
+              </div>
+
+              {(search || city || category) && (
+                <button
+                  onClick={clearFilters}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(148, 163, 184, 0.6)',
+                    background: 'transparent',
+                    fontSize: '0.8rem',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          </section>
+
+          {/* Подзаголовок перед сеткой */}
+          <section style={{ marginBottom: '1.5rem' }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: '0.9rem',
+                color: '#9ca3af',
+              }}
+            >
+              Показаны релевантные предложения
+            </p>
+          </section>
+
+          {/* Результаты */}
+          {loading ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '4rem 2rem',
+                color: '#6b7280',
+              }}
+            >
+              <p>Загрузка...</p>
+            </div>
+          ) : businesses.length > 0 ? (
+            <section>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                  gap: '1.75rem',
                 }}
               >
-                Сбросить
-              </button>
-            )}
-          </div>
+                {businesses.map((business) => (
+                  <BusinessCardLink key={business.id} business={business} />
+                ))}
+              </div>
+            </section>
+          ) : (
+            <section>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '4rem 2rem',
+                  color: '#6b7280',
+                }}
+              >
+                <p style={{ fontSize: '1.05rem' }}>
+                  {search || city || category
+                    ? 'Ничего не найдено по заданным фильтрам'
+                    : 'Пока нет предложений. Вы можете стать первым бизнесом на Lec7.'}
+                </p>
+              </div>
+            </section>
+          )}
         </div>
-
-        {/* Результаты */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#666' }}>
-            <p>Загрузка...</p>
-          </div>
-        ) : businesses.length > 0 ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '2rem'
-          }}>
-            {businesses.map((business) => (
-              <BusinessCardLink key={business.id} business={business} />
-            ))}
-          </div>
-        ) : (
-          <div style={{
-            textAlign: 'center',
-            padding: '4rem 2rem',
-            color: '#666'
-          }}>
-            <p style={{ fontSize: '1.1rem' }}>
-              {search || city || category 
-                ? 'Ничего не найдено по заданным фильтрам'
-                : 'Пока нет предложений. Вы можете стать первым бизнесом на Lec7.'}
-            </p>
-          </div>
-        )}
       </div>
+
+      {/* Нижняя подпись */}
+      <footer
+        style={{
+          padding: '1.5rem 1.5rem 2rem',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '1120px',
+            margin: '0 auto',
+            textAlign: 'center',
+            fontSize: '0.9rem',
+            color: '#6b7280',
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 600,
+              color: '#111827',
+            }}
+          >
+            Lec7
+          </span>{' '}
+          — рабочая AI-инфраструктура для реальных сделок.
+        </div>
+      </footer>
     </main>
   )
 }
