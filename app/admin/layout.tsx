@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import jwt from 'jsonwebtoken'
 
@@ -13,10 +13,15 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
+  const h = headers()
+  const forwardedUri = h.get('x-forwarded-uri') || h.get('x-original-uri') || null
+  const target = forwardedUri && forwardedUri.startsWith('/admin') ? forwardedUri : '/admin'
+  const redirectTarget = `/login?redirect=${encodeURIComponent(target)}`
+
   const token = cookies().get('token')?.value
 
   if (!token) {
-    redirect('/login?redirect=/admin')
+    redirect(redirectTarget)
   }
 
   let user: JwtPayload | null = null
@@ -27,7 +32,7 @@ export default async function AdminLayout({
   }
 
   if (!user || user.role !== 'LEC7_ADMIN') {
-    redirect('/login?redirect=/admin')
+    redirect(redirectTarget)
   }
 
   return (
