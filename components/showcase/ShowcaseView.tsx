@@ -73,8 +73,11 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const photos = business.photos || []
   const portfolioItems = business.portfolioItems || []
 
+  // Фильтруем кейсы с фото
+  const casesWithPhotos = portfolioItems.filter((item) => item.photos && item.photos.length > 0)
+
   // Используем portfolioItems как кейсы, если они есть, иначе — прямые фото бизнеса как fallback
-  const hasPortfolioItems = portfolioItems.length > 0 && portfolioItems.some((item) => item.photos.length > 0)
+  const hasPortfolioItems = casesWithPhotos.length > 0
 
   return (
     <div
@@ -323,96 +326,100 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                 gap: '2rem',
               }}
             >
-              {portfolioItems
-                .filter((item) => item.photos.length > 0)
-                .map((item, index) => {
-                  const itemPhotos = item.photos
-                  const hasDescription = item.comment && item.comment.trim().length > 0
+              {casesWithPhotos.map((item, index) => {
+                const hasDescription = item.comment && item.comment.trim().length > 0
 
-                  // ВСЕ кейсы используют одинаковую сетку 3×1
-                  // Количество фото не влияет на структуру контейнера
-                  return (
+                // Определяем сетку в зависимости от количества фото
+                // Все кейсы используют одинаковую структуру сетки
+                const getGridColumns = (count: number) => {
+                  if (count === 1) return 'repeat(3, 1fr)' // 1 фото в сетке 3×1, но занимает только 1 колонку
+                  if (count === 2) return 'repeat(2, 1fr)'
+                  if (count === 3) return 'repeat(3, 1fr)'
+                  return 'repeat(3, 1fr)' // для 4+ фото используем 3 колонки
+                }
+
+                // Сортируем фото по sortOrder
+                const sortedPhotos = item.photos
+                  .slice()
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedCaseIndex(index)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      cursor: 'pointer',
+                      transition: 'opacity 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.9'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                    }}
+                  >
+                    {/* Фото кейса - весь контейнер кликабелен */}
                     <div
-                      key={item.id}
-                      onClick={() => setSelectedCaseIndex(index)}
                       style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1rem',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '0.9'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '1'
+                        display: 'grid',
+                        gridTemplateColumns: getGridColumns(sortedPhotos.length),
+                        gap: '0.9rem',
                       }}
                     >
-                      {/* Фото кейса - весь контейнер кликабелен */}
-                      {/* ВСЕ кейсы используют одинаковую сетку 3×1 */}
-                      <div
+                      {sortedPhotos.map((photo, idx) => {
+                        // Для 1 фото - занимает только 1 колонку из 3
+                        const gridColumnSpan = sortedPhotos.length === 1 ? 1 : 1
+
+                        return (
+                          <div
+                            key={photo.id}
+                            style={{
+                              gridColumn: sortedPhotos.length === 1 ? 'span 1' : undefined,
+                              width: '100%',
+                              paddingTop: '66%',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              background: '#e5e7eb',
+                              borderRadius: 0,
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt="Фото проекта"
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Описание кейса */}
+                    {hasDescription && (
+                      <p
                         style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(3, 1fr)',
-                          gap: '0.9rem',
+                          margin: 0,
+                          color: '#4b5563',
+                          fontSize: '0.95rem',
+                          lineHeight: 1.6,
+                          fontWeight: 400,
                         }}
                       >
-                        {itemPhotos.map((photo, idx) => {
-                          // Для 1 фото - занимает только 1 колонку из 3
-                          // Для 2 фото - каждое занимает 1 колонку
-                          // Для 3+ фото - каждое занимает 1 колонку
-                          const gridColumnStart = idx + 1
-                          const gridColumnEnd = idx + 2
-
-                          return (
-                            <div
-                              key={photo.id}
-                              style={{
-                                gridColumn: `${gridColumnStart} / ${gridColumnEnd}`,
-                                width: '100%',
-                                paddingTop: '66%',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                background: '#e5e7eb',
-                                borderRadius: 0,
-                              }}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={photo.url}
-                                alt="Фото проекта"
-                                style={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                }}
-                              />
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Описание кейса */}
-                      {hasDescription && (
-                        <p
-                          style={{
-                            margin: 0,
-                            color: '#4b5563',
-                            fontSize: '0.95rem',
-                            lineHeight: 1.6,
-                            fontWeight: 400,
-                          }}
-                        >
-                          {item.comment}
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
+                        {item.comment}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ) : photos.length > 0 ? (
             // Fallback: если нет portfolioItems, показываем прямые фото бизнеса
@@ -487,16 +494,14 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         title={business.name}
       />
 
-      {selectedCaseIndex !== null && hasPortfolioItems && (
+      {selectedCaseIndex !== null && hasPortfolioItems && casesWithPhotos[selectedCaseIndex] && (
         <PortfolioCaseView
           isOpen={selectedCaseIndex !== null}
           onClose={() => setSelectedCaseIndex(null)}
-          photos={portfolioItems.filter((item) => item.photos.length > 0)[selectedCaseIndex]?.photos || []}
-          description={
-            portfolioItems.filter((item) => item.photos.length > 0)[selectedCaseIndex]?.comment || null
-          }
+          photos={casesWithPhotos[selectedCaseIndex].photos || []}
+          description={casesWithPhotos[selectedCaseIndex].comment || null}
           caseIndex={selectedCaseIndex}
-          totalCases={portfolioItems.filter((item) => item.photos.length > 0).length}
+          totalCases={casesWithPhotos.length}
         />
       )}
     </div>
