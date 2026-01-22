@@ -107,13 +107,17 @@ export default function PortfolioCaseView({
           left: 0,
           right: 0,
           bottom: 0,
+          width: '100vw',
+          height: '100vh',
           background: '#f7f2ee',
-          zIndex: 2000,
+          zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
+          margin: 0,
+          padding: 0,
         }}
         onClick={onClose}
       >
