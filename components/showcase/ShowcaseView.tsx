@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import RequestModal from './RequestModal'
 import ContactModal from './ContactModal'
 import ShareModal from './ShareModal'
+import PortfolioCaseView from './PortfolioCaseView'
 
 interface PortfolioItemPhoto {
   id: string
@@ -53,6 +54,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [selectedCaseIndex, setSelectedCaseIndex] = useState<number | null>(null)
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
 
@@ -323,7 +325,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
             >
               {portfolioItems
                 .filter((item) => item.photos.length > 0)
-                .map((item) => {
+                .map((item, index) => {
                   const itemPhotos = item.photos
                   const hasDescription = item.comment && item.comment.trim().length > 0
 
@@ -338,13 +340,22 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   return (
                     <div
                       key={item.id}
+                      onClick={() => setSelectedCaseIndex(index)}
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '1rem',
+                        cursor: 'pointer',
+                        transition: 'opacity 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '0.9'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '1'
                       }}
                     >
-                      {/* Фото кейса */}
+                      {/* Фото кейса - весь контейнер кликабелен */}
                       <div
                         style={{
                           display: 'grid',
@@ -471,6 +482,19 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         url={shareUrl}
         title={business.name}
       />
+
+      {selectedCaseIndex !== null && hasPortfolioItems && (
+        <PortfolioCaseView
+          isOpen={selectedCaseIndex !== null}
+          onClose={() => setSelectedCaseIndex(null)}
+          photos={portfolioItems.filter((item) => item.photos.length > 0)[selectedCaseIndex]?.photos || []}
+          description={
+            portfolioItems.filter((item) => item.photos.length > 0)[selectedCaseIndex]?.comment || null
+          }
+          caseIndex={selectedCaseIndex}
+          totalCases={portfolioItems.filter((item) => item.photos.length > 0).length}
+        />
+      )}
     </div>
   )
 }
