@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import RequestModal from './RequestModal'
+import ContactModal from './ContactModal'
 
 interface PortfolioItemPhoto {
   id: string
@@ -24,6 +25,8 @@ interface ShowcaseBusiness {
   category?: string | null
   avatarUrl?: string | null
   profile?: {
+    phone: string | null
+    telegramUsername: string | null
     statsCases: number
     statsProjects: number
     statsCities: number
@@ -47,6 +50,7 @@ interface ShowcaseViewProps {
 
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false)
 
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
@@ -254,6 +258,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           </button>
           <button
             type="button"
+            onClick={() => setIsContactModalOpen(true)}
             style={{
               minWidth: 170,
               padding: '0.8rem 1.2rem',
@@ -262,7 +267,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               background: '#4b6fae',
               color: '#ffffff',
               fontSize: '0.9rem',
-              cursor: 'default',
+              cursor: 'pointer',
             }}
           >
             Связаться
@@ -358,6 +363,13 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         onClose={() => setIsRequestModalOpen(false)}
         businessId={business.id}
         businessName={business.name}
+      />
+
+      <ContactModal
+        isOpen={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
+        phone={business.profile?.phone ?? null}
+        telegramUsername={business.profile?.telegramUsername ?? null}
       />
     </div>
   )

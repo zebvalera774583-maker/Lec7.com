@@ -88,6 +88,8 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
     const {
       displayName,
       avatarUrl,
+      phone,
+      telegramUsername,
       statsCases,
       statsProjects,
       statsCities,
@@ -142,6 +144,8 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         businessId,
         displayName: displayName || null,
         avatarUrl: avatarUrl || null,
+        phone: phone || null,
+        telegramUsername: telegramUsername || null,
         statsCases: statsCases ?? 40,
         statsProjects: statsProjects ?? 2578,
         statsCities: statsCities ?? 4,
@@ -151,6 +155,8 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       update: {
         displayName: displayName !== undefined ? displayName || null : undefined,
         avatarUrl: avatarUrl !== undefined ? avatarUrl || null : undefined,
+        phone: phone !== undefined ? phone || null : undefined,
+        telegramUsername: telegramUsername !== undefined ? telegramUsername || null : undefined,
         statsCases: statsCases !== undefined ? statsCases : undefined,
         statsProjects: statsProjects !== undefined ? statsProjects : undefined,
         statsCities: statsCities !== undefined ? statsCities : undefined,

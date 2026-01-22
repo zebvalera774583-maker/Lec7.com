@@ -21,6 +21,8 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
       profile: {
         select: {
           avatarUrl: true,
+          phone: true,
+          telegramUsername: true,
           statsCases: true,
           statsProjects: true,
           statsCities: true,

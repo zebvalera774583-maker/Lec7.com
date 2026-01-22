@@ -50,17 +50,19 @@ model Business {
 }
 
 model BusinessProfile {
-  id            String   @id @default(cuid())
-  businessId    String   @unique
-  displayName   String?
-  avatarUrl     String?
-  statsCases    Int      @default(40)
-  statsProjects Int      @default(2578)
-  statsCities   Int      @default(4)
-  cities        String[]
-  services      String[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  businessId      String   @unique
+  displayName     String?
+  avatarUrl       String?
+  phone           String?
+  telegramUsername String?
+  statsCases      Int      @default(40)
+  statsProjects   Int      @default(2578)
+  statsCities     Int      @default(4)
+  cities          String[]
+  services        String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 

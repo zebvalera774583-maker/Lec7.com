@@ -16,6 +16,8 @@ interface BusinessProfile {
   businessId: string
   displayName: string | null
   avatarUrl: string | null
+  phone: string | null
+  telegramUsername: string | null
   statsCases: number
   statsProjects: number
   statsCities: number
@@ -56,6 +58,8 @@ export default function BusinessProfileEditor({
   const router = useRouter()
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [phone, setPhone] = useState('')
+  const [telegramUsername, setTelegramUsername] = useState('')
   const [cities, setCities] = useState<string[]>([])
   const [services, setServices] = useState<string[]>([])
   const [featuredServices, setFeaturedServices] = useState<string[]>(['', '', '', ''])
@@ -98,6 +102,8 @@ export default function BusinessProfileEditor({
         const profile: BusinessProfile = await response.json()
         setDisplayName(profile.displayName || '')
         setAvatarUrl(profile.avatarUrl || '')
+        setPhone(profile.phone || '')
+        setTelegramUsername(profile.telegramUsername || '')
         setCities(profile.cities || [])
         setServices(profile.services || [])
         // Заполняем featuredServices из старых данных (обратная совместимость)
@@ -451,6 +457,8 @@ export default function BusinessProfileEditor({
         body: JSON.stringify({
           displayName: displayName || null,
           avatarUrl: avatarUrl || null,
+          phone: phone || null,
+          telegramUsername: telegramUsername || null,
           statsCases: metrics.cases,
           statsProjects: metrics.projects,
           statsCities: metrics.cities,
@@ -990,6 +998,53 @@ export default function BusinessProfileEditor({
               )}
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
                 Только латинские буквы, цифры, пробелы и дефисы
+              </p>
+            </div>
+          </section>
+
+          {/* Контакты */}
+          <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+            <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Контакты</h2>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                Номер телефона
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+7 (999) 123-45-67"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '1rem',
+                }}
+              />
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
+                Будет отображаться в кнопке "Связаться" на витрине
+              </p>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                Telegram username
+              </label>
+              <input
+                type="text"
+                value={telegramUsername}
+                onChange={(e) => setTelegramUsername(e.target.value)}
+                placeholder="@username"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '1rem',
+                }}
+              />
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
+                Без символа @, например: username
               </p>
             </div>
           </section>

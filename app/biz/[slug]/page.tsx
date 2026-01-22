@@ -38,6 +38,8 @@ export default async function BizPage({ params }: PageProps) {
       profile: {
         select: {
           avatarUrl: true,
+          phone: true,
+          telegramUsername: true,
           statsCases: true,
           statsProjects: true,
           statsCities: true,
