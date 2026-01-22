@@ -312,7 +312,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           </button>
         </div>
 
-        {/* Портфолио кейсы */}
+        {/* Портфолио кейсы - Instagram-style grid */}
         <div
           style={{
             marginTop: '2.5rem',
@@ -321,37 +321,33 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           {hasPortfolioItems ? (
             <div
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2rem',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '0.9rem',
               }}
             >
               {casesWithPhotos.map((item, index) => {
-                const hasDescription = item.comment && item.comment.trim().length > 0
-
                 // Сортируем фото по sortOrder
                 const sortedPhotos = item.photos
                   .slice()
                   .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+                // Обложка: coverUrl если есть, иначе первое фото
+                const coverUrl = item.coverUrl || sortedPhotos[0]?.url
 
                 return (
                   <div
                     key={item.id}
                     onClick={() => setSelectedCaseIndex(index)}
                     style={{
-                      // КАРТОЧКА КЕЙСА - всегда одинаковая структура
-                      background: '#ffffff',
-                      border: '1px solid #e5e7eb',
+                      width: '100%',
+                      paddingTop: '100%',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      background: '#e5e7eb',
                       borderRadius: 0,
-                      padding: '1.25rem',
                       cursor: 'pointer',
                       transition: 'opacity 0.2s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.9rem',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      marginBottom: '2rem',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.opacity = '0.9'
@@ -360,79 +356,26 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       e.currentTarget.style.opacity = '1'
                     }}
                   >
-                    {/* Grid для фото внутри карточки - всегда 3 колонки */}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(3, 1fr)',
-                        gap: '0.9rem',
-                        width: '100%',
-                      }}
-                    >
-                      {sortedPhotos.map((photo, photoIndex) => {
-                        // Определяем сколько колонок занимает фото
-                        let gridColumnSpan = 1
-                        if (sortedPhotos.length === 1) {
-                          // 1 фото → занимает всю ширину (3 колонки)
-                          gridColumnSpan = 3
-                        } else if (sortedPhotos.length === 2) {
-                          // 2 фото → первое span 2, второе span 1
-                          gridColumnSpan = photoIndex === 0 ? 2 : 1
-                        } else {
-                          // 3+ фото → каждое по 1 колонке
-                          gridColumnSpan = 1
-                        }
-
-                        return (
-                          <div
-                            key={photo.id}
-                            style={{
-                              gridColumn: `span ${gridColumnSpan}`,
-                              width: '100%',
-                              paddingTop: '66%',
-                              position: 'relative',
-                              overflow: 'hidden',
-                              background: '#e5e7eb',
-                              borderRadius: 0,
-                            }}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={photo.url}
-                              alt="Фото проекта"
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Описание кейса */}
-                    {hasDescription && (
-                      <p
+                    {coverUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={coverUrl}
+                        alt="Кейс"
                         style={{
-                          margin: 0,
-                          color: '#4b5563',
-                          fontSize: '0.95rem',
-                          lineHeight: 1.6,
-                          fontWeight: 400,
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
                         }}
-                      >
-                        {item.comment}
-                      </p>
+                      />
                     )}
                   </div>
                 )
               })}
             </div>
           ) : photos.length > 0 ? (
-            // Fallback: если нет portfolioItems, показываем прямые фото бизнеса
+            // Fallback: если нет portfolioItems, показываем прямые фото бизнеса как квадраты
             <div
               style={{
                 display: 'grid',
@@ -445,7 +388,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   key={photo.id}
                   style={{
                     width: '100%',
-                    paddingTop: '66%',
+                    paddingTop: '100%',
                     position: 'relative',
                     overflow: 'hidden',
                     background: '#e5e7eb',
@@ -458,8 +401,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                     alt="Фото проекта"
                     style={{
                       position: 'absolute',
-                      top: 0,
-                      left: 0,
+                      inset: 0,
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
@@ -504,16 +446,24 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         title={business.name}
       />
 
-      {selectedCaseIndex !== null && hasPortfolioItems && casesWithPhotos[selectedCaseIndex] && (
-        <PortfolioCaseView
-          isOpen={selectedCaseIndex !== null}
-          onClose={() => setSelectedCaseIndex(null)}
-          photos={casesWithPhotos[selectedCaseIndex].photos || []}
-          description={casesWithPhotos[selectedCaseIndex].comment || null}
-          caseIndex={selectedCaseIndex}
-          totalCases={casesWithPhotos.length}
-        />
-      )}
+      {selectedCaseIndex !== null && hasPortfolioItems && casesWithPhotos[selectedCaseIndex] && (() => {
+        const selectedCase = casesWithPhotos[selectedCaseIndex]
+        // Сортируем фото по sortOrder для модалки
+        const sortedPhotos = selectedCase.photos
+          .slice()
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+
+        return (
+          <PortfolioCaseView
+            isOpen={true}
+            onClose={() => setSelectedCaseIndex(null)}
+            photos={sortedPhotos}
+            description={selectedCase.comment || null}
+            caseIndex={selectedCaseIndex}
+            totalCases={casesWithPhotos.length}
+          />
+        )
+      })()}
     </div>
   )
 }
