@@ -71,18 +71,8 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const photos = business.photos || []
   const portfolioItems = business.portfolioItems || []
 
-  // Все фото из portfolioItems, если они есть, иначе — прямые фото бизнеса
-  const galleryPhotos: PortfolioItemPhoto[] = (() => {
-    const fromItems: PortfolioItemPhoto[] = []
-    portfolioItems.forEach((item) => {
-      item.photos.forEach((p) => fromItems.push(p))
-    })
-    if (fromItems.length > 0) return fromItems
-    return photos
-  })()
-
-  const displayPhotos = galleryPhotos.slice(0, 6)
-  const totalPages = Math.max(1, Math.ceil(Math.max(galleryPhotos.length, 1) / 6))
+  // Используем portfolioItems как кейсы, если они есть, иначе — прямые фото бизнеса как fallback
+  const hasPortfolioItems = portfolioItems.length > 0 && portfolioItems.some((item) => item.photos.length > 0)
 
   return (
     <div
@@ -317,60 +307,135 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           </button>
         </div>
 
-        {/* Галерея 3x2 */}
+        {/* Портфолио кейсы */}
         <div
           style={{
             marginTop: '2.5rem',
           }}
         >
-          {displayPhotos.length > 0 ? (
-            <>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                  gap: '0.9rem',
-                }}
-              >
-                {displayPhotos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    style={{
-                      width: '100%',
-                      paddingTop: '66%',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      background: '#e5e7eb',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={photo.url}
-                      alt="Фото проекта"
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
+          {hasPortfolioItems ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2rem',
+              }}
+            >
+              {portfolioItems
+                .filter((item) => item.photos.length > 0)
+                .map((item) => {
+                  const itemPhotos = item.photos
+                  const hasDescription = item.comment && item.comment.trim().length > 0
 
-              <div
-                style={{
-                  marginTop: '1.75rem',
-                  textAlign: 'center',
-                  fontSize: '0.9rem',
-                  color: '#4b5563',
-                }}
-              >
-                1 / {totalPages}
-              </div>
-            </>
+                  // Определяем сетку в зависимости от количества фото
+                  const getGridColumns = (count: number) => {
+                    if (count === 1) return '1fr'
+                    if (count === 2) return 'repeat(2, 1fr)'
+                    if (count === 3) return 'repeat(3, 1fr)'
+                    return 'repeat(3, 1fr)' // для 4+ фото используем 3 колонки
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem',
+                      }}
+                    >
+                      {/* Фото кейса */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: getGridColumns(itemPhotos.length),
+                          gap: '0.9rem',
+                        }}
+                      >
+                        {itemPhotos.map((photo) => (
+                          <div
+                            key={photo.id}
+                            style={{
+                              width: '100%',
+                              paddingTop: '66%',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              background: '#e5e7eb',
+                              borderRadius: 0,
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt="Фото проекта"
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Описание кейса */}
+                      {hasDescription && (
+                        <p
+                          style={{
+                            margin: 0,
+                            color: '#4b5563',
+                            fontSize: '0.95rem',
+                            lineHeight: 1.6,
+                            fontWeight: 400,
+                          }}
+                        >
+                          {item.comment}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          ) : photos.length > 0 ? (
+            // Fallback: если нет portfolioItems, показываем прямые фото бизнеса
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '0.9rem',
+              }}
+            >
+              {photos.slice(0, 6).map((photo) => (
+                <div
+                  key={photo.id}
+                  style={{
+                    width: '100%',
+                    paddingTop: '66%',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    background: '#e5e7eb',
+                    borderRadius: 0,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt="Фото проекта"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
             <p
               style={{
