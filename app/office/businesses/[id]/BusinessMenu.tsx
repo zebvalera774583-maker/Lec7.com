@@ -27,6 +27,11 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
     setIsOpen(false)
   }
 
+  const handleOpenRequests = () => {
+    router.push('/office/requests')
+    setIsOpen(false)
+  }
+
   return (
     <div style={{ position: 'relative' }}>
       <button
@@ -120,6 +125,29 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
               }}
             >
               Редактировать профиль
+            </button>
+            <button
+              onClick={handleOpenRequests}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderTop: '1px solid #e5e7eb',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: '#111827',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+            >
+              📥 Заявки
             </button>
             <button
               onClick={handleOpenAds}
