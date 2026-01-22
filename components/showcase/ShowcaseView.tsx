@@ -1,6 +1,7 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import RequestModal from './RequestModal'
 
 interface PortfolioItemPhoto {
   id: string
@@ -45,6 +46,8 @@ interface ShowcaseViewProps {
 }
 
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
+
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
   const statsCities = business.profile?.statsCities ?? 4
@@ -235,6 +238,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         >
           <button
             type="button"
+            onClick={() => setIsRequestModalOpen(true)}
             style={{
               minWidth: 150,
               padding: '0.8rem 1.2rem',
@@ -243,7 +247,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               background: '#f9fafb',
               color: '#111827',
               fontSize: '0.9rem',
-              cursor: 'default',
+              cursor: 'pointer',
             }}
           >
             Расчёт
@@ -348,6 +352,13 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           )}
         </div>
       </section>
+
+      <RequestModal
+        isOpen={isRequestModalOpen}
+        onClose={() => setIsRequestModalOpen(false)}
+        businessId={business.id}
+        businessName={business.name}
+      />
     </div>
   )
 }
