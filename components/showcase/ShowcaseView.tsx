@@ -90,14 +90,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
       }}
     >
       {/* Карточка витрины по макету P3 */}
-      <section
-        style={{
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 0,
-          padding: '3rem 3rem 2.5rem',
-        }}
-      >
+      <section>
         {/* Hero */}
         <div
           style={{
