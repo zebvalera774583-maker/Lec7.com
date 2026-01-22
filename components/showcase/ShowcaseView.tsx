@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import RequestModal from './RequestModal'
 import ContactModal from './ContactModal'
 import ShareModal from './ShareModal'
@@ -55,8 +55,19 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [selectedCaseIndex, setSelectedCaseIndex] = useState<number | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+
+  // Определяем мобильный режим
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 640)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
@@ -92,78 +103,166 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
       {/* Карточка витрины по макету P3 */}
       <section>
         {/* Hero */}
-        <div
-          style={{
-            textAlign: 'center',
-          }}
-        >
-          <h1
-            style={{
-              margin: 0,
-              fontSize: '2.4rem',
-              fontWeight: 500,
-              letterSpacing: '0.03em',
-              color: '#111827',
-            }}
-          >
-            {business.name}
-          </h1>
-
-          <div
-            style={{
-              marginTop: '1.9rem',
-              display: 'flex',
-              justifyContent: 'center',
-            }}
-          >
+        {isMobile ? (
+          // Mobile: Instagram-style layout
+          <div>
+            {/* Header: Avatar + Name + Stats */}
             <div
               style={{
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                backgroundColor: '#dde1e7',
-                overflow: 'hidden',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
+                gap: '1rem',
+                marginBottom: '1rem',
+              }}
+            >
+              {/* Left: Avatar */}
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: '50%',
+                  backgroundColor: '#dde1e7',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {business.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={business.avatarUrl}
+                    alt={business.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '2rem', fontWeight: 500, color: '#ffffff' }}>{initials}</span>
+                )}
+              </div>
+
+              {/* Right: Name + Stats */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: '1.3rem',
+                    fontWeight: 500,
+                    color: '#111827',
+                  }}
+                >
+                  {business.name}
+                </h1>
+
+                {/* Stats */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem',
+                    fontSize: '0.85rem',
+                    color: '#111827',
+                  }}
+                >
+                  <div>
+                    <span style={{ fontWeight: 600 }}>{statsCases}</span> кейсов
+                  </div>
+                  <div>
+                    <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов
+                  </div>
+                  <div>
+                    <span style={{ fontWeight: 600 }}>{statsCities}</span> города
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Desktop: Centered layout
+          <div
+            style={{
+              textAlign: 'center',
+            }}
+          >
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '2.4rem',
+                fontWeight: 500,
+                letterSpacing: '0.03em',
+                color: '#111827',
+              }}
+            >
+              {business.name}
+            </h1>
+
+            <div
+              style={{
+                marginTop: '1.9rem',
+                display: 'flex',
                 justifyContent: 'center',
               }}
             >
-              {business.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={business.avatarUrl}
-                  alt={business.name}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-              ) : (
-                <span style={{ fontSize: '3rem', fontWeight: 500, color: '#ffffff' }}>{initials}</span>
-              )}
+              <div
+                style={{
+                  width: 120,
+                  height: 120,
+                  borderRadius: '50%',
+                  backgroundColor: '#dde1e7',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {business.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={business.avatarUrl}
+                    alt={business.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '3rem', fontWeight: 500, color: '#ffffff' }}>{initials}</span>
+                )}
+              </div>
             </div>
-          </div>
 
-          <p
-            style={{
-              marginTop: '1.75rem',
-              marginBottom: 0,
-              fontSize: '0.95rem',
-              color: '#111827',
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>{statsCases}</span> уникальных кейсов&nbsp;|{' '}
-            <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов&nbsp;|{' '}
-            <span style={{ fontWeight: 600 }}>{statsCities}</span> города
-          </p>
-        </div>
+            <p
+              style={{
+                marginTop: '1.75rem',
+                marginBottom: 0,
+                fontSize: '0.95rem',
+                color: '#111827',
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>{statsCases}</span> уникальных кейсов&nbsp;|{' '}
+              <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов&nbsp;|{' '}
+              <span style={{ fontWeight: 600 }}>{statsCities}</span> города
+            </p>
+          </div>
+        )}
 
         {/* Разделитель */}
         <div
           style={{
-            marginTop: '2.25rem',
-            marginBottom: '2rem',
+            marginTop: isMobile ? '1rem' : '2.25rem',
+            marginBottom: isMobile ? '1rem' : '2rem',
             height: 1,
             background: 'rgba(15, 23, 42, 0.06)',
           }}
@@ -175,7 +274,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
             style={{
               margin: 0,
               marginBottom: '0.75rem',
-              fontSize: '1rem',
+              fontSize: isMobile ? '0.9rem' : '1rem',
               fontWeight: 600,
               color: '#111827',
             }}
@@ -213,9 +312,9 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         {profileCities.length > 0 && (
           <div
             style={{
-              marginTop: '2.25rem',
-              textAlign: 'center',
-              fontSize: '0.95rem',
+              marginTop: isMobile ? '1.25rem' : '2.25rem',
+              textAlign: isMobile ? 'left' : 'center',
+              fontSize: isMobile ? '0.85rem' : '0.95rem',
               color: '#4b5563',
             }}
           >
@@ -226,24 +325,26 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         {/* CTA-кнопки */}
         <div
           style={{
-            marginTop: '1.9rem',
+            marginTop: isMobile ? '1.25rem' : '1.9rem',
             display: 'flex',
             justifyContent: 'center',
-            gap: '1rem',
+            gap: isMobile ? '0.5rem' : '1rem',
           }}
         >
           <button
             type="button"
             onClick={() => setIsRequestModalOpen(true)}
             style={{
-              minWidth: 150,
-              padding: '0.8rem 1.2rem',
+              minWidth: isMobile ? 0 : 150,
+              flex: isMobile ? 1 : 'none',
+              padding: isMobile ? '0.65rem 0.5rem' : '0.8rem 1.2rem',
               borderRadius: 0,
               border: '1px solid #d1d5db',
               background: '#f9fafb',
               color: '#111827',
-              fontSize: '0.9rem',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
             Расчёт
@@ -252,14 +353,16 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
             type="button"
             onClick={() => setIsContactModalOpen(true)}
             style={{
-              minWidth: 170,
-              padding: '0.8rem 1.2rem',
+              minWidth: isMobile ? 0 : 170,
+              flex: isMobile ? 1 : 'none',
+              padding: isMobile ? '0.65rem 0.5rem' : '0.8rem 1.2rem',
               borderRadius: 0,
               border: '1px solid #4b5563',
               background: '#4b6fae',
               color: '#ffffff',
-              fontSize: '0.9rem',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
             Связаться
@@ -291,14 +394,16 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               setIsShareModalOpen(true)
             }}
             style={{
-              minWidth: 170,
-              padding: '0.8rem 1.2rem',
+              minWidth: isMobile ? 0 : 170,
+              flex: isMobile ? 1 : 'none',
+              padding: isMobile ? '0.65rem 0.5rem' : '0.8rem 1.2rem',
               borderRadius: 0,
               border: '1px solid #d1d5db',
               background: '#f9fafb',
               color: '#111827',
-              fontSize: '0.9rem',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
             }}
           >
             Поделиться
@@ -308,7 +413,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         {/* Портфолио кейсы - Instagram-style grid */}
         <div
           style={{
-            marginTop: '2.5rem',
+            marginTop: isMobile ? '1.5rem' : '2.5rem',
           }}
         >
           {hasPortfolioItems ? (
@@ -316,7 +421,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                gap: '0.9rem',
+                gap: isMobile ? '0.4rem' : '0.9rem',
               }}
             >
               {casesWithPhotos.map((item, index) => {
@@ -373,7 +478,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                gap: '0.9rem',
+                gap: isMobile ? '0.4rem' : '0.9rem',
               }}
             >
               {photos.slice(0, 6).map((photo) => (
