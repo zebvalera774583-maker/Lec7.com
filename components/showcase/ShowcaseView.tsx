@@ -329,14 +329,6 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               {casesWithPhotos.map((item, index) => {
                 const hasDescription = item.comment && item.comment.trim().length > 0
 
-                // Определяем сетку для фото внутри карточки
-                // 1 фото → grid 1×1, 2 фото → grid 2×1, 3+ фото → grid 3×1
-                const getGridColumns = (count: number) => {
-                  if (count === 1) return '1fr'
-                  if (count === 2) return 'repeat(2, 1fr)'
-                  return 'repeat(3, 1fr)' // для 3+ фото используем 3 колонки
-                }
-
                 // Сортируем фото по sortOrder
                 const sortedPhotos = item.photos
                   .slice()
@@ -349,17 +341,16 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                     style={{
                       // КАРТОЧКА КЕЙСА - всегда одинаковая структура
                       background: '#ffffff',
-                      border: '1px solid #d1d5db',
+                      border: '1px solid #e5e7eb',
                       borderRadius: 0,
-                      padding: '1.5rem',
+                      padding: '1.25rem',
                       cursor: 'pointer',
                       transition: 'opacity 0.2s',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '1rem',
+                      gap: '0.9rem',
                       width: '100%',
                       boxSizing: 'border-box',
-                      // Убеждаемся, что карточка видна
                       marginBottom: '2rem',
                     }}
                     onMouseEnter={(e) => {
@@ -369,41 +360,57 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       e.currentTarget.style.opacity = '1'
                     }}
                   >
-                    {/* Grid для фото внутри карточки */}
+                    {/* Grid для фото внутри карточки - всегда 3 колонки */}
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: getGridColumns(sortedPhotos.length),
+                        gridTemplateColumns: 'repeat(3, 1fr)',
                         gap: '0.9rem',
                         width: '100%',
                       }}
                     >
-                      {sortedPhotos.map((photo) => (
-                        <div
-                          key={photo.id}
-                          style={{
-                            width: '100%',
-                            paddingTop: '66%',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            background: '#e5e7eb',
-                            borderRadius: 0,
-                          }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={photo.url}
-                            alt="Фото проекта"
+                      {sortedPhotos.map((photo, photoIndex) => {
+                        // Определяем сколько колонок занимает фото
+                        let gridColumnSpan = 1
+                        if (sortedPhotos.length === 1) {
+                          // 1 фото → занимает всю ширину (3 колонки)
+                          gridColumnSpan = 3
+                        } else if (sortedPhotos.length === 2) {
+                          // 2 фото → первое span 2, второе span 1
+                          gridColumnSpan = photoIndex === 0 ? 2 : 1
+                        } else {
+                          // 3+ фото → каждое по 1 колонке
+                          gridColumnSpan = 1
+                        }
+
+                        return (
+                          <div
+                            key={photo.id}
                             style={{
-                              position: 'absolute',
-                              inset: 0,
+                              gridColumn: `span ${gridColumnSpan}`,
                               width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
+                              paddingTop: '66%',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              background: '#e5e7eb',
+                              borderRadius: 0,
                             }}
-                          />
-                        </div>
-                      ))}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt="Фото проекта"
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                              }}
+                            />
+                          </div>
+                        )
+                      })}
                     </div>
 
                     {/* Описание кейса */}
