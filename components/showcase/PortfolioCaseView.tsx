@@ -95,7 +95,7 @@ export default function PortfolioCaseView({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.95)',
+          background: '#000000',
           zIndex: 2000,
           display: 'flex',
           flexDirection: 'column',
@@ -111,12 +111,13 @@ export default function PortfolioCaseView({
             position: 'relative',
             width: '100%',
             maxWidth: '1200px',
-            height: '100%',
+            height: '100vh',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: '2rem',
             overflow: 'hidden',
+            background: '#000000',
           }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => handleSwipeStart(e.clientX)}
@@ -160,6 +161,7 @@ export default function PortfolioCaseView({
               justifyContent: 'center',
               gap: '1rem',
               position: 'relative',
+              background: '#000000',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -173,6 +175,7 @@ export default function PortfolioCaseView({
                 height: 'auto',
                 objectFit: 'contain',
                 display: 'block',
+                background: '#000000',
               }}
             />
 
