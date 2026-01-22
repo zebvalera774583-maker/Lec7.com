@@ -349,7 +349,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                     style={{
                       // КАРТОЧКА КЕЙСА - всегда одинаковая структура
                       background: '#ffffff',
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid #d1d5db',
                       borderRadius: 0,
                       padding: '1.5rem',
                       cursor: 'pointer',
@@ -357,6 +357,10 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '1rem',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      // Убеждаемся, что карточка видна
+                      marginBottom: '2rem',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.opacity = '0.9'
