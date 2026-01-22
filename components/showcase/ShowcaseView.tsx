@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import RequestModal from './RequestModal'
 import ContactModal from './ContactModal'
+import ShareModal from './ShareModal'
 
 interface PortfolioItemPhoto {
   id: string
@@ -51,6 +52,9 @@ interface ShowcaseViewProps {
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
   const [isContactModalOpen, setIsContactModalOpen] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
@@ -274,6 +278,30 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           </button>
           <button
             type="button"
+            onClick={async () => {
+              const url = window.location.href
+              const title = business.name
+
+              // Пробуем использовать Web Share API если доступен
+              if (navigator.share) {
+                try {
+                  await navigator.share({
+                    title: title,
+                    text: `Посмотрите витрину ${title} на Lec7`,
+                    url: url,
+                  })
+                  return
+                } catch (err) {
+                  // Пользователь отменил или произошла ошибка
+                  if ((err as Error).name !== 'AbortError') {
+                    console.error('Error sharing:', err)
+                  }
+                }
+              }
+
+              // Если Web Share API недоступен, показываем модальное окно
+              setIsShareModalOpen(true)
+            }}
             style={{
               minWidth: 170,
               padding: '0.8rem 1.2rem',
@@ -282,7 +310,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               background: '#f9fafb',
               color: '#111827',
               fontSize: '0.9rem',
-              cursor: 'default',
+              cursor: 'pointer',
             }}
           >
             Поделиться
@@ -370,6 +398,13 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         onClose={() => setIsContactModalOpen(false)}
         phone={business.profile?.phone ?? null}
         telegramUsername={business.profile?.telegramUsername ?? null}
+      />
+
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        url={shareUrl}
+        title={business.name}
       />
     </div>
   )
