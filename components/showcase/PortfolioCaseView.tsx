@@ -27,13 +27,20 @@ export default function PortfolioCaseView({
       setCurrentPhotoIndex(0)
       // Блокируем скролл body при открытии модалки
       document.body.style.overflow = 'hidden'
+      // Устанавливаем бежевый фон для body и html, чтобы не было белого фона
+      const originalBodyBackground = document.body.style.background
+      const originalHtmlBackground = document.documentElement.style.background
+      document.body.style.background = '#f7f2ee'
+      document.documentElement.style.background = '#f7f2ee'
+      
+      return () => {
+        // Восстанавливаем скролл и фон при закрытии модалки
+        document.body.style.overflow = ''
+        document.body.style.background = originalBodyBackground
+        document.documentElement.style.background = originalHtmlBackground
+      }
     } else {
       // Разблокируем скролл body при закрытии модалки
-      document.body.style.overflow = ''
-    }
-
-    return () => {
-      // Восстанавливаем скролл при размонтировании
       document.body.style.overflow = ''
     }
   }, [isOpen])
