@@ -24,6 +24,16 @@ export default function PortfolioCaseView({
   useEffect(() => {
     if (isOpen) {
       setCurrentPhotoIndex(0)
+      // Блокируем скролл body при открытии модалки
+      document.body.style.overflow = 'hidden'
+    } else {
+      // Разблокируем скролл body при закрытии модалки
+      document.body.style.overflow = ''
+    }
+
+    return () => {
+      // Восстанавливаем скролл при размонтировании
+      document.body.style.overflow = ''
     }
   }, [isOpen])
 
@@ -95,7 +105,7 @@ export default function PortfolioCaseView({
           left: 0,
           right: 0,
           bottom: 0,
-          background: '#000000',
+          background: '#f7f2ee',
           zIndex: 2000,
           display: 'flex',
           flexDirection: 'column',
@@ -117,7 +127,7 @@ export default function PortfolioCaseView({
             justifyContent: 'center',
             padding: '2rem',
             overflow: 'hidden',
-            background: '#000000',
+            background: '#f7f2ee',
           }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => handleSwipeStart(e.clientX)}
@@ -132,10 +142,10 @@ export default function PortfolioCaseView({
                 left: '1rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
                 borderRadius: 0,
-                color: '#ffffff',
+                color: '#111827',
                 width: '48px',
                 height: '48px',
                 display: 'flex',
@@ -161,7 +171,7 @@ export default function PortfolioCaseView({
               justifyContent: 'center',
               gap: '1rem',
               position: 'relative',
-              background: '#000000',
+              background: '#f7f2ee',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -175,7 +185,6 @@ export default function PortfolioCaseView({
                 height: 'auto',
                 objectFit: 'contain',
                 display: 'block',
-                background: '#000000',
               }}
             />
 
@@ -183,7 +192,7 @@ export default function PortfolioCaseView({
             {photos.length > 1 && (
               <div
                 style={{
-                  color: '#ffffff',
+                  color: '#111827',
                   fontSize: '0.9rem',
                   textAlign: 'center',
                 }}
@@ -196,7 +205,7 @@ export default function PortfolioCaseView({
             {description && description.trim().length > 0 && (
               <div
                 style={{
-                  color: '#ffffff',
+                  color: '#111827',
                   fontSize: '1rem',
                   textAlign: 'center',
                   maxWidth: '800px',
@@ -218,10 +227,10 @@ export default function PortfolioCaseView({
                 right: '1rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
                 borderRadius: 0,
-                color: '#ffffff',
+                color: '#111827',
                 width: '48px',
                 height: '48px',
                 display: 'flex',
@@ -244,10 +253,10 @@ export default function PortfolioCaseView({
             position: 'absolute',
             top: '1rem',
             right: '1rem',
-            background: 'rgba(255, 255, 255, 0.2)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
             borderRadius: 0,
-            color: '#ffffff',
+            color: '#111827',
             width: '48px',
             height: '48px',
             display: 'flex',
