@@ -329,13 +329,12 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               {casesWithPhotos.map((item, index) => {
                 const hasDescription = item.comment && item.comment.trim().length > 0
 
-                // Определяем сетку в зависимости от количества фото
-                // Все кейсы используют одинаковую структуру сетки
+                // Определяем сетку для фото внутри карточки
+                // 1 фото → grid 1×1, 2 фото → grid 2×1, 3+ фото → grid 3×1
                 const getGridColumns = (count: number) => {
-                  if (count === 1) return 'repeat(3, 1fr)' // 1 фото в сетке 3×1, но занимает только 1 колонку
+                  if (count === 1) return '1fr'
                   if (count === 2) return 'repeat(2, 1fr)'
-                  if (count === 3) return 'repeat(3, 1fr)'
-                  return 'repeat(3, 1fr)' // для 4+ фото используем 3 колонки
+                  return 'repeat(3, 1fr)' // для 3+ фото используем 3 колонки
                 }
 
                 // Сортируем фото по sortOrder
@@ -348,11 +347,16 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                     key={item.id}
                     onClick={() => setSelectedCaseIndex(index)}
                     style={{
+                      // КАРТОЧКА КЕЙСА - всегда одинаковая структура
+                      background: '#ffffff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 0,
+                      padding: '1.5rem',
+                      cursor: 'pointer',
+                      transition: 'opacity 0.2s',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '1rem',
-                      cursor: 'pointer',
-                      transition: 'opacity 0.2s',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.opacity = '0.9'
@@ -361,46 +365,41 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       e.currentTarget.style.opacity = '1'
                     }}
                   >
-                    {/* Фото кейса - весь контейнер кликабелен */}
+                    {/* Grid для фото внутри карточки */}
                     <div
                       style={{
                         display: 'grid',
                         gridTemplateColumns: getGridColumns(sortedPhotos.length),
                         gap: '0.9rem',
+                        width: '100%',
                       }}
                     >
-                      {sortedPhotos.map((photo, idx) => {
-                        // Для 1 фото - занимает только 1 колонку из 3
-                        const gridColumnSpan = sortedPhotos.length === 1 ? 1 : 1
-
-                        return (
-                          <div
-                            key={photo.id}
+                      {sortedPhotos.map((photo) => (
+                        <div
+                          key={photo.id}
+                          style={{
+                            width: '100%',
+                            paddingTop: '66%',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            background: '#e5e7eb',
+                            borderRadius: 0,
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.url}
+                            alt="Фото проекта"
                             style={{
-                              gridColumn: sortedPhotos.length === 1 ? 'span 1' : undefined,
+                              position: 'absolute',
+                              inset: 0,
                               width: '100%',
-                              paddingTop: '66%',
-                              position: 'relative',
-                              overflow: 'hidden',
-                              background: '#e5e7eb',
-                              borderRadius: 0,
+                              height: '100%',
+                              objectFit: 'cover',
                             }}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={photo.url}
-                              alt="Фото проекта"
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                              }}
-                            />
-                          </div>
-                        )
-                      })}
+                          />
+                        </div>
+                      ))}
                     </div>
 
                     {/* Описание кейса */}
