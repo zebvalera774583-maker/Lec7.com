@@ -1,12 +1,6 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import jwt from 'jsonwebtoken'
-
-type JwtPayload = {
-  id?: string
-  email?: string
-  role?: string
-}
+import { verifyToken } from '@/lib/auth'
 
 export default async function AdminLayout({
   children,
@@ -14,22 +8,24 @@ export default async function AdminLayout({
   children: React.ReactNode
 }) {
   const h = headers()
-  const forwardedUri = h.get('x-forwarded-uri') || h.get('x-original-uri') || null
-  const target = forwardedUri && forwardedUri.startsWith('/admin') ? forwardedUri : '/admin'
-  const redirectTarget = `/login?redirect=${encodeURIComponent(target)}`
+  // Используем x-pathname, который устанавливается middleware
+  const pathname = h.get('x-pathname') || '/admin'
+  
+  // Пропускаем проверку для страницы логина, чтобы избежать бесконечного редиректа
+  if (pathname.startsWith('/admin/login')) {
+    return <>{children}</>
+  }
 
-  const token = cookies().get('token')?.value
+  const target = pathname.startsWith('/admin') ? pathname : '/admin'
+  const redirectTarget = `/admin/login?redirect=${encodeURIComponent(target)}`
+
+  const token = cookies().get('auth_token')?.value
 
   if (!token) {
     redirect(redirectTarget)
   }
 
-  let user: JwtPayload | null = null
-  try {
-    user = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload
-  } catch {
-    user = null
-  }
+  const user = verifyToken(token)
 
   if (!user || user.role !== 'LEC7_ADMIN') {
     redirect(redirectTarget)
