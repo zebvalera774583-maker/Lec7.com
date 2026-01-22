@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface PortfolioCaseViewProps {
   isOpen: boolean
@@ -95,7 +96,8 @@ export default function PortfolioCaseView({
 
   const currentPhoto = photos[currentPhotoIndex]
 
-  return (
+  // Рендерим модалку через Portal в body, чтобы избежать проблем с белым фоном
+  const modalContent = (
     <>
       {/* Overlay */}
       <div
@@ -271,4 +273,8 @@ export default function PortfolioCaseView({
       </div>
     </>
   )
+
+  // Рендерим через Portal в body
+  if (typeof window === 'undefined') return null
+  return createPortal(modalContent, document.body)
 }
