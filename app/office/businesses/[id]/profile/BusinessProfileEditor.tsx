@@ -1023,7 +1023,7 @@ export default function BusinessProfileEditor({
                 }}
               />
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
-                Будет отображаться в кнопке "Связаться" на витрине
+                Будет отображаться в кнопке &quot;Связаться&quot; на витрине
               </p>
             </div>
             <div style={{ marginBottom: '1rem' }}>
