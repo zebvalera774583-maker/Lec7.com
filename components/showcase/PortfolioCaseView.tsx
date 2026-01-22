@@ -120,7 +120,6 @@ export default function PortfolioCaseView({
           style={{
             position: 'relative',
             width: '100%',
-            maxWidth: '1200px',
             height: '100vh',
             display: 'flex',
             alignItems: 'center',
