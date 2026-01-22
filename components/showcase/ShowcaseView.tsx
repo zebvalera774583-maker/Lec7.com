@@ -329,14 +329,8 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   const itemPhotos = item.photos
                   const hasDescription = item.comment && item.comment.trim().length > 0
 
-                  // Определяем сетку в зависимости от количества фото
-                  const getGridColumns = (count: number) => {
-                    if (count === 1) return '1fr'
-                    if (count === 2) return 'repeat(2, 1fr)'
-                    if (count === 3) return 'repeat(3, 1fr)'
-                    return 'repeat(3, 1fr)' // для 4+ фото используем 3 колонки
-                  }
-
+                  // ВСЕ кейсы используют одинаковую сетку 3×1
+                  // Количество фото не влияет на структуру контейнера
                   return (
                     <div
                       key={item.id}
@@ -356,40 +350,50 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       }}
                     >
                       {/* Фото кейса - весь контейнер кликабелен */}
+                      {/* ВСЕ кейсы используют одинаковую сетку 3×1 */}
                       <div
                         style={{
                           display: 'grid',
-                          gridTemplateColumns: getGridColumns(itemPhotos.length),
+                          gridTemplateColumns: 'repeat(3, 1fr)',
                           gap: '0.9rem',
                         }}
                       >
-                        {itemPhotos.map((photo) => (
-                          <div
-                            key={photo.id}
-                            style={{
-                              width: '100%',
-                              paddingTop: '66%',
-                              position: 'relative',
-                              overflow: 'hidden',
-                              background: '#e5e7eb',
-                              borderRadius: 0,
-                            }}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={photo.url}
-                              alt="Фото проекта"
+                        {itemPhotos.map((photo, idx) => {
+                          // Для 1 фото - занимает только 1 колонку из 3
+                          // Для 2 фото - каждое занимает 1 колонку
+                          // Для 3+ фото - каждое занимает 1 колонку
+                          const gridColumnStart = idx + 1
+                          const gridColumnEnd = idx + 2
+
+                          return (
+                            <div
+                              key={photo.id}
                               style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
+                                gridColumn: `${gridColumnStart} / ${gridColumnEnd}`,
                                 width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
+                                paddingTop: '66%',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                background: '#e5e7eb',
+                                borderRadius: 0,
                               }}
-                            />
-                          </div>
-                        ))}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={photo.url}
+                                alt="Фото проекта"
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                }}
+                              />
+                            </div>
+                          )
+                        })}
                       </div>
 
                       {/* Описание кейса */}
