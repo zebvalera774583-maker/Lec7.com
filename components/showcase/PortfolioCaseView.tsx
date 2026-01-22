@@ -137,7 +137,7 @@ export default function PortfolioCaseView({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '2rem',
+            padding: 0,
             overflow: 'hidden',
             background: '#f7f2ee',
           }}
@@ -184,6 +184,7 @@ export default function PortfolioCaseView({
               gap: '1rem',
               position: 'relative',
               background: '#f7f2ee',
+              padding: '2rem',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -197,6 +198,7 @@ export default function PortfolioCaseView({
                 height: 'auto',
                 objectFit: 'contain',
                 display: 'block',
+                background: '#f7f2ee',
               }}
             />
 
