@@ -45,12 +45,6 @@ interface ShowcaseViewProps {
 }
 
 export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
-  const cityLabel =
-    business.city && business.city.trim().length > 0 ? business.city : 'Город не указан'
-  const categoryLabel =
-    business.category && business.category.trim().length > 0 ? business.category : 'Категория не указана'
-  const subtitle = `${cityLabel} • ${categoryLabel}`
-
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
   const statsCities = business.profile?.statsCities ?? 4
@@ -155,17 +149,6 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           <p
             style={{
               marginTop: '1.75rem',
-              marginBottom: 0,
-              fontSize: '0.98rem',
-              color: '#4b5563',
-            }}
-          >
-            {subtitle}
-          </p>
-
-          <p
-            style={{
-              marginTop: '1.1rem',
               marginBottom: 0,
               fontSize: '0.95rem',
               color: '#111827',
