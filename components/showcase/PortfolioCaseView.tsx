@@ -95,12 +95,13 @@ export default function PortfolioCaseView({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.9)',
+          background: 'rgba(0, 0, 0, 0.95)',
           zIndex: 2000,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
         }}
         onClick={onClose}
       >
@@ -115,6 +116,7 @@ export default function PortfolioCaseView({
             alignItems: 'center',
             justifyContent: 'center',
             padding: '2rem',
+            overflow: 'hidden',
           }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => handleSwipeStart(e.clientX)}
@@ -151,11 +153,13 @@ export default function PortfolioCaseView({
           <div
             style={{
               width: '100%',
-              maxHeight: '90vh',
+              height: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '1rem',
+              position: 'relative',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -164,8 +168,11 @@ export default function PortfolioCaseView({
               alt={`Фото ${currentPhotoIndex + 1} из ${photos.length}`}
               style={{
                 maxWidth: '100%',
-                maxHeight: '70vh',
+                maxHeight: 'calc(100vh - 200px)',
+                width: 'auto',
+                height: 'auto',
                 objectFit: 'contain',
+                display: 'block',
               }}
             />
 
