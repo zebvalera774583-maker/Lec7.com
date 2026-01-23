@@ -33,6 +33,7 @@ export default function AgentLayout() {
   // Загрузка списка чатов
   useEffect(() => {
     loadConversations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Загрузка сообщений при выборе чата
