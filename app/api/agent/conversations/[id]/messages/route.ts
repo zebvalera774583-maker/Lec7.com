@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/middleware'
 import { prisma } from '@/lib/prisma'
-import { openai } from '@/lib/openai'
 
 /**
  * POST /api/agent/conversations/[id]/messages
@@ -101,35 +100,50 @@ export async function POST(
       }
     }
 
-    // Вызов OpenAI
+    // Вызов AI Gateway
     let assistantContent = 'Извините, произошла ошибка при генерации ответа.'
     let meta: any = null
 
-    if (openai) {
+    const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
+    const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
+
+    if (!gatewayUrl || !gatewaySecret) {
+      console.warn('AI Gateway configuration is missing')
+      assistantContent = 'AI не настроен. Пожалуйста, настройте LEC7_AI_GATEWAY_URL и LEC7_GATEWAY_SECRET.'
+    } else {
       try {
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...messages,
-          ],
-          temperature: 0.7,
+        // Подготовка messages для Gateway (включая system prompt)
+        const gatewayMessages = [
+          { role: 'system' as const, content: systemPrompt },
+          ...messages,
+        ]
+
+        const gatewayResponse = await fetch(`${gatewayUrl}/v1/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-LEC7-GATEWAY-SECRET': gatewaySecret,
+          },
+          body: JSON.stringify({ messages: gatewayMessages }),
         })
 
-        assistantContent = completion.choices[0]?.message?.content || assistantContent
-        meta = {
-          model: 'gpt-4o-mini',
-          tokens: completion.usage?.total_tokens,
-          promptTokens: completion.usage?.prompt_tokens,
-          completionTokens: completion.usage?.completion_tokens,
+        if (!gatewayResponse.ok) {
+          const errorText = await gatewayResponse.text().catch(() => 'AI gateway error')
+          console.error('AI Gateway error:', gatewayResponse.status, errorText)
+          assistantContent = 'Извините, не удалось получить ответ от AI. Попробуйте позже.'
+        } else {
+          const data = (await gatewayResponse.json()) as { reply?: string }
+          assistantContent = data.reply?.trim() || assistantContent
+          meta = {
+            model: 'gpt-4o-mini',
+            gateway: true,
+            gatewayUrl,
+          }
         }
       } catch (error) {
-        console.error('OpenAI API error:', error)
+        console.error('AI Gateway request error:', error)
         assistantContent = 'Извините, не удалось получить ответ от AI. Попробуйте позже.'
       }
-    } else {
-      console.warn('OPENAI_API_KEY is not set')
-      assistantContent = 'AI не настроен. Пожалуйста, настройте OPENAI_API_KEY.'
     }
 
     // Сохранение ответа агента
