@@ -42,6 +42,7 @@ services:
       LEC7_OWNER_PASSWORD: ${LEC7_OWNER_PASSWORD}
       LEC7_AI_GATEWAY_URL: ${LEC7_AI_GATEWAY_URL}
       LEC7_GATEWAY_SECRET: ${LEC7_GATEWAY_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
