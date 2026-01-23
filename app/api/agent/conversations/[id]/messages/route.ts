@@ -112,13 +112,11 @@ export async function POST(
     const isCreatorAdmin =
       conversation.mode === 'CREATOR' && user.role === 'LEC7_ADMIN'
     const normalizedContent = content.toLowerCase()
-    const businessCountPattern =
-      /сколько\s+бизнес(ов|а)?/i ||
-      /количеств[оа]\s+бизнес(ов|а)?/i ||
-      /числ[оа]\s+бизнес(ов|а)?/i
-
     const isBusinessCountQuestion =
-      isCreatorAdmin && /сколько\s+бизнесов|количеств[оа]\s+бизнесов|числ[оа]\s+бизнесов/i.test(normalizedContent)
+      isCreatorAdmin &&
+      /сколько\s+бизнес(ов|а)?|количеств[оа]\s+бизнес(ов|а)?|числ[оа]\s+бизнес(ов|а)?/i.test(
+        normalizedContent
+      )
 
     if (isBusinessCountQuestion) {
       try {
