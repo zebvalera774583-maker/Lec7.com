@@ -18,10 +18,14 @@ function AdminLoginContent() {
     setLoading(true)
 
     try {
+      // Нормализация: удаляем пробелы и приводим email к нижнему регистру
+      const emailClean = email.trim().toLowerCase()
+      const passwordClean = password.trim()
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: emailClean, password: passwordClean }),
       })
 
       const data = await response.json()
