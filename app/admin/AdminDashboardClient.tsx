@@ -1,15 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import OwnerAgentClient from './owner-agent/OwnerAgentClient'
+import AgentLayout from '@/components/agent/AgentLayout'
 import BusinessActivationTable from './businesses/BusinessActivationTable'
-
-interface OwnerAgentClientProps {
-  gitBranch?: string
-  environment: string
-  notesPath: string
-  tasksPath: string
-}
 
 interface Business {
   id: string
@@ -21,13 +14,12 @@ interface Business {
 }
 
 interface AdminDashboardClientProps {
-  agentProps: OwnerAgentClientProps
   businesses: Business[]
 }
 
 type Tab = 'agent' | 'businesses'
 
-export default function AdminDashboardClient({ agentProps, businesses }: AdminDashboardClientProps) {
+export default function AdminDashboardClient({ businesses }: AdminDashboardClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>('agent')
   const [isMobile, setIsMobile] = useState(false)
 
@@ -142,22 +134,15 @@ export default function AdminDashboardClient({ agentProps, businesses }: AdminDa
         <div
           style={{
             flex: 1,
-            background: '#ffffff',
-            border: '1px solid #e5e7eb',
-            padding: '2rem',
+            background: activeTab === 'agent' ? 'transparent' : '#ffffff',
+            border: activeTab === 'agent' ? 'none' : '1px solid #e5e7eb',
+            padding: activeTab === 'agent' ? 0 : '2rem',
             borderRadius: 0,
             marginRight: isMobile ? '2rem' : '2rem',
             maxWidth: isMobile ? 'none' : 'calc(1200px - 200px - 2rem - 2rem)',
           }}
         >
-          {activeTab === 'agent' && (
-            <OwnerAgentClient
-              gitBranch={agentProps.gitBranch}
-              environment={agentProps.environment}
-              notesPath={agentProps.notesPath}
-              tasksPath={agentProps.tasksPath}
-            />
-          )}
+          {activeTab === 'agent' && <AgentLayout />}
           {activeTab === 'businesses' && <BusinessActivationTable businesses={businesses} />}
         </div>
       </div>
