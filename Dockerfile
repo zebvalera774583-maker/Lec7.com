@@ -41,6 +41,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 # node_modules (включая Prisma CLI и сгенерированный Client)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
+# scripts (для админ-скриптов)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
 # entrypoint
 COPY --chown=nextjs:nodejs docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
