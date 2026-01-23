@@ -21,6 +21,7 @@ model User {
   ownerConversations OwnerConversation[]
   auditLogs          AuditLog[]
   conversations      Conversation[]
+  agentConversations AgentConversation[] @relation("AgentConversations")
 }
 
 model Business {
@@ -47,6 +48,7 @@ model Business {
   photos     BusinessPhoto[]
   portfolioItems BusinessPortfolioItem[]
   conversations   Conversation[]
+  agentConversations AgentConversation[] @relation("AgentConversations")
 }
 
 model BusinessProfile {
@@ -294,4 +296,64 @@ model Message {
 
   @@index([conversationId])
   @@index([role])
+}
+
+// === Agent (Chat) ===
+
+enum AgentScope {
+  PLATFORM
+  BUSINESS
+  PUBLIC
+}
+
+enum AgentMode {
+  CREATOR
+  RESIDENT
+  CLIENT
+}
+
+enum AgentMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+model AgentConversation {
+  id        String     @id @default(cuid())
+  title     String?
+  scope     AgentScope
+  mode      AgentMode  @default(CREATOR)
+
+  // кто ведёт разговор (авторизованный пользователь платформы)
+  userId    String
+  user      User       @relation("AgentConversations", fields: [userId], references: [id], onDelete: Cascade)
+
+  // привязка к бизнесу (если scope=BUSINESS). Для PLATFORM/PUBLIC будет null.
+  businessId String?
+  business   Business? @relation("AgentConversations", fields: [businessId], references: [id], onDelete: Cascade)
+
+  messages  AgentMessage[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId, updatedAt])
+  @@index([scope, businessId, updatedAt])
+}
+
+model AgentMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role           AgentMessageRole
+  content        String
+
+  // метаданные (токены, модель, latency, toolCalls и т.п.)
+  meta           Json?
+
+  createdAt      DateTime          @default(now())
+
+  @@index([conversationId, createdAt])
 }
