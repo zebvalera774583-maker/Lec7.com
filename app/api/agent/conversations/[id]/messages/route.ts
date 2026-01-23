@@ -100,49 +100,86 @@ export async function POST(
       }
     }
 
-    // Вызов AI Gateway
+    // Вызов AI Gateway или server-side tool в зависимости от запроса
     let assistantContent = 'Извините, произошла ошибка при генерации ответа.'
     let meta: any = null
 
     const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
     const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
 
-    if (!gatewayUrl || !gatewaySecret) {
-      console.warn('AI Gateway configuration is missing')
-      assistantContent = 'AI не настроен. Пожалуйста, настройте LEC7_AI_GATEWAY_URL и LEC7_GATEWAY_SECRET.'
-    } else {
+    // Tool v1: get_platform_business_count
+    // Только для CREATOR и LEC7_ADMIN, вопрос вида "сколько бизнесов..."
+    const isCreatorAdmin =
+      conversation.mode === 'CREATOR' && user.role === 'LEC7_ADMIN'
+    const normalizedContent = content.toLowerCase()
+    const businessCountPattern =
+      /сколько\s+бизнес(ов|а)?/i ||
+      /количеств[оа]\s+бизнес(ов|а)?/i ||
+      /числ[оа]\s+бизнес(ов|а)?/i
+
+    const isBusinessCountQuestion =
+      isCreatorAdmin && /сколько\s+бизнесов|количеств[оа]\s+бизнесов|числ[оа]\s+бизнесов/i.test(normalizedContent)
+
+    if (isBusinessCountQuestion) {
       try {
-        // Подготовка messages для Gateway (включая system prompt)
-        const gatewayMessages = [
-          { role: 'system' as const, content: systemPrompt },
-          ...messages,
-        ]
-
-        const gatewayResponse = await fetch(`${gatewayUrl}/v1/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-LEC7-GATEWAY-SECRET': gatewaySecret,
-          },
-          body: JSON.stringify({ messages: gatewayMessages }),
-        })
-
-        if (!gatewayResponse.ok) {
-          const errorText = await gatewayResponse.text().catch(() => 'AI gateway error')
-          console.error('AI Gateway error:', gatewayResponse.status, errorText)
-          assistantContent = 'Извините, не удалось получить ответ от AI. Попробуйте позже.'
-        } else {
-          const data = (await gatewayResponse.json()) as { reply?: string }
-          assistantContent = data.reply?.trim() || assistantContent
-          meta = {
-            model: 'gpt-4o-mini',
-            gateway: true,
-            gatewayUrl,
-          }
+        const businessCount = await prisma.business.count()
+        assistantContent = `На платформе сейчас ${businessCount} бизнесов.`
+        meta = {
+          tool: 'get_platform_business_count',
+          businessCount,
         }
       } catch (error) {
-        console.error('AI Gateway request error:', error)
-        assistantContent = 'Извините, не удалось получить ответ от AI. Попробуйте позже.'
+        console.error('Error in get_platform_business_count tool:', error)
+        assistantContent =
+          'Извините, не удалось получить число бизнесов на платформе. Попробуйте позже.'
+      }
+    } else {
+      if (!gatewayUrl || !gatewaySecret) {
+        console.warn('AI Gateway configuration is missing')
+        assistantContent =
+          'AI не настроен. Пожалуйста, настройте LEC7_AI_GATEWAY_URL и LEC7_GATEWAY_SECRET.'
+      } else {
+        try {
+          // Подготовка messages для Gateway (включая system prompt)
+          const gatewayMessages = [
+            { role: 'system' as const, content: systemPrompt },
+            ...messages,
+          ]
+
+          const gatewayResponse = await fetch(`${gatewayUrl}/v1/chat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-LEC7-GATEWAY-SECRET': gatewaySecret,
+            },
+            body: JSON.stringify({ messages: gatewayMessages }),
+          })
+
+          if (!gatewayResponse.ok) {
+            const errorText = await gatewayResponse
+              .text()
+              .catch(() => 'AI gateway error')
+            console.error(
+              'AI Gateway error:',
+              gatewayResponse.status,
+              errorText
+            )
+            assistantContent =
+              'Извините, не удалось получить ответ от AI. Попробуйте позже.'
+          } else {
+            const data = (await gatewayResponse.json()) as { reply?: string }
+            assistantContent = data.reply?.trim() || assistantContent
+            meta = {
+              model: 'gpt-4o-mini',
+              gateway: true,
+              gatewayUrl,
+            }
+          }
+        } catch (error) {
+          console.error('AI Gateway request error:', error)
+          assistantContent =
+            'Извините, не удалось получить ответ от AI. Попробуйте позже.'
+        }
       }
     }
 
