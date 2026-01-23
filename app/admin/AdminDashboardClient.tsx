@@ -41,8 +41,10 @@ export default function AdminDashboardClient({ agentProps, businesses }: AdminDa
   }, [])
 
   return (
-    <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <h1 style={{ marginBottom: '2rem', fontSize: '1.875rem', fontWeight: 700 }}>Админ-панель</h1>
+    <main style={{ width: '100%', padding: isMobile ? '2rem' : '2rem 0' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', paddingLeft: isMobile ? 0 : '2rem', paddingRight: isMobile ? 0 : '2rem' }}>
+        <h1 style={{ marginBottom: '2rem', fontSize: '1.875rem', fontWeight: 700 }}>Админ-панель</h1>
+      </div>
 
       <div
         style={{
@@ -50,6 +52,7 @@ export default function AdminDashboardClient({ agentProps, businesses }: AdminDa
           flexDirection: isMobile ? 'column' : 'row',
           gap: '2rem',
           alignItems: 'flex-start',
+          width: '100%',
         }}
       >
         {/* Табы - слева (на desktop) или сверху (на mobile) */}
@@ -62,9 +65,11 @@ export default function AdminDashboardClient({ agentProps, businesses }: AdminDa
             width: isMobile ? '100%' : 'auto',
             borderRight: isMobile ? 'none' : '1px solid #e5e7eb',
             borderBottom: isMobile ? '1px solid #e5e7eb' : 'none',
-            paddingRight: isMobile ? 0 : '2rem',
+            paddingRight: isMobile ? '2rem' : '2rem',
+            paddingLeft: isMobile ? '2rem' : '0',
             paddingBottom: isMobile ? '1rem' : 0,
             marginBottom: isMobile ? '1rem' : 0,
+            marginLeft: 0,
             overflowX: isMobile ? 'auto' : 'visible',
             WebkitOverflowScrolling: isMobile ? 'touch' : 'auto',
           }}
@@ -141,6 +146,8 @@ export default function AdminDashboardClient({ agentProps, businesses }: AdminDa
             border: '1px solid #e5e7eb',
             padding: '2rem',
             borderRadius: 0,
+            marginRight: isMobile ? '2rem' : '2rem',
+            maxWidth: isMobile ? 'none' : 'calc(1200px - 200px - 2rem - 2rem)',
           }}
         >
           {activeTab === 'agent' && (
