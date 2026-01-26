@@ -33,15 +33,26 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
       NEXT_PUBLIC_APP_URL: https://lec7.com
-      R2_ENDPOINT: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-      R2_ACCESS_KEY_ID: <R2_ACCESS_KEY_ID>
-      R2_SECRET_ACCESS_KEY: <R2_SECRET_ACCESS_KEY>
-      R2_BUCKET: lec7
-      R2_PUBLIC_BASE_URL: https://<PUBLIC_FILES_DOMAIN>
+      # Cloudflare R2 (приоритет, если установлено)
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-lec7}
+      # Timeweb S3 (для обратной совместимости, если R2 не установлено)
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+      S3_REGION: ${S3_REGION:-ru-1}
+      # Публичный URL для файлов (используется для R2 и S3)
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+      # Другие переменные
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
       LEC7_OWNER_EMAIL: ${LEC7_OWNER_EMAIL}
       LEC7_OWNER_PASSWORD: ${LEC7_OWNER_PASSWORD}
-      LEC7_AI_GATEWAY_URL: ${LEC7_AI_GATEWAY_URL}
-      LEC7_GATEWAY_SECRET: ${LEC7_GATEWAY_SECRET}
+      LEC7_AI_GATEWAY_URL: ${LEC7_AI_GATEWAY_URL:-}
+      LEC7_GATEWAY_SECRET: ${LEC7_GATEWAY_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,5 +69,51 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  ai-gateway:
+    image: node:20
+    container_name: lec7-ai-gateway
+    working_dir: /srv
+    volumes:
+      - ./lec7-ai-gateway:/srv
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      LEC7_GATEWAY_SECRET: ${LEC7_GATEWAY_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    command: sh -lc "npm i && node server.js"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health | grep -q ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:latest
+    container_name: lec7-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    depends_on:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

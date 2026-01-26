@@ -1,17 +1,33 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
 /**
- * Инициализация S3 клиента для Timeweb S3
- * forcePathStyle = true обязателен для Timeweb S3
+ * Определяем тип хранилища по переменным окружения
+ * Если есть R2_ENDPOINT - используем Cloudflare R2
+ * Иначе - Timeweb S3 (для обратной совместимости)
+ */
+const isR2 = !!process.env.R2_ENDPOINT
+
+/**
+ * Инициализация S3 клиента
+ * - Cloudflare R2: forcePathStyle = false, endpoint = R2_ENDPOINT
+ * - Timeweb S3: forcePathStyle = true, endpoint = S3_ENDPOINT
  */
 const s3Client = new S3Client({
-  endpoint: process.env.S3_ENDPOINT,
-  region: process.env.S3_REGION || 'ru-1',
+  endpoint: isR2 
+    ? process.env.R2_ENDPOINT 
+    : process.env.S3_ENDPOINT,
+  region: isR2 
+    ? 'auto' // R2 использует 'auto'
+    : (process.env.S3_REGION || 'ru-1'),
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+    accessKeyId: isR2
+      ? (process.env.R2_ACCESS_KEY_ID || '')
+      : (process.env.S3_ACCESS_KEY_ID || ''),
+    secretAccessKey: isR2
+      ? (process.env.R2_SECRET_ACCESS_KEY || '')
+      : (process.env.S3_SECRET_ACCESS_KEY || ''),
   },
-  forcePathStyle: true, // ОБЯЗАТЕЛЬНО для Timeweb S3
+  forcePathStyle: !isR2, // false для R2, true для Timeweb S3
 })
 
 /**
@@ -26,25 +42,32 @@ export async function uploadPublicFile(
   key: string,
   contentType: string
 ): Promise<string> {
-  const bucketName = process.env.S3_BUCKET_NAME
+  const bucketName = isR2
+    ? (process.env.R2_BUCKET || process.env.S3_BUCKET_NAME)
+    : process.env.S3_BUCKET_NAME
 
   if (!bucketName) {
-    throw new Error('S3_BUCKET_NAME environment variable is not set')
+    throw new Error(isR2 
+      ? 'R2_BUCKET or S3_BUCKET_NAME environment variable is not set'
+      : 'S3_BUCKET_NAME environment variable is not set')
   }
 
-  // Загружаем файл в S3
+  // Загружаем файл в S3/R2
+  // R2 не поддерживает ACL, использует bucket policy
+  // Timeweb S3 также использует bucket policy для публичного доступа
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: key,
     Body: buffer,
     ContentType: contentType,
-    ACL: 'public-read', // Публичный доступ для чтения
   })
 
   await s3Client.send(command)
 
   // Формируем публичный URL
+  // Используем S3_PUBLIC_URL для обоих хранилищ (R2 и Timeweb S3)
   const publicUrl = process.env.S3_PUBLIC_URL
+
   if (!publicUrl) {
     throw new Error('S3_PUBLIC_URL environment variable is not set')
   }
@@ -62,7 +85,10 @@ export async function uploadPublicFile(
  * @returns true при успехе, false при ошибке
  */
 export async function deletePublicFileByUrl(publicUrl: string): Promise<boolean> {
-  const bucketName = process.env.S3_BUCKET_NAME
+  const bucketName = isR2
+    ? (process.env.R2_BUCKET || process.env.S3_BUCKET_NAME)
+    : process.env.S3_BUCKET_NAME
+  
   const s3PublicUrl = process.env.S3_PUBLIC_URL
 
   if (!bucketName || !s3PublicUrl) {
