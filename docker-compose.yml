@@ -33,9 +33,8 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://lec7:lec7_password@postgres:5432/lec7?schema=public
       NEXT_PUBLIC_APP_URL: https://lec7.com
-      # Google Cloud Storage
+      # Google Cloud Storage (использует Application Default Credentials)
       GCS_BUCKET: ${GCS_BUCKET:-lec7-files}
-      GOOGLE_APPLICATION_CREDENTIALS: /app/keys/lec7-storage-key.json
       # Другие переменные
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
@@ -43,8 +42,6 @@ services:
       LEC7_OWNER_PASSWORD: ${LEC7_OWNER_PASSWORD}
       LEC7_AI_GATEWAY_URL: ${LEC7_AI_GATEWAY_URL:-}
       LEC7_GATEWAY_SECRET: ${LEC7_GATEWAY_SECRET:-}
-    volumes:
-      - ./keys:/app/keys:ro
     depends_on:
       postgres:
         condition: service_healthy

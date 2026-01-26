@@ -2,11 +2,10 @@ import { Storage } from '@google-cloud/storage'
 
 /**
  * Инициализация Google Cloud Storage клиента
- * Использует keyFilename из переменной окружения GOOGLE_APPLICATION_CREDENTIALS
+ * Использует Application Default Credentials (ADC)
+ * На Google Compute Engine автоматически использует default service account
  */
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-})
+const storage = new Storage()
 
 /**
  * Загрузка файла в Google Cloud Storage bucket с публичным доступом
@@ -24,10 +23,6 @@ export async function uploadPublicFile(
 
   if (!bucketName) {
     throw new Error('GCS_BUCKET environment variable is not set')
-  }
-
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    throw new Error('GOOGLE_APPLICATION_CREDENTIALS environment variable is not set')
   }
 
   const bucket = storage.bucket(bucketName)
@@ -57,8 +52,8 @@ export async function uploadPublicFile(
 export async function deletePublicFileByUrl(publicUrl: string): Promise<boolean> {
   const bucketName = process.env.GCS_BUCKET
 
-  if (!bucketName || !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.warn('GCS_BUCKET or GOOGLE_APPLICATION_CREDENTIALS environment variable is not set')
+  if (!bucketName) {
+    console.warn('GCS_BUCKET environment variable is not set')
     return false
   }
 
