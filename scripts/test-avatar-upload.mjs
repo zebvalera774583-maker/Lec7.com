@@ -1,5 +1,5 @@
 /**
- * Тестовый скрипт для проверки загрузки аватара в S3
+ * Тестовый скрипт для проверки загрузки аватара в Google Cloud Storage
  * 
  * Запуск:
  *   docker-compose exec app node scripts/test-avatar-upload.mjs
@@ -11,8 +11,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// Попытка импорта uploadPublicFile из lib/s3
-// Если не работает, используем встроенную версию
+// Импорт uploadPublicFile из lib/s3
 let uploadPublicFile
 
 try {
@@ -20,51 +19,13 @@ try {
   uploadPublicFile = s3Module.uploadPublicFile
   console.log('✓ Используется импорт из lib/s3.js\n')
 } catch (error) {
-  // Fallback: встроенная версия функции
-  console.log('⚠ Импорт из lib/s3.js не удался, используется встроенная версия\n')
-  
-  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
-  
-  const s3Client = new S3Client({
-    endpoint: process.env.S3_ENDPOINT,
-    region: process.env.S3_REGION || 'ru-1',
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
-    },
-    forcePathStyle: true,
-  })
-
-  uploadPublicFile = async (buffer, key, contentType) => {
-    const bucketName = process.env.S3_BUCKET_NAME
-    if (!bucketName) {
-      throw new Error('S3_BUCKET_NAME environment variable is not set')
-    }
-
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      ACL: 'public-read',
-    })
-
-    await s3Client.send(command)
-
-    const publicUrl = process.env.S3_PUBLIC_URL
-    if (!publicUrl) {
-      throw new Error('S3_PUBLIC_URL environment variable is not set')
-    }
-
-    const baseUrl = publicUrl.replace(/\/$/, '')
-    const fileKey = key.startsWith('/') ? key : `/${key}`
-    return `${baseUrl}${fileKey}`
-  }
+  console.error('✗ Не удалось импортировать lib/s3.js:', error.message)
+  process.exit(1)
 }
 
 async function testAvatarUpload() {
   try {
-    console.log('=== Тест загрузки аватара в S3 ===\n')
+    console.log('=== Тест загрузки аватара в Google Cloud Storage ===\n')
 
     // a) Получаем первого пользователя из БД
     const user = await prisma.user.findFirst()
@@ -87,12 +48,14 @@ async function testAvatarUpload() {
     }
 
     // c) Загружаем через uploadPublicFile
-    const s3Key = `avatars/${user.id}/manual-test.png`
-    console.log(`Путь в S3: ${s3Key}`)
-    console.log('Загрузка в S3...')
+    const gcsKey = `avatars/${user.id}/manual-test.png`
+    console.log(`Bucket: ${process.env.GCS_BUCKET || 'not set'}`)
+    console.log(`Key: ${gcsKey}`)
+    console.log('Загрузка в GCS...')
     
-    const avatarUrl = await uploadPublicFile(imageBuffer, s3Key, 'image/png')
-    console.log(`✓ Файл загружен в S3\n`)
+    const avatarUrl = await uploadPublicFile(imageBuffer, gcsKey, 'image/png')
+    console.log(`✓ Файл загружен в GCS`)
+    console.log(`Публичный URL: ${avatarUrl}\n`)
 
     // d) Сохраняем avatarUrl в user
     console.log('Сохранение avatarUrl в БД...')
