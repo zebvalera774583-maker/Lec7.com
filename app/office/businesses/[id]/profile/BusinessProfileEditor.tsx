@@ -1568,19 +1568,7 @@ export default function BusinessProfileEditor({
             >
               {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
-            <Link
-              href={`/office/businesses/${businessId}`}
-              style={{
-                display: 'block',
-                textAlign: 'center',
-                padding: '0.75rem',
-                color: '#666',
-                textDecoration: 'underline',
-                fontSize: '0.875rem',
-              }}
-            >
-              ← Назад в кабинет
-            </Link>
+            {/* Кнопка "В кабинет" теперь отображается в шапке рядом с "Открыть витрину" */}
           </div>
         </div>
       </div>
