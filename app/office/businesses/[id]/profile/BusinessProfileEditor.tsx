@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isLatinOnly } from '@/lib/slug'
@@ -85,6 +85,29 @@ export default function BusinessProfileEditor({
   const [uploadingPhotosItemId, setUploadingPhotosItemId] = useState<string | null>(null)
   const [compressingPhotosItemId, setCompressingPhotosItemId] = useState<string | null>(null)
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
+  const [showTelegramHint, setShowTelegramHint] = useState(false)
+  const [dismissedTelegramHint, setDismissedTelegramHint] = useState(false)
+  const telegramInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Инициализация состояния подсказки Telegram из localStorage (24 часа)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const storageKey = `lec7:hint:telegram:dismissed:${businessId}`
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) return
+
+      const parsed = JSON.parse(raw) as { dismissedAt?: number }
+      if (parsed.dismissedAt && Date.now() - parsed.dismissedAt < 24 * 60 * 60 * 1000) {
+        setDismissedTelegramHint(true)
+      } else {
+        window.localStorage.removeItem(storageKey)
+      }
+    } catch {
+      // Если что-то пошло не так с localStorage — просто игнорируем
+    }
+  }, [businessId])
 
   // Загрузка профиля при монтировании
   useEffect(() => {
@@ -448,29 +471,40 @@ export default function BusinessProfileEditor({
     setSuccess(false)
 
     try {
+      const payload = {
+        displayName: displayName || null,
+        avatarUrl: avatarUrl || null,
+        phone: phone || null,
+        telegramUsername: telegramUsername || null,
+        statsCases: metrics.cases,
+        statsProjects: metrics.projects,
+        statsCities: metrics.cities,
+        cities,
+        services,
+        featuredServices: featuredServices.filter((s) => s.trim() !== '').slice(0, 4),
+      }
+
       const response = await fetch(`/api/office/businesses/${businessId}/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          displayName: displayName || null,
-          avatarUrl: avatarUrl || null,
-          phone: phone || null,
-          telegramUsername: telegramUsername || null,
-          statsCases: metrics.cases,
-          statsProjects: metrics.projects,
-          statsCities: metrics.cities,
-          cities,
-          services,
-          featuredServices: featuredServices.filter((s) => s.trim() !== '').slice(0, 4),
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Ошибка сохранения профиля')
+      }
+
+      // Подсказка по Telegram: показываем только после успешного сохранения
+      const phoneTrimmed = (payload.phone || '').trim()
+      const telegramTrimmed = (payload.telegramUsername || '').trim()
+      if (!dismissedTelegramHint && phoneTrimmed !== '' && telegramTrimmed === '') {
+        setShowTelegramHint(true)
+      } else {
+        setShowTelegramHint(false)
       }
 
       setSuccess(true)
@@ -508,6 +542,50 @@ export default function BusinessProfileEditor({
     const newServices = [...featuredServices]
     newServices[index] = value
     setFeaturedServices(newServices)
+  }
+
+  const handleTelegramChange = (value: string) => {
+    setTelegramUsername(value)
+    const trimmed = value.trim()
+
+    if (trimmed !== '') {
+      setDismissedTelegramHint(false)
+      setShowTelegramHint(false)
+
+      if (typeof window !== 'undefined') {
+        const storageKey = `lec7:hint:telegram:dismissed:${businessId}`
+        try {
+          window.localStorage.removeItem(storageKey)
+        } catch {
+          // ignore localStorage errors
+        }
+      }
+    }
+  }
+
+  const handleTelegramHintAdd = () => {
+    setShowTelegramHint(false)
+    setDismissedTelegramHint(false)
+    telegramInputRef.current?.focus()
+  }
+
+  const handleTelegramHintLater = () => {
+    setShowTelegramHint(false)
+    setDismissedTelegramHint(true)
+
+    if (typeof window !== 'undefined') {
+      const storageKey = `lec7:hint:telegram:dismissed:${businessId}`
+      try {
+        window.localStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            dismissedAt: Date.now(),
+          })
+        )
+      } catch {
+        // ignore localStorage errors
+      }
+    }
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1028,9 +1106,10 @@ export default function BusinessProfileEditor({
                 Telegram username
               </label>
               <input
+                ref={telegramInputRef}
                 type="text"
                 value={telegramUsername}
-                onChange={(e) => setTelegramUsername(e.target.value)}
+                onChange={(e) => handleTelegramChange(e.target.value)}
                 placeholder="@username"
                 style={{
                   width: '100%',
@@ -1044,6 +1123,32 @@ export default function BusinessProfileEditor({
                 Без символа @, например: username
               </p>
             </div>
+
+            {showTelegramHint && (
+              <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                <div className="mb-1 font-semibold">Подсказка</div>
+                <p className="text-gray-600 leading-relaxed">
+                  Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram.
+                  Добавьте ник в Telegram, чтобы кнопка «Связаться» открывала чат.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleTelegramHintAdd}
+                    className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                  >
+                    Добавить Telegram
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTelegramHintLater}
+                    className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Позже
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Портфолио кейсы */}
