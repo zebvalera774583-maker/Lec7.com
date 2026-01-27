@@ -90,6 +90,8 @@ export default function BusinessProfileEditor({
   const [showTelegramHint, setShowTelegramHint] = useState(false)
   const [dismissedTelegramHint, setDismissedTelegramHint] = useState(false)
   const [servicesHint, setServicesHint] = useState<ServicesHintType>('none')
+  const [servicesAiLoading, setServicesAiLoading] = useState(false)
+  const [servicesAiError, setServicesAiError] = useState('')
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
   const servicesSectionRef = useRef<HTMLDivElement | null>(null)
 
@@ -639,15 +641,171 @@ export default function BusinessProfileEditor({
 
   const handleServicesHintDismiss = () => {
     setServicesHint('none')
+    setServicesAiError('')
   }
 
   const handleServicesHintManualEdit = () => {
     setServicesHint('none')
+    setServicesAiError('')
     scrollToServicesSection()
   }
 
   const handleServicesHintKeepAsIs = () => {
     setServicesHint('none')
+    setServicesAiError('')
+  }
+
+  type AiServiceItem = { title: string; description: string }
+
+  const splitServiceLine = (line: string): AiServiceItem => {
+    const emDashIndex = line.indexOf('—')
+    if (emDashIndex !== -1) {
+      const title = line.slice(0, emDashIndex).trim()
+      const description = line.slice(emDashIndex + 1).trim()
+      return { title, description }
+    }
+    const hyphenIndex = line.indexOf('-')
+    if (hyphenIndex !== -1) {
+      const title = line.slice(0, hyphenIndex).trim()
+      const description = line.slice(hyphenIndex + 1).trim()
+      return { title, description }
+    }
+    return { title: line.trim(), description: '' }
+  }
+
+  const buildServiceLine = (title: string, description: string): string => {
+    const cleanTitle = title.trim()
+    const cleanDescription = description.trim()
+    if (!cleanDescription) return cleanTitle
+    return `${cleanTitle} — ${cleanDescription}`
+  }
+
+  const callServicesAi = async (mode: 'suggest' | 'improve') => {
+    if (servicesAiLoading) return
+
+    setServicesAiLoading(true)
+    setServicesAiError('')
+
+    try {
+      const items = featuredServices
+        .map(splitServiceLine)
+        .filter((item) => item.title)
+        .slice(0, 4)
+
+      const payload = {
+        intent: 'resident_marketing' as const,
+        businessId,
+        message: [
+          'Ты — помощник платформы Lek7, помогаешь владельцу бизнеса сделать блок «Товары / Услуги» понятным для клиента.',
+          '',
+          'ВАЖНО:',
+          '- ты не маркетолог и не пишешь продающие тексты;',
+          '- ты не используешь рекламные клише и оценки;',
+          '- ты не добавляешь новые позиции сверх запрошенного количества;',
+          '- в режиме improve ты не изменяешь title, только description.',
+          '',
+          'Требования к описаниям:',
+          '- одно предложение;',
+          '- длина 80–160 символов;',
+          '- нейтральный, простой язык, без восклицаний;',
+          '- не использовать слова: "лучший", "качественный", "индивидуальный", "гарантия", "профессиональный", "под ключ";',
+          '- описывай, ЧТО входит в услугу/товар, а не почему это выгодно.',
+          '',
+          `Режим: ${mode === 'suggest' ? 'suggest' : 'improve'}.`,
+          '',
+          'Входные данные (JSON):',
+          JSON.stringify(
+            {
+              businessName: displayName || null,
+              featuredServices: items,
+            },
+            null,
+            2
+          ),
+          '',
+          'Ответь ТОЛЬКО одним JSON-массивом без пояснений вокруг.',
+          'Каждый элемент массива должен иметь вид: { "title": string, "description": string }.',
+          mode === 'improve'
+            ? 'В режиме improve поле title в ответе ДОЛЖНО в точности совпадать с входным title.'
+            : 'В режиме suggest сгенерируй до 4 новых позиций.',
+        ].join('\n'),
+      }
+
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        setServicesAiError('Не удалось получить ответ от AI. Попробуйте ещё раз.')
+        return
+      }
+
+      const data = (await response.json()) as { reply?: string; error?: string }
+      if (!data.reply) {
+        setServicesAiError('Пустой ответ AI. Попробуйте ещё раз.')
+        return
+      }
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(data.reply)
+      } catch {
+        setServicesAiError('Не удалось разобрать ответ AI. Попробуйте ещё раз.')
+        return
+      }
+
+      if (!Array.isArray(parsed)) {
+        setServicesAiError('AI вернул некорректный формат ответа. Ожидался JSON-массив.')
+        return
+      }
+
+      const itemsFromAi: AiServiceItem[] = (parsed as any[])
+        .filter((item) => item && typeof item.title === 'string' && typeof item.description === 'string')
+        .slice(0, 4)
+
+      if (itemsFromAi.length === 0) {
+        setServicesAiError('AI не предложил ни одной позиции.')
+        return
+      }
+
+      if (mode === 'suggest') {
+        const newFeatured: string[] = itemsFromAi.map((item) => buildServiceLine(item.title, item.description))
+        while (newFeatured.length < 4) {
+          newFeatured.push('')
+        }
+        setFeaturedServices(newFeatured)
+        setServicesHint('none')
+        setServicesAiError('')
+      } else {
+        // improve: изменяем только описание, title оставляем как есть
+        const improved = featuredServices.map((line) => {
+          const { title } = splitServiceLine(line)
+          const match = itemsFromAi.find((item) => item.title.trim() === title.trim())
+          if (!match) return line
+          return buildServiceLine(title, match.description)
+        })
+        setFeaturedServices(improved)
+        setServicesHint('none')
+        setServicesAiError('')
+      }
+    } catch (error) {
+      console.error('Services AI error', error)
+      setServicesAiError('Произошла ошибка при обращении к AI. Попробуйте ещё раз.')
+    } finally {
+      setServicesAiLoading(false)
+    }
+  }
+
+  const handleServicesAiSuggest = () => {
+    callServicesAi('suggest')
+  }
+
+  const handleServicesAiImprove = () => {
+    callServicesAi('improve')
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1669,14 +1827,16 @@ export default function BusinessProfileEditor({
                     <button
                       type="button"
                       onClick={handleServicesHintManualEdit}
-                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      disabled={servicesAiLoading}
                     >
                       Добавить вручную
                     </button>
                     <button
                       type="button"
-                      onClick={handleServicesHintDismiss}
-                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                      onClick={handleServicesAiSuggest}
+                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                      disabled={servicesAiLoading}
                     >
                       Предложить варианты (AI)
                     </button>
@@ -1686,27 +1846,36 @@ export default function BusinessProfileEditor({
                     <button
                       type="button"
                       onClick={handleServicesHintManualEdit}
-                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      disabled={servicesAiLoading}
                     >
                       Допишу сам
                     </button>
                     <button
                       type="button"
-                      onClick={handleServicesHintDismiss}
-                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                      onClick={handleServicesAiImprove}
+                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                      disabled={servicesAiLoading}
                     >
                       Улучшить с AI
                     </button>
                     <button
                       type="button"
                       onClick={handleServicesHintKeepAsIs}
-                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      disabled={servicesAiLoading}
                     >
                       Оставить как есть
                     </button>
                   </>
                 )}
               </div>
+              {servicesAiLoading && (
+                <p className="mt-2 text-xs text-gray-500">AI думает…</p>
+              )}
+              {servicesAiError && !servicesAiLoading && (
+                <p className="mt-2 text-xs text-red-600">{servicesAiError}</p>
+              )}
             </div>
           )}
           {/* Кнопка "В кабинет" теперь отображается в шапке рядом с "Открыть витрину" */}
