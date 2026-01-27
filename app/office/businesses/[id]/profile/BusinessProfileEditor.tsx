@@ -680,6 +680,28 @@ export default function BusinessProfileEditor({
     return `${cleanTitle} — ${cleanDescription}`
   }
 
+  const parseJsonArrayFromAiReply = (raw: string): unknown => {
+    if (!raw) {
+      throw new Error('Empty AI reply')
+    }
+
+    let s = String(raw).trim()
+
+    // убрать ```json ... ``` / ``` ... ```
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+
+    // вытащить именно массив
+    const start = s.indexOf('[')
+    const end = s.lastIndexOf(']')
+
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error('AI reply does not contain JSON array')
+    }
+
+    const json = s.slice(start, end + 1)
+    return JSON.parse(json)
+  }
+
   const callServicesAi = async (mode: 'suggest' | 'improve') => {
     if (servicesAiLoading) return
 
@@ -752,9 +774,10 @@ export default function BusinessProfileEditor({
 
       let parsed: unknown
       try {
-        parsed = JSON.parse(data.reply)
-      } catch {
-        setServicesAiError('Не удалось разобрать ответ AI. Попробуйте ещё раз.')
+        parsed = parseJsonArrayFromAiReply(data.reply)
+      } catch (e) {
+        console.error('Failed to parse AI reply', e)
+        setServicesAiError('Не удалось разобрать ответ AI. Убедитесь, что он возвращает JSON-массив.')
         return
       }
 
