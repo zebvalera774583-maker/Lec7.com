@@ -1131,7 +1131,10 @@ export default function BusinessProfileEditor({
                   Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram.
                   Добавьте ник в Telegram, чтобы кнопка «Связаться» открывала чат.
                 </p>
-                <div className="mt-2 flex gap-2">
+                <div
+                  className="mt-2 flex gap-2"
+                  style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}
+                >
                   <button
                     type="button"
                     onClick={handleTelegramHintAdd}
