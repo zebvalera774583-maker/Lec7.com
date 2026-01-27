@@ -25,6 +25,8 @@ interface BusinessProfile {
   services: string[]
 }
 
+type ServicesHintType = 'none' | 'empty' | 'weak'
+
 interface BusinessPhoto {
   id: string
   url: string
@@ -87,6 +89,7 @@ export default function BusinessProfileEditor({
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const [showTelegramHint, setShowTelegramHint] = useState(false)
   const [dismissedTelegramHint, setDismissedTelegramHint] = useState(false)
+  const [servicesHint, setServicesHint] = useState<ServicesHintType>('none')
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
 
   // Инициализация состояния подсказки Telegram из localStorage (24 часа)
@@ -498,13 +501,25 @@ export default function BusinessProfileEditor({
         throw new Error(data.error || 'Ошибка сохранения профиля')
       }
 
-      // Подсказка по Telegram: показываем только после успешного сохранения
+      // Подсказки показываем только после успешного сохранения
       const phoneTrimmed = (payload.phone || '').trim()
       const telegramTrimmed = (payload.telegramUsername || '').trim()
-      if (!dismissedTelegramHint && phoneTrimmed !== '' && telegramTrimmed === '') {
+      const featuredForHints = payload.featuredServices
+
+      // Считаем, нужно ли показать подсказку по Telegram
+      const shouldShowTelegramHint =
+        !dismissedTelegramHint && phoneTrimmed !== '' && telegramTrimmed === ''
+
+      // Считаем, нужна ли подсказка по услугам
+      const servicesHintType = evaluateServicesHintType(featuredForHints)
+
+      if (shouldShowTelegramHint) {
+        // Приоритет Telegram
         setShowTelegramHint(true)
+        setServicesHint('none')
       } else {
         setShowTelegramHint(false)
+        setServicesHint(servicesHintType)
       }
 
       setSuccess(true)
@@ -586,6 +601,28 @@ export default function BusinessProfileEditor({
         // ignore localStorage errors
       }
     }
+  }
+
+  const evaluateServicesHintType = (featured: string[]): ServicesHintType => {
+    const nonEmpty = featured.map((s) => s.trim()).filter((s) => s !== '').slice(0, 4)
+    if (nonEmpty.length === 0) return 'empty'
+
+    // Считаем услуги «слабыми», если они очень короткие и без пояснений
+    const hasVeryShort = nonEmpty.some((title) => title.length < 10)
+    if (hasVeryShort) return 'weak'
+
+    return 'none'
+  }
+
+  const handleServicesAiHelpClick = () => {
+    // Приоритет Telegram-подсказки
+    if (showTelegramHint) return
+    const nextType = evaluateServicesHintType(featuredServices)
+    setServicesHint(nextType)
+  }
+
+  const handleServicesHintDismiss = () => {
+    setServicesHint('none')
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1462,7 +1499,31 @@ export default function BusinessProfileEditor({
 
           {/* Услуги или товары */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-            <h2 style={{ marginBottom: '0.5rem', fontSize: '1.125rem' }}>Услуги или товары</h2>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <h2 style={{ margin: 0, fontSize: '1.125rem' }}>Услуги или товары</h2>
+              <button
+                type="button"
+                onClick={handleServicesAiHelpClick}
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.75rem',
+                  borderRadius: '9999px',
+                  border: '1px solid #0ea5e9',
+                  background: 'white',
+                  color: '#0ea5e9',
+                  cursor: 'pointer',
+                }}
+              >
+                Помощь AI
+              </button>
+            </div>
             <p
               style={{
                 margin: '0 0 1rem 0',
@@ -1540,7 +1601,7 @@ export default function BusinessProfileEditor({
               Вес страницы: {pageWeight.toFixed(1)} ГБ
             </span>
           </div>
-          {/* Подсказка по Telegram под кнопкой сохранения */}
+          {/* Подсказки под кнопкой "Сохранить изменения" */}
           {showTelegramHint && (
             <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
               <div className="mb-1 font-semibold">Подсказка</div>
@@ -1563,6 +1624,53 @@ export default function BusinessProfileEditor({
                 >
                   Позже
                 </button>
+              </div>
+            </div>
+          )}
+          {!showTelegramHint && servicesHint !== 'none' && (
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <div className="mb-1 font-semibold">Подсказка</div>
+              <p className="text-gray-600 leading-relaxed">
+                {servicesHint === 'empty'
+                  ? 'Сейчас в блоке «Услуги / Товары» нет ни одной позиции. Клиенту сложно понять, чем вы занимаетесь и что можно у вас заказать.'
+                  : 'Услуги указаны очень коротко. Без пояснений сложно понять ценность и чем вы отличаетесь от других.'}
+              </p>
+              <div className="mt-2 flex gap-2">
+                {servicesHint === 'empty' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleServicesHintDismiss}
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Добавить вручную
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleServicesHintDismiss}
+                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                    >
+                      Предложить варианты (AI)
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleServicesHintDismiss}
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Допишу сам
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleServicesHintDismiss}
+                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                    >
+                      Улучшить с AI
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
