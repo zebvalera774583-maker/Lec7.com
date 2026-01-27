@@ -929,21 +929,6 @@ export default function BusinessProfileEditor({
         </div>
       )}
 
-      {/* Индикатор веса */}
-      <div
-        style={{
-          padding: '1rem',
-          background: '#f0f9ff',
-          border: '1px solid #bae6fd',
-          borderRadius: '8px',
-          marginBottom: '2rem',
-        }}
-      >
-        <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
-          Вес страницы: {pageWeight.toFixed(1)} ГБ
-        </span>
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         {/* Основной контент */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -1540,6 +1525,22 @@ export default function BusinessProfileEditor({
             >
               {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
+          {/* Индикатор веса страницы как информационный блок */}
+          <div
+            style={{
+              padding: '1rem',
+              background: '#f0f9ff',
+              border: '1px solid #bae6fd',
+              borderRadius: '8px',
+              marginBottom: '1rem',
+              marginTop: '0.5rem',
+            }}
+          >
+            <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
+              Вес страницы: {pageWeight.toFixed(1)} ГБ
+            </span>
+          </div>
+          {/* Подсказка по Telegram под кнопкой сохранения */}
           {showTelegramHint && (
             <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
               <div className="mb-1 font-semibold">Подсказка</div>
