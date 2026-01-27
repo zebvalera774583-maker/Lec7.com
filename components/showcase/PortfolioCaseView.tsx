@@ -145,33 +145,6 @@ export default function PortfolioCaseView({
           onMouseDown={(e) => handleSwipeStart(e.clientX)}
           onTouchStart={(e) => handleSwipeStart(e.touches[0].clientX)}
         >
-          {/* Previous Button */}
-          {photos.length > 1 && (
-            <button
-              onClick={handlePrevious}
-              style={{
-                position: 'absolute',
-                left: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 0,
-                color: '#111827',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                fontSize: '1.5rem',
-                zIndex: 10,
-              }}
-            >
-              ←
-            </button>
-          )}
-
           {/* Photo */}
           <div
             style={{
@@ -231,33 +204,6 @@ export default function PortfolioCaseView({
               </div>
             )}
           </div>
-
-          {/* Next Button */}
-          {photos.length > 1 && (
-            <button
-              onClick={handleNext}
-              style={{
-                position: 'absolute',
-                right: '1rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 0,
-                color: '#111827',
-                width: '48px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                fontSize: '1.5rem',
-                zIndex: 10,
-              }}
-            >
-              →
-            </button>
-          )}
         </div>
 
         {/* Close Button */}
