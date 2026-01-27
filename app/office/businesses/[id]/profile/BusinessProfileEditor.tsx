@@ -854,7 +854,7 @@ export default function BusinessProfileEditor({
               width: '60px',
               height: '60px',
               borderRadius: '50%',
-              background: avatarUrl ? `url(${avatarUrl})` : '#e5e7eb',
+              background: avatarUrl ? `url(${avatarUrl})` : '#f3f4f6',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               border: '2px solid #e5e7eb',
@@ -865,20 +865,36 @@ export default function BusinessProfileEditor({
             <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>/{initialSlug}</p>
           </div>
         </div>
-        <Link
-          href={`/office/businesses/${businessId}/preview`}
-          target="_blank"
-          style={{
-            padding: '0.5rem 1rem',
-            background: '#0070f3',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: '4px',
-            fontSize: '0.875rem',
-          }}
-        >
-          Открыть витрину →
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Link
+            href="/office"
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'white',
+              color: '#374151',
+              textDecoration: 'none',
+              border: '1px solid #e5e7eb',
+              borderRadius: '4px',
+              fontSize: '0.875rem',
+            }}
+          >
+            ← В кабинет
+          </Link>
+          <Link
+            href={`/office/businesses/${businessId}/preview`}
+            target="_blank"
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#0070f3',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '4px',
+              fontSize: '0.875rem',
+            }}
+          >
+            Открыть витрину →
+          </Link>
+        </div>
       </div>
 
       {/* Сообщения об ошибках/успехе */}
@@ -1123,14 +1139,15 @@ export default function BusinessProfileEditor({
                 Без символа @, например: username
               </p>
             </div>
+          </section>
 
-            {showTelegramHint && (
-              <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-                <div className="mb-1 font-semibold">Подсказка</div>
-                <p className="text-gray-600 leading-relaxed">
-                  Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram.
-                  Добавьте ник в Telegram, чтобы кнопка «Связаться» открывала чат.
-                </p>
+          {showTelegramHint && (
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <div className="mb-1 font-semibold">Подсказка</div>
+              <p className="text-gray-600 leading-relaxed">
+                Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram.
+                Добавьте ник в Telegram, чтобы кнопка «Связаться» открывала чат.
+              </p>
                 <div
                   className="mt-2 flex gap-2"
                   style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}
@@ -1146,13 +1163,13 @@ export default function BusinessProfileEditor({
                     type="button"
                     onClick={handleTelegramHintLater}
                     className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    style={{ marginLeft: '0.5rem' }}
                   >
                     Позже
                   </button>
                 </div>
-              </div>
-            )}
-          </section>
+            </div>
+          )}
 
           {/* Портфолио кейсы */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
