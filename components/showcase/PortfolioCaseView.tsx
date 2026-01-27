@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 
 interface PortfolioCaseViewProps {
@@ -21,6 +21,7 @@ export default function PortfolioCaseView({
   totalCases,
 }: PortfolioCaseViewProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
+  const isSwipingRef = useRef(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -45,6 +46,14 @@ export default function PortfolioCaseView({
     }
   }, [isOpen])
 
+  const handlePrevious = useCallback(() => {
+    setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1))
+  }, [photos.length])
+
+  const handleNext = useCallback(() => {
+    setCurrentPhotoIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0))
+  }, [photos.length])
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -58,24 +67,36 @@ export default function PortfolioCaseView({
       }
     }
 
+    const handleWheel = (e: WheelEvent) => {
+      // Прокрутка вниз → следующее фото, вверх → предыдущее
+      e.preventDefault() // Предотвращаем прокрутку страницы
+      if (e.deltaY > 0) {
+        handleNext()
+      } else if (e.deltaY < 0) {
+        handlePrevious()
+      }
+    }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, currentPhotoIndex, photos.length])
-
-  const handlePrevious = () => {
-    setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1))
-  }
-
-  const handleNext = () => {
-    setCurrentPhotoIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0))
-  }
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('wheel', handleWheel)
+    }
+  }, [isOpen, handlePrevious, handleNext, onClose])
 
   const handleSwipeStart = (clientX: number) => {
     const startX = clientX
     let currentX = clientX
+    isSwipingRef.current = false
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
       currentX = 'touches' in e ? e.touches[0].clientX : e.clientX
+      // Если мышь/палец сдвинулся больше чем на 5px, считаем это свайпом
+      if (Math.abs(startX - currentX) > 5) {
+        isSwipingRef.current = true
+      }
     }
 
     const handleEnd = () => {
@@ -87,6 +108,10 @@ export default function PortfolioCaseView({
           handlePrevious()
         }
       }
+      // Сбрасываем флаг свайпа через небольшую задержку, чтобы клик не сработал
+      setTimeout(() => {
+        isSwipingRef.current = false
+      }, 100)
       document.removeEventListener('mousemove', handleMove)
       document.removeEventListener('mouseup', handleEnd)
       document.removeEventListener('touchmove', handleMove)
@@ -97,6 +122,27 @@ export default function PortfolioCaseView({
     document.addEventListener('mouseup', handleEnd)
     document.addEventListener('touchmove', handleMove, { passive: true })
     document.addEventListener('touchend', handleEnd)
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Игнорируем клик, если был свайп
+    if (isSwipingRef.current) {
+      return
+    }
+
+    // Определяем область клика: левая треть → предыдущее, правая треть → следующее
+    const containerWidth = e.currentTarget.clientWidth
+    const clickX = e.clientX - e.currentTarget.getBoundingClientRect().left
+    const thirdWidth = containerWidth / 3
+
+    if (clickX < thirdWidth) {
+      // Левая треть → предыдущее фото
+      handlePrevious()
+    } else if (clickX > thirdWidth * 2) {
+      // Правая треть → следующее фото
+      handleNext()
+    }
+    // Центральная треть → ничего не делаем (можно кликнуть для закрытия через overlay)
   }
 
   if (!isOpen || photos.length === 0) return null
@@ -141,7 +187,10 @@ export default function PortfolioCaseView({
             overflow: 'hidden',
             background: '#f7f2ee',
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            handleClick(e)
+          }}
           onMouseDown={(e) => handleSwipeStart(e.clientX)}
           onTouchStart={(e) => handleSwipeStart(e.touches[0].clientX)}
         >
