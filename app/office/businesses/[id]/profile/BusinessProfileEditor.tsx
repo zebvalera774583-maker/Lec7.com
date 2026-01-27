@@ -845,12 +845,9 @@ export default function BusinessProfileEditor({
           marginBottom: '2rem',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>Вес страницы:</span>
-          <span style={{ fontSize: '1rem', fontWeight: 600, color: '#0369a1' }}>
-            {pageWeight.toFixed(1)} / 10
-          </span>
-        </div>
+        <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
+          Вес страницы: {pageWeight.toFixed(1)} ГБ
+        </span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
