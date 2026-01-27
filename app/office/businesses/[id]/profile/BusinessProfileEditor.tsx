@@ -1141,35 +1141,7 @@ export default function BusinessProfileEditor({
             </div>
           </section>
 
-          {showTelegramHint && (
-            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
-              <div className="mb-1 font-semibold">Подсказка</div>
-              <p className="text-gray-600 leading-relaxed">
-                Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram.
-                Добавьте ник в Telegram, чтобы кнопка «Связаться» открывала чат.
-              </p>
-                <div
-                  className="mt-2 flex gap-2"
-                  style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}
-                >
-                  <button
-                    type="button"
-                    onClick={handleTelegramHintAdd}
-                    className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
-                  >
-                    Добавить Telegram
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTelegramHintLater}
-                    className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                    style={{ marginLeft: '0.5rem' }}
-                  >
-                    Позже
-                  </button>
-                </div>
-            </div>
-          )}
+          {/* Подсказки (Telegram / услуги) рендерятся под кнопкой "Сохранить изменения" в правой колонке */}
 
           {/* Портфолио кейсы */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
@@ -1568,7 +1540,32 @@ export default function BusinessProfileEditor({
             >
               {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
-            {/* Кнопка "В кабинет" теперь отображается в шапке рядом с "Открыть витрину" */}
+          {showTelegramHint && (
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <div className="mb-1 font-semibold">Подсказка</div>
+              <p className="text-gray-600 leading-relaxed">
+                Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram. Добавьте ник в Telegram,
+                чтобы кнопка «Связаться» открывала чат.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleTelegramHintAdd}
+                  className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                >
+                  Добавить Telegram
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTelegramHintLater}
+                  className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Позже
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Кнопка "В кабинет" теперь отображается в шапке рядом с "Открыть витрину" */}
           </div>
         </div>
       </div>
