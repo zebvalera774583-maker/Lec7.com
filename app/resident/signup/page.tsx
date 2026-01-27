@@ -95,6 +95,26 @@ export default function ResidentSignupPage() {
           maxWidth: '480px',
         }}
       >
+        <button
+          type="button"
+          onClick={() => router.back()}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            marginBottom: '1rem',
+            padding: 0,
+            background: 'none',
+            border: 'none',
+            color: '#0070f3',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+          }}
+        >
+          <span aria-hidden="true">←</span>
+          <span>Назад</span>
+        </button>
+
         <h1 style={{ marginBottom: '0.5rem', textAlign: 'center' }}>Регистрация резидента</h1>
         <p style={{ marginTop: 0, marginBottom: '1.5rem', textAlign: 'center', color: '#666', fontSize: '0.95rem' }}>
           Создайте аккаунт и бизнес на Lec7, чтобы управлять витриной и заявками.
