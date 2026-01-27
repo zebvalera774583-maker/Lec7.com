@@ -91,6 +91,7 @@ export default function BusinessProfileEditor({
   const [dismissedTelegramHint, setDismissedTelegramHint] = useState(false)
   const [servicesHint, setServicesHint] = useState<ServicesHintType>('none')
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
+  const servicesSectionRef = useRef<HTMLDivElement | null>(null)
 
   // Инициализация состояния подсказки Telegram из localStorage (24 часа)
   useEffect(() => {
@@ -607,9 +608,18 @@ export default function BusinessProfileEditor({
     const nonEmpty = featured.map((s) => s.trim()).filter((s) => s !== '').slice(0, 4)
     if (nonEmpty.length === 0) return 'empty'
 
-    // Считаем услуги «слабыми», если они очень короткие и без пояснений
-    const hasVeryShort = nonEmpty.some((title) => title.length < 10)
-    if (hasVeryShort) return 'weak'
+    // TODO: когда появятся отдельные описания услуг, использовать их длину
+    // Здесь работаем только с заголовками и ищем "слабые" случаи.
+    const genericTitles = ['услуги', 'товары', 'работы', 'прочее']
+    const hasGeneric = nonEmpty.some((title) => genericTitles.includes(title.toLowerCase()))
+
+    // Считаем «слабой» позицию, если она очень короткая и без пояснений (1–2 слова и меньше ~25 символов)
+    const hasTooShort = nonEmpty.some((title) => {
+      const words = title.split(/\s+/).filter(Boolean)
+      return words.length <= 2 && title.length < 25
+    })
+
+    if (hasGeneric || hasTooShort) return 'weak'
 
     return 'none'
   }
@@ -621,7 +631,22 @@ export default function BusinessProfileEditor({
     setServicesHint(nextType)
   }
 
+  const scrollToServicesSection = () => {
+    if (servicesSectionRef.current) {
+      servicesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   const handleServicesHintDismiss = () => {
+    setServicesHint('none')
+  }
+
+  const handleServicesHintManualEdit = () => {
+    setServicesHint('none')
+    scrollToServicesSection()
+  }
+
+  const handleServicesHintKeepAsIs = () => {
     setServicesHint('none')
   }
 
@@ -1498,7 +1523,10 @@ export default function BusinessProfileEditor({
           </section>
 
           {/* Услуги или товары */}
-          <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <section
+            ref={servicesSectionRef}
+            style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}
+          >
             <div
               style={{
                 display: 'flex',
@@ -1640,7 +1668,7 @@ export default function BusinessProfileEditor({
                   <>
                     <button
                       type="button"
-                      onClick={handleServicesHintDismiss}
+                      onClick={handleServicesHintManualEdit}
                       className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                     >
                       Добавить вручную
@@ -1657,7 +1685,7 @@ export default function BusinessProfileEditor({
                   <>
                     <button
                       type="button"
-                      onClick={handleServicesHintDismiss}
+                      onClick={handleServicesHintManualEdit}
                       className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                     >
                       Допишу сам
@@ -1668,6 +1696,13 @@ export default function BusinessProfileEditor({
                       className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700"
                     >
                       Улучшить с AI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleServicesHintKeepAsIs}
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Оставить как есть
                     </button>
                   </>
                 )}
