@@ -643,16 +643,13 @@ export default function BusinessProfileEditor({
   const handleServicesAiHelpClick = () => {
     // Приоритет Telegram-подсказки
     if (showTelegramHint) return
-    
-    // Если servicesRaw пустое — запускаем онбординг
-    if (!servicesRaw || servicesRaw.trim() === '') {
-      handleServicesOnboardingStart()
-      return
-    }
-    
-    // Иначе показываем обычную подсказку
-    const nextType = evaluateServicesHintType(featuredServices)
-    setServicesHint(nextType)
+
+    // Всегда запускаем онбординг: сначала спрашиваем пользователя
+    // Если servicesRaw уже есть — подставляем его как черновик в textarea
+    setServicesOnboardingStep('asking')
+    setServicesOnboardingInput(servicesRaw || '')
+    setServicesOnboardingAiResponse('')
+    setServicesAiError('')
   }
 
   const scrollToServicesSection = () => {
@@ -852,8 +849,10 @@ export default function BusinessProfileEditor({
       console.log('SERVICES_ONBOARDING_V1: handleServicesOnboardingStart called')
     }
     setServicesOnboardingStep('asking')
-    setServicesOnboardingInput('')
+    // Если servicesRaw уже есть — используем его как черновик
+    setServicesOnboardingInput(servicesRaw || '')
     setServicesOnboardingAiResponse('')
+    setServicesAiError('')
   }
 
   const handleServicesOnboardingSubmit = async () => {
