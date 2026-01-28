@@ -98,8 +98,10 @@ export default function BusinessProfileEditor({
   const [servicesOnboardingStep, setServicesOnboardingStep] = useState<ServicesOnboardingStep>('idle')
   const [servicesOnboardingInput, setServicesOnboardingInput] = useState('')
   const [servicesOnboardingAiResponse, setServicesOnboardingAiResponse] = useState('')
+  const [shouldScrollToFeatured, setShouldScrollToFeatured] = useState(false)
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
-  const servicesSectionRef = useRef<HTMLDivElement | null>(null)
+  const servicesOnboardingRef = useRef<HTMLDivElement | null>(null)
+  const servicesFeaturedRef = useRef<HTMLDivElement | null>(null)
 
   // Инициализация состояния подсказки Telegram из localStorage (24 часа)
   useEffect(() => {
@@ -653,8 +655,8 @@ export default function BusinessProfileEditor({
   }
 
   const scrollToServicesSection = () => {
-    if (servicesSectionRef.current) {
-      servicesSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (servicesFeaturedRef.current) {
+      servicesFeaturedRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
@@ -899,6 +901,7 @@ export default function BusinessProfileEditor({
       return
     }
 
+    setShouldScrollToFeatured(false)
     setServicesOnboardingStep('formatting')
     setServicesAiLoading(true)
     setServicesAiError('')
@@ -935,6 +938,7 @@ export default function BusinessProfileEditor({
       if (!response.ok) {
         setServicesAiError('Не удалось получить ответ от AI.')
         setServicesOnboardingStep('asking_format')
+        setShouldScrollToFeatured(false)
         return
       }
 
@@ -942,6 +946,7 @@ export default function BusinessProfileEditor({
       if (!data.reply) {
         setServicesAiError('Пустой ответ AI.')
         setServicesOnboardingStep('asking_format')
+        setShouldScrollToFeatured(false)
         return
       }
 
@@ -952,12 +957,14 @@ export default function BusinessProfileEditor({
         console.error('Failed to parse AI reply', e)
         setServicesAiError('Не удалось разобрать ответ AI.')
         setServicesOnboardingStep('asking_format')
+        setShouldScrollToFeatured(false)
         return
       }
 
       if (!Array.isArray(parsed)) {
         setServicesAiError('AI вернул некорректный формат.')
         setServicesOnboardingStep('asking_format')
+        setShouldScrollToFeatured(false)
         return
       }
 
@@ -968,6 +975,7 @@ export default function BusinessProfileEditor({
       if (itemsFromAi.length === 0) {
         setServicesAiError('AI не смог структурировать услуги.')
         setServicesOnboardingStep('asking_format')
+        setShouldScrollToFeatured(false)
         return
       }
 
@@ -977,6 +985,7 @@ export default function BusinessProfileEditor({
         newFeatured.push('')
       }
       setFeaturedServices(newFeatured)
+      setShouldScrollToFeatured(true)
       setServicesOnboardingStep('done')
       setServicesHint('none')
       setServicesAiError('')
@@ -984,10 +993,28 @@ export default function BusinessProfileEditor({
       console.error('Services formatting error', error)
       setServicesAiError('Произошла ошибка при структурировании.')
       setServicesOnboardingStep('asking_format')
+      setShouldScrollToFeatured(false)
     } finally {
       setServicesAiLoading(false)
     }
   }
+
+  // Автопрокрутка к диалогу и результатам
+  useEffect(() => {
+    if (!showTelegramHint && servicesOnboardingStep === 'asking' && servicesOnboardingRef.current) {
+      servicesOnboardingRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+
+    if (
+      !showTelegramHint &&
+      servicesOnboardingStep === 'done' &&
+      shouldScrollToFeatured &&
+      servicesFeaturedRef.current
+    ) {
+      servicesFeaturedRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setShouldScrollToFeatured(false)
+    }
+  }, [servicesOnboardingStep, shouldScrollToFeatured, showTelegramHint])
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1863,7 +1890,7 @@ export default function BusinessProfileEditor({
 
           {/* Услуги или товары */}
           <section
-            ref={servicesSectionRef}
+            ref={servicesFeaturedRef}
             data-services-onboarding="v1"
             style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}
           >
@@ -1999,7 +2026,11 @@ export default function BusinessProfileEditor({
           )}
           {/* Пошаговый онбординг услуг (Telegram-стиль) */}
           {!showTelegramHint && servicesOnboardingStep !== 'idle' && servicesOnboardingStep !== 'done' && (
-            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" data-services-onboarding-flow="v1">
+            <div
+              ref={servicesOnboardingRef}
+              className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+              data-services-onboarding-flow="v1"
+            >
               <div className="mb-1 font-semibold">Помощь AI</div>
               {servicesOnboardingStep === 'asking' && (
                 <>
