@@ -1,7 +1,5 @@
 'use client'
 
-const SERVICES_ONBOARDING_BUILD_MARKER = 'SERVICES_ONBOARDING_V1'
-
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -12,6 +10,8 @@ interface BusinessProfileEditorProps {
   businessId: string
   businessSlug: string
 }
+
+const SERVICES_ONBOARDING_BUILD_MARKER = 'SERVICES_ONBOARDING_V1'
 
 interface BusinessProfile {
   id: string
@@ -101,9 +101,12 @@ export default function BusinessProfileEditor({
   const [servicesOnboardingInput, setServicesOnboardingInput] = useState('')
   const [servicesOnboardingAiResponse, setServicesOnboardingAiResponse] = useState('')
   const [shouldScrollToFeatured, setShouldScrollToFeatured] = useState(false)
+  const [highlightFeatured, setHighlightFeatured] = useState(false)
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
   const servicesOnboardingRef = useRef<HTMLDivElement | null>(null)
   const servicesFeaturedRef = useRef<HTMLDivElement | null>(null)
+  const servicesTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const servicesFeaturedFirstInputRef = useRef<HTMLInputElement | null>(null)
 
   // build marker – intentionally unused, чтобы код онбординга точно попал в client bundle
   useEffect(() => {
@@ -1009,17 +1012,36 @@ export default function BusinessProfileEditor({
   // Автопрокрутка к диалогу и результатам
   useEffect(() => {
     if (!showTelegramHint && servicesOnboardingStep === 'asking' && servicesOnboardingRef.current) {
-      servicesOnboardingRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Ждём реального рендера, затем скроллим к диалогу и фокусируем textarea
+      requestAnimationFrame(() => {
+        servicesOnboardingRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+        requestAnimationFrame(() => {
+          servicesTextareaRef.current?.focus()
+        })
+      })
     }
 
-    if (
-      !showTelegramHint &&
-      servicesOnboardingStep === 'done' &&
-      shouldScrollToFeatured &&
-      servicesFeaturedRef.current
-    ) {
-      servicesFeaturedRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setShouldScrollToFeatured(false)
+    if (!showTelegramHint && servicesOnboardingStep === 'done' && shouldScrollToFeatured) {
+      if (servicesFeaturedFirstInputRef.current) {
+        servicesFeaturedFirstInputRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+        setShouldScrollToFeatured(false)
+        setHighlightFeatured(true)
+        setTimeout(() => {
+          setHighlightFeatured(false)
+        }, 1500)
+      } else if (servicesFeaturedRef.current) {
+        servicesFeaturedRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+        setShouldScrollToFeatured(false)
+      }
     }
   }, [servicesOnboardingStep, shouldScrollToFeatured, showTelegramHint])
 
@@ -1939,23 +1961,40 @@ export default function BusinessProfileEditor({
             {/* Маркер для проверки попадания онбординга в bundle */}
             <div data-services-onboarding-bundle="v1" style={{ display: 'none' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {[0, 1, 2, 3].map((index) => (
-                <input
-                  key={index}
-                  type="text"
-                  value={featuredServices[index] || ''}
-                  onChange={(e) => handleFeaturedServiceChange(index, e.target.value)}
-                  placeholder={`Услуга или товар ${index + 1}`}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '0.875rem',
-                    fontFamily: 'inherit',
-                  }}
-                />
-              ))}
+              {[0, 1, 2, 3].map((index) => {
+                const isFirst = index === 0
+                const baseStyle = {
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '0.875rem',
+                  fontFamily: 'inherit',
+                } as const
+
+                const highlightStyle =
+                  isFirst && highlightFeatured
+                    ? {
+                        borderColor: '#0ea5e9',
+                        boxShadow: '0 0 0 2px rgba(14, 165, 233, 0.4)',
+                      }
+                    : {}
+
+                return (
+                  <input
+                    key={index}
+                    ref={isFirst ? servicesFeaturedFirstInputRef : undefined}
+                    type="text"
+                    value={featuredServices[index] || ''}
+                    onChange={(e) => handleFeaturedServiceChange(index, e.target.value)}
+                    placeholder={`Услуга или товар ${index + 1}`}
+                    style={{
+                      ...baseStyle,
+                      ...highlightStyle,
+                    }}
+                  />
+                )
+              })}
             </div>
           </section>
         </div>
@@ -2046,6 +2085,7 @@ export default function BusinessProfileEditor({
                     Напишите, какие услуги или товары вы предлагаете.
                   </p>
                   <textarea
+                    ref={servicesTextareaRef}
                     value={servicesOnboardingInput}
                     onChange={(e) => setServicesOnboardingInput(e.target.value)}
                     placeholder="Например: разработка сайтов, дизайн интерьеров, ремонт квартир..."
