@@ -847,6 +847,10 @@ export default function BusinessProfileEditor({
 
   // Новый пошаговый флоу онбординга услуг (Telegram-стиль)
   const handleServicesOnboardingStart = () => {
+    // Маркер для проверки попадания в bundle
+    if (typeof window !== 'undefined') {
+      console.log('SERVICES_ONBOARDING_V1: handleServicesOnboardingStart called')
+    }
     setServicesOnboardingStep('asking')
     setServicesOnboardingInput('')
     setServicesOnboardingAiResponse('')
@@ -858,6 +862,10 @@ export default function BusinessProfileEditor({
     const userText = servicesOnboardingInput.trim()
     setServicesOnboardingStep('saved')
     setServicesOnboardingAiResponse('Принял 👍')
+    // Маркер для проверки попадания в bundle
+    if (typeof window !== 'undefined') {
+      console.log('SERVICES_ONBOARDING_V1: handleServicesOnboardingSubmit called')
+    }
 
     // Сохраняем servicesRaw
     try {
@@ -1857,6 +1865,7 @@ export default function BusinessProfileEditor({
           {/* Услуги или товары */}
           <section
             ref={servicesSectionRef}
+            data-services-onboarding="v1"
             style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}
           >
             <div
@@ -1894,6 +1903,8 @@ export default function BusinessProfileEditor({
             >
               Добавьте до 4 основных услуг или товаров — они будут показаны на главном экране вашей страницы
             </p>
+            {/* Маркер для проверки попадания онбординга в bundle */}
+            <div data-services-onboarding-bundle="v1" style={{ display: 'none' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {[0, 1, 2, 3].map((index) => (
                 <input
@@ -1989,7 +2000,7 @@ export default function BusinessProfileEditor({
           )}
           {/* Пошаговый онбординг услуг (Telegram-стиль) */}
           {!showTelegramHint && servicesOnboardingStep !== 'idle' && servicesOnboardingStep !== 'done' && (
-            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm" data-services-onboarding-flow="v1">
               <div className="mb-1 font-semibold">Помощь AI</div>
               {servicesOnboardingStep === 'asking' && (
                 <>
