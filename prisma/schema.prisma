@@ -63,6 +63,7 @@ model BusinessProfile {
   statsCities     Int      @default(4)
   cities          String[]
   services        String[]
+  servicesRaw     String?  // Сырой текст услуг от пользователя (до структурирования AI)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

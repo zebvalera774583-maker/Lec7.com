@@ -96,6 +96,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       cities,
       services,
       featuredServices,
+      servicesRaw,
     } = body
 
     // Валидация displayName: только латиница, цифры, пробелы, дефисы
@@ -151,6 +152,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         statsCities: statsCities ?? 4,
         cities: cities || [],
         services: servicesToSave || [],
+        servicesRaw: servicesRaw !== undefined ? servicesRaw || null : null,
       },
       update: {
         displayName: displayName !== undefined ? displayName || null : undefined,
@@ -162,6 +164,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         statsCities: statsCities !== undefined ? statsCities : undefined,
         cities: cities !== undefined ? cities : undefined,
         services: servicesToSave !== undefined ? servicesToSave : undefined,
+        servicesRaw: servicesRaw !== undefined ? servicesRaw || null : undefined,
       },
     })
 

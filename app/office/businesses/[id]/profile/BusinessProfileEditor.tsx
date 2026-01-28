@@ -23,9 +23,11 @@ interface BusinessProfile {
   statsCities: number
   cities: string[]
   services: string[]
+  servicesRaw: string | null
 }
 
 type ServicesHintType = 'none' | 'empty' | 'weak'
+type ServicesOnboardingStep = 'idle' | 'asking' | 'saved' | 'asking_format' | 'formatting' | 'done'
 
 interface BusinessPhoto {
   id: string
@@ -92,6 +94,10 @@ export default function BusinessProfileEditor({
   const [servicesHint, setServicesHint] = useState<ServicesHintType>('none')
   const [servicesAiLoading, setServicesAiLoading] = useState(false)
   const [servicesAiError, setServicesAiError] = useState('')
+  const [servicesRaw, setServicesRaw] = useState('')
+  const [servicesOnboardingStep, setServicesOnboardingStep] = useState<ServicesOnboardingStep>('idle')
+  const [servicesOnboardingInput, setServicesOnboardingInput] = useState('')
+  const [servicesOnboardingAiResponse, setServicesOnboardingAiResponse] = useState('')
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
   const servicesSectionRef = useRef<HTMLDivElement | null>(null)
 
@@ -135,10 +141,17 @@ export default function BusinessProfileEditor({
         setTelegramUsername(profile.telegramUsername || '')
         setCities(profile.cities || [])
         setServices(profile.services || [])
+        setServicesRaw(profile.servicesRaw || '')
         // Заполняем featuredServices из старых данных (обратная совместимость)
         const existingServices = profile.services || []
         const featured = [...existingServices.slice(0, 4), '', '', '', ''].slice(0, 4)
         setFeaturedServices(featured)
+        // Инициализируем step онбординга
+        if (!profile.servicesRaw || profile.servicesRaw.trim() === '') {
+          setServicesOnboardingStep('idle')
+        } else {
+          setServicesOnboardingStep('done')
+        }
         setMetrics({
           cases: profile.statsCases,
           projects: profile.statsProjects,
@@ -488,6 +501,7 @@ export default function BusinessProfileEditor({
         cities,
         services,
         featuredServices: featuredServices.filter((s) => s.trim() !== '').slice(0, 4),
+        servicesRaw: servicesRaw || null,
       }
 
       const response = await fetch(`/api/office/businesses/${businessId}/profile`, {
@@ -629,6 +643,14 @@ export default function BusinessProfileEditor({
   const handleServicesAiHelpClick = () => {
     // Приоритет Telegram-подсказки
     if (showTelegramHint) return
+    
+    // Если servicesRaw пустое — запускаем онбординг
+    if (!servicesRaw || servicesRaw.trim() === '') {
+      handleServicesOnboardingStart()
+      return
+    }
+    
+    // Иначе показываем обычную подсказку
     const nextType = evaluateServicesHintType(featuredServices)
     setServicesHint(nextType)
   }
@@ -823,12 +845,141 @@ export default function BusinessProfileEditor({
     }
   }
 
-  const handleServicesAiSuggest = () => {
-    callServicesAi('suggest')
+  // Новый пошаговый флоу онбординга услуг (Telegram-стиль)
+  const handleServicesOnboardingStart = () => {
+    setServicesOnboardingStep('asking')
+    setServicesOnboardingInput('')
+    setServicesOnboardingAiResponse('')
   }
 
-  const handleServicesAiImprove = () => {
-    callServicesAi('improve')
+  const handleServicesOnboardingSubmit = async () => {
+    if (!servicesOnboardingInput.trim()) return
+
+    const userText = servicesOnboardingInput.trim()
+    setServicesOnboardingStep('saved')
+    setServicesOnboardingAiResponse('Принял 👍')
+
+    // Сохраняем servicesRaw
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          servicesRaw: userText,
+        }),
+      })
+
+      if (response.ok) {
+        setServicesRaw(userText)
+        // После сохранения задаём вопрос про структурирование
+        setTimeout(() => {
+          setServicesOnboardingStep('asking_format')
+          setServicesOnboardingAiResponse('Хотите, я помогу оформить это в список услуг?')
+        }, 500)
+      }
+    } catch (error) {
+      console.error('Failed to save servicesRaw', error)
+    }
+  }
+
+  const handleServicesOnboardingFormat = async (shouldFormat: boolean) => {
+    if (!shouldFormat) {
+      setServicesOnboardingStep('done')
+      setServicesHint('none')
+      return
+    }
+
+    setServicesOnboardingStep('formatting')
+    setServicesAiLoading(true)
+    setServicesAiError('')
+
+    try {
+      const payload = {
+        intent: 'resident_marketing' as const,
+        businessId,
+        message: [
+          'Ты — помощник платформы Lek7. Твоя задача — структурировать текст пользователя в список услуг.',
+          '',
+          'ВАЖНО:',
+          '- НЕ добавляй новые услуги, которых нет в тексте пользователя',
+          '- НЕ придумывай и не угадывай',
+          '- Только разбей текст на отдельные услуги/товары',
+          '- Максимум 4 позиции',
+          '',
+          'Текст пользователя:',
+          servicesRaw,
+          '',
+          'Ответь ТОЛЬКО JSON-массивом без пояснений:',
+          '[{"title": "название услуги", "description": "краткое описание (80-160 символов, нейтрально, без клише)"}]',
+        ].join('\n'),
+      }
+
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        setServicesAiError('Не удалось получить ответ от AI.')
+        setServicesOnboardingStep('asking_format')
+        return
+      }
+
+      const data = (await response.json()) as { reply?: string; error?: string }
+      if (!data.reply) {
+        setServicesAiError('Пустой ответ AI.')
+        setServicesOnboardingStep('asking_format')
+        return
+      }
+
+      let parsed: unknown
+      try {
+        parsed = parseJsonArrayFromAiReply(data.reply)
+      } catch (e) {
+        console.error('Failed to parse AI reply', e)
+        setServicesAiError('Не удалось разобрать ответ AI.')
+        setServicesOnboardingStep('asking_format')
+        return
+      }
+
+      if (!Array.isArray(parsed)) {
+        setServicesAiError('AI вернул некорректный формат.')
+        setServicesOnboardingStep('asking_format')
+        return
+      }
+
+      const itemsFromAi: AiServiceItem[] = (parsed as any[])
+        .filter((item) => item && typeof item.title === 'string' && typeof item.description === 'string')
+        .slice(0, 4)
+
+      if (itemsFromAi.length === 0) {
+        setServicesAiError('AI не смог структурировать услуги.')
+        setServicesOnboardingStep('asking_format')
+        return
+      }
+
+      // Применяем структурированные услуги
+      const newFeatured: string[] = itemsFromAi.map((item) => buildServiceLine(item.title, item.description))
+      while (newFeatured.length < 4) {
+        newFeatured.push('')
+      }
+      setFeaturedServices(newFeatured)
+      setServicesOnboardingStep('done')
+      setServicesHint('none')
+      setServicesAiError('')
+    } catch (error) {
+      console.error('Services formatting error', error)
+      setServicesAiError('Произошла ошибка при структурировании.')
+      setServicesOnboardingStep('asking_format')
+    } finally {
+      setServicesAiLoading(false)
+    }
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1836,7 +1987,77 @@ export default function BusinessProfileEditor({
               </div>
             </div>
           )}
-          {!showTelegramHint && servicesHint !== 'none' && (
+          {/* Пошаговый онбординг услуг (Telegram-стиль) */}
+          {!showTelegramHint && servicesOnboardingStep !== 'idle' && servicesOnboardingStep !== 'done' && (
+            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+              <div className="mb-1 font-semibold">Помощь AI</div>
+              {servicesOnboardingStep === 'asking' && (
+                <>
+                  <p className="text-gray-600 leading-relaxed mb-2">
+                    Чем вы занимаетесь?<br />
+                    Напишите, какие услуги или товары вы предлагаете.
+                  </p>
+                  <textarea
+                    value={servicesOnboardingInput}
+                    onChange={(e) => setServicesOnboardingInput(e.target.value)}
+                    placeholder="Например: разработка сайтов, дизайн интерьеров, ремонт квартир..."
+                    style={{
+                      width: '100%',
+                      minHeight: '60px',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '0.875rem',
+                      fontFamily: 'inherit',
+                      marginBottom: '0.5rem',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleServicesOnboardingSubmit}
+                    disabled={!servicesOnboardingInput.trim()}
+                    className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    Отправить
+                  </button>
+                </>
+              )}
+              {servicesOnboardingStep === 'saved' && (
+                <p className="text-gray-600 leading-relaxed">{servicesOnboardingAiResponse}</p>
+              )}
+              {servicesOnboardingStep === 'asking_format' && (
+                <>
+                  <p className="text-gray-600 leading-relaxed mb-2">{servicesOnboardingAiResponse}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleServicesOnboardingFormat(true)}
+                      disabled={servicesAiLoading}
+                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                    >
+                      Да
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleServicesOnboardingFormat(false)}
+                      disabled={servicesAiLoading}
+                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Нет
+                    </button>
+                  </div>
+                </>
+              )}
+              {servicesOnboardingStep === 'formatting' && (
+                <p className="text-gray-600 leading-relaxed">Оформляю в список...</p>
+              )}
+              {servicesAiError && servicesOnboardingStep === 'formatting' && (
+                <p className="mt-2 text-xs text-red-600">{servicesAiError}</p>
+              )}
+            </div>
+          )}
+          {/* Обычные подсказки (только если онбординг завершён) */}
+          {!showTelegramHint && servicesHint !== 'none' && servicesOnboardingStep === 'done' && (
             <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
               <div className="mb-1 font-semibold">Подсказка</div>
               <p className="text-gray-600 leading-relaxed">
@@ -1845,60 +2066,21 @@ export default function BusinessProfileEditor({
                   : 'Услуги указаны очень коротко. Без пояснений сложно понять ценность и чем вы отличаетесь от других.'}
               </p>
               <div className="mt-2 flex gap-2">
-                {servicesHint === 'empty' ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleServicesHintManualEdit}
-                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      disabled={servicesAiLoading}
-                    >
-                      Добавить вручную
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleServicesAiSuggest}
-                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-                      disabled={servicesAiLoading}
-                    >
-                      Предложить варианты (AI)
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleServicesHintManualEdit}
-                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      disabled={servicesAiLoading}
-                    >
-                      Допишу сам
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleServicesAiImprove}
-                      className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
-                      disabled={servicesAiLoading}
-                    >
-                      Улучшить с AI
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleServicesHintKeepAsIs}
-                      className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      disabled={servicesAiLoading}
-                    >
-                      Оставить как есть
-                    </button>
-                  </>
-                )}
+                <button
+                  type="button"
+                  onClick={handleServicesHintManualEdit}
+                  className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {servicesHint === 'empty' ? 'Добавить вручную' : 'Допишу сам'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleServicesHintKeepAsIs}
+                  className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Оставить как есть
+                </button>
               </div>
-              {servicesAiLoading && (
-                <p className="mt-2 text-xs text-gray-500">AI думает…</p>
-              )}
-              {servicesAiError && !servicesAiLoading && (
-                <p className="mt-2 text-xs text-red-600">{servicesAiError}</p>
-              )}
             </div>
           )}
           {/* Кнопка "В кабинет" теперь отображается в шапке рядом с "Открыть витрину" */}
