@@ -1,5 +1,7 @@
 'use client'
 
+const SERVICES_ONBOARDING_BUILD_MARKER = 'SERVICES_ONBOARDING_V1'
+
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -102,6 +104,11 @@ export default function BusinessProfileEditor({
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
   const servicesOnboardingRef = useRef<HTMLDivElement | null>(null)
   const servicesFeaturedRef = useRef<HTMLDivElement | null>(null)
+
+  // build marker – intentionally unused, чтобы код онбординга точно попал в client bundle
+  useEffect(() => {
+    void SERVICES_ONBOARDING_BUILD_MARKER
+  }, [])
 
   // Инициализация состояния подсказки Telegram из localStorage (24 часа)
   useEffect(() => {
