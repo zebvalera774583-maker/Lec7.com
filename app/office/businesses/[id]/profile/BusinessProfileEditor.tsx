@@ -2143,7 +2143,7 @@ export default function BusinessProfileEditor({
                     <button
                       type="button"
                       onClick={() => handleServicesOnboardingFormat(true)}
-                      disabled={servicesAiLoading || servicesOnboardingStep === 'formatting'}
+                      disabled={servicesAiLoading}
                       className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
                     >
                       Да
@@ -2151,7 +2151,7 @@ export default function BusinessProfileEditor({
                     <button
                       type="button"
                       onClick={() => handleServicesOnboardingFormat(false)}
-                      disabled={servicesAiLoading || servicesOnboardingStep === 'formatting'}
+                      disabled={servicesAiLoading}
                       className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Нет
