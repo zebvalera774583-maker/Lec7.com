@@ -670,6 +670,11 @@ export default function BusinessProfileEditor({
       return
     }
 
+    // Блокируем повторный старт онбординга во время форматирования
+    if (servicesAiLoading || servicesOnboardingStep === 'formatting') {
+      return
+    }
+
     // Всегда запускаем онбординг: сначала спрашиваем пользователя
     // Если servicesRaw уже есть — подставляем его как черновик в textarea
     setServicesOnboardingStep('asking')
@@ -886,7 +891,7 @@ export default function BusinessProfileEditor({
 
     const userText = servicesOnboardingInput.trim()
     setServicesOnboardingStep('saved')
-    setServicesOnboardingAiResponse('Принял 👍')
+    setServicesOnboardingAiResponse('Принято. Сделать до 4 позиций?')
     // Маркер для проверки попадания в bundle
     if (typeof window !== 'undefined') {
       console.log('SERVICES_ONBOARDING_V1: handleServicesOnboardingSubmit called')
@@ -907,11 +912,6 @@ export default function BusinessProfileEditor({
 
       if (response.ok) {
         setServicesRaw(userText)
-        // После сохранения задаём вопрос про структурирование
-        setTimeout(() => {
-          setServicesOnboardingStep('asking_format')
-          setServicesOnboardingAiResponse('Хотите, я помогу оформить это в список услуг?')
-        }, 500)
       }
     } catch (error) {
       console.error('Failed to save servicesRaw', error)
@@ -920,8 +920,10 @@ export default function BusinessProfileEditor({
 
   const handleServicesOnboardingFormat = async (shouldFormat: boolean) => {
     if (!shouldFormat) {
-      setServicesOnboardingStep('done')
+      setServicesOnboardingStep('idle')
       setServicesHint('none')
+      setServicesAiError('')
+      setShouldScrollToFeatured(false)
       return
     }
 
@@ -960,16 +962,16 @@ export default function BusinessProfileEditor({
       })
 
       if (!response.ok) {
-        setServicesAiError('Не удалось получить ответ от AI.')
-        setServicesOnboardingStep('asking_format')
+        setServicesAiError('Не получилось. Попробуйте иначе.')
+        setServicesOnboardingStep('asking')
         setShouldScrollToFeatured(false)
         return
       }
 
       const data = (await response.json()) as { reply?: string; error?: string }
       if (!data.reply) {
-        setServicesAiError('Пустой ответ AI.')
-        setServicesOnboardingStep('asking_format')
+        setServicesAiError('Не получилось. Попробуйте иначе.')
+        setServicesOnboardingStep('asking')
         setShouldScrollToFeatured(false)
         return
       }
@@ -979,15 +981,15 @@ export default function BusinessProfileEditor({
         parsed = parseJsonArrayFromAiReply(data.reply)
       } catch (e) {
         console.error('Failed to parse AI reply', e)
-        setServicesAiError('Не удалось разобрать ответ AI.')
-        setServicesOnboardingStep('asking_format')
+        setServicesAiError('Не получилось. Попробуйте иначе.')
+        setServicesOnboardingStep('asking')
         setShouldScrollToFeatured(false)
         return
       }
 
       if (!Array.isArray(parsed)) {
-        setServicesAiError('AI вернул некорректный формат.')
-        setServicesOnboardingStep('asking_format')
+        setServicesAiError('Не получилось. Попробуйте иначе.')
+        setServicesOnboardingStep('asking')
         setShouldScrollToFeatured(false)
         return
       }
@@ -997,8 +999,8 @@ export default function BusinessProfileEditor({
         .slice(0, 4)
 
       if (itemsFromAi.length === 0) {
-        setServicesAiError('AI не смог структурировать услуги.')
-        setServicesOnboardingStep('asking_format')
+        setServicesAiError('Не получилось. Попробуйте иначе.')
+        setServicesOnboardingStep('asking')
         setShouldScrollToFeatured(false)
         return
       }
@@ -1015,8 +1017,8 @@ export default function BusinessProfileEditor({
       setServicesAiError('')
     } catch (error) {
       console.error('Services formatting error', error)
-      setServicesAiError('Произошла ошибка при структурировании.')
-      setServicesOnboardingStep('asking_format')
+      setServicesAiError('Не получилось. Попробуйте иначе.')
+      setServicesOnboardingStep('asking')
       setShouldScrollToFeatured(false)
     } finally {
       setServicesAiLoading(false)
@@ -2106,14 +2108,13 @@ export default function BusinessProfileEditor({
               {servicesOnboardingStep === 'asking' && (
                 <>
                   <p className="text-gray-600 leading-relaxed mb-2">
-                    Чем вы занимаетесь?<br />
-                    Напишите, какие услуги или товары вы предлагаете.
+                    Чем занимаетесь? Напишите 1–2 фразы.
                   </p>
                   <textarea
                     ref={servicesTextareaRef}
                     value={servicesOnboardingInput}
                     onChange={(e) => setServicesOnboardingInput(e.target.value)}
-                    placeholder="Например: разработка сайтов, дизайн интерьеров, ремонт квартир..."
+                    placeholder="Напр.: кухни на заказ, ремонт, дизайн…"
                     style={{
                       width: '100%',
                       minHeight: '60px',
@@ -2136,16 +2137,13 @@ export default function BusinessProfileEditor({
                 </>
               )}
               {servicesOnboardingStep === 'saved' && (
-                <p className="text-gray-600 leading-relaxed">{servicesOnboardingAiResponse}</p>
-              )}
-              {servicesOnboardingStep === 'asking_format' && (
                 <>
                   <p className="text-gray-600 leading-relaxed mb-2">{servicesOnboardingAiResponse}</p>
                   <div className="mt-2 flex gap-2">
                     <button
                       type="button"
                       onClick={() => handleServicesOnboardingFormat(true)}
-                      disabled={servicesAiLoading}
+                      disabled={servicesAiLoading || servicesOnboardingStep === 'formatting'}
                       className="inline-flex items-center rounded border border-sky-600 bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
                     >
                       Да
@@ -2153,7 +2151,7 @@ export default function BusinessProfileEditor({
                     <button
                       type="button"
                       onClick={() => handleServicesOnboardingFormat(false)}
-                      disabled={servicesAiLoading}
+                      disabled={servicesAiLoading || servicesOnboardingStep === 'formatting'}
                       className="inline-flex items-center rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Нет
@@ -2162,9 +2160,9 @@ export default function BusinessProfileEditor({
                 </>
               )}
               {servicesOnboardingStep === 'formatting' && (
-                <p className="text-gray-600 leading-relaxed">Оформляю в список...</p>
+                <p className="text-gray-600 leading-relaxed">Форматирую…</p>
               )}
-              {servicesAiError && servicesOnboardingStep === 'formatting' && (
+              {servicesAiError && servicesOnboardingStep === 'asking' && (
                 <p className="mt-2 text-xs text-red-600">{servicesAiError}</p>
               )}
             </div>
