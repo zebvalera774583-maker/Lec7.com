@@ -102,11 +102,13 @@ export default function BusinessProfileEditor({
   const [servicesOnboardingAiResponse, setServicesOnboardingAiResponse] = useState('')
   const [shouldScrollToFeatured, setShouldScrollToFeatured] = useState(false)
   const [highlightFeatured, setHighlightFeatured] = useState(false)
+  const [highlightTelegramHint, setHighlightTelegramHint] = useState(false)
   const telegramInputRef = useRef<HTMLInputElement | null>(null)
   const servicesOnboardingRef = useRef<HTMLDivElement | null>(null)
   const servicesFeaturedRef = useRef<HTMLDivElement | null>(null)
   const servicesTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const servicesFeaturedFirstInputRef = useRef<HTMLInputElement | null>(null)
+  const telegramHintRef = useRef<HTMLDivElement | null>(null)
 
   // build marker – intentionally unused, чтобы код онбординга точно попал в client bundle
   useEffect(() => {
@@ -654,7 +656,19 @@ export default function BusinessProfileEditor({
 
   const handleServicesAiHelpClick = () => {
     // Приоритет Telegram-подсказки
-    if (showTelegramHint) return
+    if (showTelegramHint) {
+      if (telegramHintRef.current) {
+        telegramHintRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+        setHighlightTelegramHint(true)
+        setTimeout(() => {
+          setHighlightTelegramHint(false)
+        }, 1500)
+      }
+      return
+    }
 
     // Всегда запускаем онбординг: сначала спрашиваем пользователя
     // Если servicesRaw уже есть — подставляем его как черновик в textarea
@@ -2030,23 +2044,34 @@ export default function BusinessProfileEditor({
               {saving ? 'Сохранение...' : 'Сохранить изменения'}
             </button>
           {/* Индикатор веса страницы как информационный блок */}
-          <div
-            style={{
-              padding: '1rem',
-              background: '#f0f9ff',
-              border: '1px solid #bae6fd',
-              borderRadius: '8px',
-              marginBottom: '1rem',
-              marginTop: '0.5rem',
-            }}
-          >
+      <div
+        style={{
+          padding: '1rem',
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          marginTop: '0.5rem',
+        }}
+      >
             <span style={{ fontSize: '0.875rem', color: '#0369a1' }}>
               Вес страницы: {pageWeight.toFixed(1)} ГБ
             </span>
           </div>
           {/* Подсказки под кнопкой "Сохранить изменения" */}
           {showTelegramHint && (
-            <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+            <div
+              ref={telegramHintRef}
+              className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+              style={
+                highlightTelegramHint
+                  ? {
+                      borderColor: '#0ea5e9',
+                      boxShadow: '0 0 0 2px rgba(14, 165, 233, 0.4)',
+                    }
+                  : undefined
+              }
+            >
               <div className="mb-1 font-semibold">Подсказка</div>
               <p className="text-gray-600 leading-relaxed">
                 Вы указали номер телефона. Многие клиенты предпочитают писать в Telegram. Добавьте ник в Telegram,
