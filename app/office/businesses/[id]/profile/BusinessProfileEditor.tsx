@@ -920,7 +920,8 @@ export default function BusinessProfileEditor({
 
   const handleServicesOnboardingFormat = async (shouldFormat: boolean) => {
     if (!shouldFormat) {
-      setServicesOnboardingStep('idle')
+      setServicesOnboardingStep('done')
+      setServicesOnboardingAiResponse('Ок. Заполните вручную.')
       setServicesHint('none')
       setServicesAiError('')
       setShouldScrollToFeatured(false)
@@ -2098,7 +2099,7 @@ export default function BusinessProfileEditor({
             </div>
           )}
           {/* Пошаговый онбординг услуг (Telegram-стиль) */}
-          {!showTelegramHint && servicesOnboardingStep !== 'idle' && servicesOnboardingStep !== 'done' && (
+          {!showTelegramHint && servicesOnboardingStep !== 'idle' && (
             <div
               ref={servicesOnboardingRef}
               className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
@@ -2162,13 +2163,16 @@ export default function BusinessProfileEditor({
               {servicesOnboardingStep === 'formatting' && (
                 <p className="text-gray-600 leading-relaxed">Форматирую…</p>
               )}
+              {servicesOnboardingStep === 'done' && servicesOnboardingAiResponse && (
+                <p className="text-gray-600 leading-relaxed">{servicesOnboardingAiResponse}</p>
+              )}
               {servicesAiError && servicesOnboardingStep === 'asking' && (
                 <p className="mt-2 text-xs text-red-600">{servicesAiError}</p>
               )}
             </div>
           )}
           {/* Обычные подсказки (только если онбординг завершён) */}
-          {!showTelegramHint && servicesHint !== 'none' && servicesOnboardingStep === 'done' && (
+          {!showTelegramHint && servicesHint !== 'none' && servicesOnboardingStep === 'idle' && (
             <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
               <div className="mb-1 font-semibold">Подсказка</div>
               <p className="text-gray-600 leading-relaxed">
