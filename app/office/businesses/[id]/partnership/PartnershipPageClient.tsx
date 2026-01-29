@@ -23,10 +23,20 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [savedRows, setSavedRows] = useState<Row[] | null>(null)
   const [savedColumns, setSavedColumns] = useState<Column[] | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const handleSave = (rows: Row[], columns: Column[]) => {
     setSavedRows(rows)
     setSavedColumns(columns)
+  }
+
+  const handleEdit = () => {
+    setIsModalOpen(true)
+    setIsMenuOpen(false)
+  }
+
+  const handlePriceClick = () => {
+    setIsModalOpen(true)
   }
 
   const rowCount = savedRows ? savedRows.length : 0
@@ -65,18 +75,113 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
 
       {/* Бейдж о сохранённом прайсе */}
       {savedRows && savedRows.length > 0 && (
-        <div
-          style={{
-            padding: '0.75rem 1rem',
-            background: '#dbeafe',
-            border: '1px solid #93c5fd',
-            borderRadius: '6px',
-            color: '#1e40af',
-            fontSize: '0.875rem',
-            display: 'inline-block',
-          }}
-        >
-          Прайс заполнен (черновик) — {rowCount} {rowCount === 1 ? 'строка' : rowCount < 5 ? 'строки' : 'строк'}
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              background: '#dbeafe',
+              border: '1px solid #93c5fd',
+              borderRadius: '6px',
+              color: '#1e40af',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+            }}
+            onClick={handlePriceClick}
+          >
+            <span>Прайс 1</span>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+                cursor: 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsMenuOpen(!isMenuOpen)
+              }}
+            >
+              <div
+                style={{
+                  width: '16px',
+                  height: '2px',
+                  background: '#1e40af',
+                }}
+              />
+              <div
+                style={{
+                  width: '16px',
+                  height: '2px',
+                  background: '#1e40af',
+                }}
+              />
+              <div
+                style={{
+                  width: '16px',
+                  height: '2px',
+                  background: '#1e40af',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Меню гамбургера */}
+          {isMenuOpen && (
+            <>
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 998,
+                }}
+                onClick={() => setIsMenuOpen(false)}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.25rem',
+                  background: 'white',
+                  borderRadius: '6px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid #e5e7eb',
+                  minWidth: '150px',
+                  zIndex: 999,
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  onClick={handleEdit}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#111827',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f9fafb'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                >
+                  Редактировать
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -84,6 +189,8 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
+        initialRows={savedRows || undefined}
+        initialColumns={savedColumns || undefined}
       />
     </main>
   )

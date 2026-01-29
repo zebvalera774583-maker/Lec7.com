@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 interface Column {
   id: string
@@ -17,6 +17,8 @@ interface PriceUploadModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (rows: Row[], columns: Column[]) => void
+  initialRows?: Row[]
+  initialColumns?: Column[]
 }
 
 const BASE_COLUMNS: Column[] = [
@@ -26,9 +28,9 @@ const BASE_COLUMNS: Column[] = [
   { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
 ]
 
-export default function PriceUploadModal({ isOpen, onClose, onSave }: PriceUploadModalProps) {
-  const [columns, setColumns] = useState<Column[]>(BASE_COLUMNS)
-  const [rows, setRows] = useState<Row[]>([{}])
+export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns }: PriceUploadModalProps) {
+  const [columns, setColumns] = useState<Column[]>(initialColumns || BASE_COLUMNS)
+  const [rows, setRows] = useState<Row[]>(initialRows && initialRows.length > 0 ? initialRows : [{}])
   const [showAddColumnForm, setShowAddColumnForm] = useState(false)
   const [newColumnTitle, setNewColumnTitle] = useState('')
   const [newColumnKind, setNewColumnKind] = useState<'text' | 'number'>('text')
@@ -82,6 +84,22 @@ export default function PriceUploadModal({ isOpen, onClose, onSave }: PriceUploa
     onSave(rows, columns)
     onClose()
   }
+
+  // Синхронизация данных при открытии модалки
+  useEffect(() => {
+    if (isOpen) {
+      if (initialColumns) {
+        setColumns(initialColumns)
+      } else {
+        setColumns(BASE_COLUMNS)
+      }
+      if (initialRows && initialRows.length > 0) {
+        setRows(initialRows)
+      } else {
+        setRows([{}])
+      }
+    }
+  }, [isOpen, initialRows, initialColumns])
 
   if (!isOpen) return null
 
