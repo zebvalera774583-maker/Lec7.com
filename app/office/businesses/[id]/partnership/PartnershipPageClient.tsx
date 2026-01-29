@@ -155,17 +155,53 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
 
   const handleSave = async (rows: Row[], columns: Column[]) => {
     try {
+      // Фильтруем пустые строки (где все поля пустые)
+      const nonEmptyRows = rows.filter((row) => {
+        const values = Object.values(row).filter((v) => v && String(v).trim() !== '')
+        return values.length > 0
+      })
+
+      // Если нет ни одной заполненной строки, используем хотя бы одну пустую
+      const rowsToSave = nonEmptyRows.length > 0 ? nonEmptyRows : [{}]
+
       if (editingPriceId) {
         // Редактирование существующего прайса
         // Преобразуем rows в формат БД
-        const dbRows = rows.map((row, index) => {
+        const dbRows = rowsToSave.map((row, index) => {
           const { name, unit, priceWithVat, priceWithoutVat, ...extra } = row
+          
+          // Обработка числовых значений
+          let priceWithVatNum: number | null = null
+          let priceWithoutVatNum: number | null = null
+          
+          if (priceWithVat && String(priceWithVat).trim() !== '') {
+            const parsed = parseFloat(String(priceWithVat))
+            if (!isNaN(parsed)) {
+              priceWithVatNum = parsed
+            }
+          }
+          
+          if (priceWithoutVat && String(priceWithoutVat).trim() !== '') {
+            const parsed = parseFloat(String(priceWithoutVat))
+            if (!isNaN(parsed)) {
+              priceWithoutVatNum = parsed
+            }
+          }
+
+          // Убираем базовые поля из extra
+          const extraClean: any = {}
+          for (const [key, value] of Object.entries(extra)) {
+            if (!['name', 'unit', 'priceWithVat', 'priceWithoutVat'].includes(key)) {
+              extraClean[key] = value
+            }
+          }
+
           return {
             name: name || '',
             unit: unit || null,
-            priceWithVat: priceWithVat ? parseFloat(priceWithVat) : null,
-            priceWithoutVat: priceWithoutVat ? parseFloat(priceWithoutVat) : null,
-            extra: Object.keys(extra).length > 0 ? extra : null,
+            priceWithVat: priceWithVatNum,
+            priceWithoutVat: priceWithoutVatNum,
+            extra: Object.keys(extraClean).length > 0 ? extraClean : null,
           }
         })
 
@@ -185,18 +221,46 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         })
 
         if (!response.ok) {
-          throw new Error('Failed to save price')
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to save price')
         }
       } else {
         // Создание нового базового прайса
-        const dbRows = rows.map((row, index) => {
+        const dbRows = rowsToSave.map((row, index) => {
           const { name, unit, priceWithVat, priceWithoutVat, ...extra } = row
+          
+          // Обработка числовых значений
+          let priceWithVatNum: number | null = null
+          let priceWithoutVatNum: number | null = null
+          
+          if (priceWithVat && String(priceWithVat).trim() !== '') {
+            const parsed = parseFloat(String(priceWithVat))
+            if (!isNaN(parsed)) {
+              priceWithVatNum = parsed
+            }
+          }
+          
+          if (priceWithoutVat && String(priceWithoutVat).trim() !== '') {
+            const parsed = parseFloat(String(priceWithoutVat))
+            if (!isNaN(parsed)) {
+              priceWithoutVatNum = parsed
+            }
+          }
+
+          // Убираем базовые поля из extra
+          const extraClean: any = {}
+          for (const [key, value] of Object.entries(extra)) {
+            if (!['name', 'unit', 'priceWithVat', 'priceWithoutVat'].includes(key)) {
+              extraClean[key] = value
+            }
+          }
+
           return {
             name: name || '',
             unit: unit || null,
-            priceWithVat: priceWithVat ? parseFloat(priceWithVat) : null,
-            priceWithoutVat: priceWithoutVat ? parseFloat(priceWithoutVat) : null,
-            extra: Object.keys(extra).length > 0 ? extra : null,
+            priceWithVat: priceWithVatNum,
+            priceWithoutVat: priceWithoutVatNum,
+            extra: Object.keys(extraClean).length > 0 ? extraClean : null,
           }
         })
 
@@ -217,7 +281,8 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         })
 
         if (!response.ok) {
-          throw new Error('Failed to create price')
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to create price')
         }
       }
 
@@ -226,9 +291,9 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       setIsModalOpen(false)
       setEditingPriceId(null)
       setEditingPriceData(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save price:', error)
-      alert('Ошибка сохранения прайса')
+      alert(error.message || 'Ошибка сохранения прайса')
     }
   }
 

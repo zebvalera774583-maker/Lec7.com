@@ -1,0 +1,15 @@
+# Caddy конфигурация для lec7.com
+# Автоматически получает SSL сертификаты через Let's Encrypt
+
+lec7.com {
+    reverse_proxy localhost:3000
+}
+
+www.lec7.com {
+    reverse_proxy localhost:3000
+}
+
+# Если нужен кастомный домен для файлов (опционально)
+# files.lec7.com {
+#     reverse_proxy <R2_PUBLIC_DOMAIN>
+# }

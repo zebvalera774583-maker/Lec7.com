@@ -64,8 +64,9 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
     })
 
     return NextResponse.json({ success: true, id: result.id })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create price list error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    const errorMessage = error?.message || 'Internal Server Error'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 })
