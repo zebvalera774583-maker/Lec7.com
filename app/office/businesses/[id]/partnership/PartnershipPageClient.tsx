@@ -196,15 +196,15 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           <div key={price.id} style={{ position: 'relative', display: 'inline-block' }}>
             <div
               style={{
-                padding: '0.75rem 1rem',
+                padding: '0.5rem 0.75rem',
                 background: '#dbeafe',
                 border: '1px solid #93c5fd',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 color: '#1e40af',
-                fontSize: '0.875rem',
+                fontSize: '0.8125rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.75rem',
+                gap: '0.5rem',
               }}
             >
               <span
@@ -230,27 +230,27 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '3px',
+                  gap: '2px',
                   alignItems: 'center',
                 }}
               >
                 <div
                   style={{
-                    width: '16px',
+                    width: '14px',
                     height: '2px',
                     background: '#1e40af',
                   }}
                 />
                 <div
                   style={{
-                    width: '16px',
+                    width: '14px',
                     height: '2px',
                     background: '#1e40af',
                   }}
                 />
                 <div
                   style={{
-                    width: '16px',
+                    width: '14px',
                     height: '2px',
                     background: '#1e40af',
                   }}
