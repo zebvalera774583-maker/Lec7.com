@@ -191,9 +191,9 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       )}
 
       {/* Список прайсов */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
         {prices.map((price) => (
-          <div key={price.id} style={{ position: 'relative', display: 'inline-block' }}>
+          <div key={price.id} style={{ position: 'relative' }}>
             <div
               style={{
                 padding: '0.5rem 0.75rem',
@@ -202,9 +202,10 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 borderRadius: '4px',
                 color: '#1e40af',
                 fontSize: '0.8125rem',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
+                width: 'fit-content',
               }}
             >
               <span
