@@ -4,20 +4,16 @@ import { requireRole } from '@/lib/middleware'
 
 const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
 
-// POST для создания нового прайса
-export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
   try {
     const url = new URL(req.url)
-    const businessId = url.pathname.split('/').slice(-2, -1)[0]
+    const businessId = url.pathname.split('/').slice(-2, -1)[0] // /api/office/businesses/[id]/prices
 
     if (!businessId) {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    const body = await req.json()
-    const { name, kind, derivedFromId, modifierType, percent, columns, rows } = body
-
-    // Проверяем доступ
+    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: { id: true, ownerId: true },
@@ -27,9 +23,67 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
+    // Резидент может видеть только свой бизнес
     if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    // Получаем список прайсов
+    const priceLists = await prisma.priceList.findMany({
+      where: { businessId },
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+        derivedFromId: true,
+        modifierType: true,
+        percent: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            rows: true,
+            assignments: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    return NextResponse.json(priceLists)
+  } catch (error) {
+    console.error('Get price lists error:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+})
+
+// POST для создания нового прайса
+export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
+  try {
+    const url = new URL(req.url)
+    const businessId = url.pathname.split('/').slice(-2, -1)[0] // /api/office/businesses/[id]/prices
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'business id is required' }, { status: 400 })
+    }
+
+    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true, ownerId: true },
+    })
+
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+
+    // Резидент может изменять только свой бизнес
+    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const { name, kind, derivedFromId, modifierType, percent, columns, rows } = body
 
     // Создаём прайс в транзакции
     const result = await prisma.$transaction(async (tx) => {

@@ -15,6 +15,21 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'business id and price id are required' }, { status: 400 })
     }
 
+    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true, ownerId: true },
+    })
+
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+
+    // Резидент может изменять только свой бизнес
+    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const { residentNumber } = body
 
@@ -26,20 +41,6 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
     const pattern = /^L7-[A-Z0-9]{8}$/
     if (!pattern.test(residentNumber.trim().toUpperCase())) {
       return NextResponse.json({ error: 'Invalid resident number format' }, { status: 400 })
-    }
-
-    // Проверяем доступ
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      select: { id: true, ownerId: true },
-    })
-
-    if (!business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Проверяем существование прайса
@@ -141,14 +142,7 @@ export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'business id and price id are required' }, { status: 400 })
     }
 
-    const searchParams = url.searchParams
-    const residentNumber = searchParams.get('residentNumber')
-
-    if (!residentNumber) {
-      return NextResponse.json({ error: 'residentNumber is required' }, { status: 400 })
-    }
-
-    // Проверяем доступ
+    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: { id: true, ownerId: true },
@@ -158,8 +152,16 @@ export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
+    // Резидент может изменять только свой бизнес
     if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const searchParams = url.searchParams
+    const residentNumber = searchParams.get('residentNumber')
+
+    if (!residentNumber) {
+      return NextResponse.json({ error: 'residentNumber is required' }, { status: 400 })
     }
 
     // Находим контрагента
