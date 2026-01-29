@@ -50,8 +50,8 @@ export default function ResidentSignupPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        if (data.error === 'USER_ALREADY_EXISTS') {
-          setError('Аккаунт с таким email уже существует. Перейдите на страницу входа.')
+        if (response.status === 409 && data.error === 'EMAIL_ALREADY_EXISTS') {
+          setError('Аккаунт с таким email уже существует. Нажмите «Войти».')
         } else if (data.message) {
           setError(data.message)
         } else {
