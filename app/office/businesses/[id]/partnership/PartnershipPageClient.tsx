@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import PriceUploadModal from './PriceUploadModal'
 
@@ -25,9 +25,33 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [savedColumns, setSavedColumns] = useState<Column[] | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
+  const storageKey = `partnership_price_${businessId}`
+
+  // Загрузка данных из localStorage при монтировании
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.rows && parsed.columns) {
+          setSavedRows(parsed.rows)
+          setSavedColumns(parsed.columns)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load price from localStorage', error)
+    }
+  }, [storageKey])
+
   const handleSave = (rows: Row[], columns: Column[]) => {
     setSavedRows(rows)
     setSavedColumns(columns)
+    // Сохранение в localStorage
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ rows, columns }))
+    } catch (error) {
+      console.error('Failed to save price to localStorage', error)
+    }
   }
 
   const handleEdit = () => {
