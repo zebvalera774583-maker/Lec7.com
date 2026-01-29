@@ -49,6 +49,8 @@ model Business {
   portfolioItems BusinessPortfolioItem[]
   conversations   Conversation[]
   agentConversations AgentConversation[] @relation("AgentConversations")
+  priceLists      PriceList[]
+  assignedPrices  PriceAssignment[] @relation("AssignedPrices")
 }
 
 model BusinessProfile {
@@ -358,4 +360,70 @@ model AgentMessage {
   createdAt      DateTime          @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// === Price Lists ===
+
+enum PriceListKind {
+  BASE
+  DERIVED
+}
+
+enum PriceModifierType {
+  MARKUP
+  DISCOUNT
+}
+
+model PriceList {
+  id            String            @id @default(cuid())
+  businessId    String
+  name          String            // "Прайс 1", "Прайс 2"
+  kind          PriceListKind     @default(BASE)
+  derivedFromId String?
+  modifierType PriceModifierType?
+  percent       Int?               // Процент наценки/скидки (0-999)
+  columns       Json?              // Структура колонок (для добавленных столбцов)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  derivedFrom       PriceList?       @relation("DerivedPrices", fields: [derivedFromId], references: [id], onDelete: SetNull)
+  derivedPrices     PriceList[]      @relation("DerivedPrices")
+  rows               PriceListRow[]
+  assignments        PriceAssignment[]
+
+  @@index([businessId])
+  @@index([derivedFromId])
+}
+
+model PriceListRow {
+  id             String    @id @default(cuid())
+  priceListId    String
+  order          Int       // № п/п (1, 2, 3...)
+  name           String    // Наименование
+  unit           String?   // Ед. изм
+  priceWithVat   Decimal?  @db.Decimal(12, 2)
+  priceWithoutVat Decimal? @db.Decimal(12, 2)
+  extra          Json?     // Для добавленных колонок
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  priceList PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+
+  @@unique([priceListId, order])
+  @@index([priceListId])
+}
+
+model PriceAssignment {
+  id                    String    @id @default(cuid())
+  priceListId           String
+  counterpartyBusinessId String
+  createdAt             DateTime  @default(now())
+
+  priceList           PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  counterpartyBusiness Business @relation("AssignedPrices", fields: [counterpartyBusinessId], references: [id], onDelete: Cascade)
+
+  @@unique([priceListId, counterpartyBusinessId])
+  @@index([priceListId])
+  @@index([counterpartyBusinessId])
 }
