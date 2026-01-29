@@ -1423,56 +1423,56 @@ export default function BusinessProfileEditor({
       {/* Индивидуальный номер резидента */}
       <div
         style={{
-          marginBottom: '1.5rem',
-          padding: '1rem 1.25rem',
+          marginBottom: '1rem',
+          padding: '0.75rem 1rem',
           background: '#f9fafb',
-          borderRadius: '8px',
+          borderRadius: '6px',
           border: '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
+          gap: '0.75rem',
         }}
       >
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.25rem' }}>Индивидуальный номер резидента</div>
-          {residentNumber ? (
+        <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#6b7280', whiteSpace: 'nowrap' }}>
+          Индивидуальный номер резидента:
+        </div>
+        {residentNumber ? (
+          <>
             <input
               type="text"
               readOnly
               value={residentNumber}
               style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
+                flex: 1,
+                padding: '0.375rem 0.5rem',
                 borderRadius: '4px',
                 border: '1px solid #d1d5db',
-                fontSize: '0.875rem',
+                fontSize: '0.8125rem',
                 fontFamily: 'inherit',
                 background: '#f3f4f6',
                 color: '#111827',
+                minWidth: 0,
               }}
             />
-          ) : (
-            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>Будет присвоен после сохранения</div>
-          )}
-        </div>
-        {residentNumber && (
-          <button
-            type="button"
-            onClick={handleCopyResidentNumber}
-            style={{
-              flexShrink: 0,
-              padding: '0.5rem 0.75rem',
-              borderRadius: '4px',
-              border: '1px solid #d1d5db',
-              background: 'white',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              color: '#374151',
-            }}
-          >
-            копировать
-          </button>
+            <button
+              type="button"
+              onClick={handleCopyResidentNumber}
+              style={{
+                flexShrink: 0,
+                padding: '0.375rem 0.625rem',
+                borderRadius: '4px',
+                border: '1px solid #d1d5db',
+                background: 'white',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                color: '#374151',
+              }}
+            >
+              копировать
+            </button>
+          </>
+        ) : (
+          <div style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Будет присвоен после сохранения</div>
         )}
       </div>
 
