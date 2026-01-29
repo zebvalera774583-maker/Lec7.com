@@ -37,9 +37,9 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
         data: {
           businessId,
           name: name || 'Прайс 1',
-          kind: kind || 'BASE',
+          kind: (kind || 'BASE') as 'BASE' | 'DERIVED',
           derivedFromId: derivedFromId || null,
-          modifierType: modifierType || null,
+          modifierType: modifierType ? (modifierType as 'MARKUP' | 'DISCOUNT') : null,
           percent: percent || null,
           columns: columns || null,
         },
@@ -47,17 +47,40 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
 
       // Если есть строки, создаём их
       if (rows && Array.isArray(rows) && rows.length > 0) {
-        await tx.priceListRow.createMany({
-          data: rows.map((row: any, index: number) => ({
+        const rowsToCreate = rows.map((row: any, index: number) => {
+          let priceWithVatNum: number | null = null
+          let priceWithoutVatNum: number | null = null
+
+          if (row.priceWithVat && String(row.priceWithVat).trim() !== '') {
+            const parsed = parseFloat(String(row.priceWithVat))
+            if (!isNaN(parsed)) {
+              priceWithVatNum = parsed
+            }
+          }
+
+          if (row.priceWithoutVat && String(row.priceWithoutVat).trim() !== '') {
+            const parsed = parseFloat(String(row.priceWithoutVat))
+            if (!isNaN(parsed)) {
+              priceWithoutVatNum = parsed
+            }
+          }
+
+          return {
             priceListId: priceList.id,
             order: index + 1,
             name: row.name || '',
             unit: row.unit || null,
-            priceWithVat: row.priceWithVat ? parseFloat(String(row.priceWithVat)) : null,
-            priceWithoutVat: row.priceWithoutVat ? parseFloat(String(row.priceWithoutVat)) : null,
+            priceWithVat: priceWithVatNum,
+            priceWithoutVat: priceWithoutVatNum,
             extra: row.extra || null,
-          })),
+          }
         })
+
+        if (rowsToCreate.length > 0) {
+          await tx.priceListRow.createMany({
+            data: rowsToCreate,
+          })
+        }
       }
 
       return priceList
