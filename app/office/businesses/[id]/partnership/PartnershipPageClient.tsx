@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import PriceUploadModal from './PriceUploadModal'
 import CreateDerivedPriceModal from './CreateDerivedPriceModal'
+import AssignCounterpartyModal from './AssignCounterpartyModal'
 
 interface Row {
   [columnId: string]: string
@@ -25,6 +26,7 @@ interface Price {
   percent?: number
   rows: Row[]
   columns: Column[]
+  assignedCounterparties?: string[]
 }
 
 interface PartnershipPageClientProps {
@@ -35,6 +37,8 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [prices, setPrices] = useState<Price[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCreateDerivedModalOpen, setIsCreateDerivedModalOpen] = useState(false)
+  const [isAssignCounterpartyModalOpen, setIsAssignCounterpartyModalOpen] = useState(false)
+  const [assigningPriceId, setAssigningPriceId] = useState<string | null>(null)
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
 
@@ -56,6 +60,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             kind: 'base',
             rows: parsed.rows,
             columns: parsed.columns,
+            assignedCounterparties: [],
           }
           setPrices([basePrice])
         }
@@ -90,6 +95,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         kind: 'base',
         rows,
         columns,
+        assignedCounterparties: [],
       }
       const newPrices = [...prices, newPrice]
       setPrices(newPrices)
@@ -112,6 +118,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       percent: data.percent,
       rows: JSON.parse(JSON.stringify(basePrice.rows)), // Глубокое копирование
       columns: JSON.parse(JSON.stringify(basePrice.columns)), // Глубокое копирование
+      assignedCounterparties: [],
     }
 
     const newPrices = [...prices, newPrice]
@@ -130,12 +137,56 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
     setIsModalOpen(true)
   }
 
+  const handleAssignCounterparty = (priceId: string) => {
+    setAssigningPriceId(priceId)
+    setIsAssignCounterpartyModalOpen(true)
+    setMenuOpenPriceId(null)
+  }
+
+  const handleCounterpartyAssign = (residentNumber: string) => {
+    if (!assigningPriceId) return
+    const newPrices = prices.map((p) => {
+      if (p.id === assigningPriceId) {
+        const current = p.assignedCounterparties || []
+        return {
+          ...p,
+          assignedCounterparties: [...current, residentNumber],
+        }
+      }
+      return p
+    })
+    setPrices(newPrices)
+    savePrices(newPrices)
+  }
+
+  const handleCounterpartyRemove = (residentNumber: string) => {
+    if (!assigningPriceId) return
+    const newPrices = prices.map((p) => {
+      if (p.id === assigningPriceId) {
+        const current = p.assignedCounterparties || []
+        return {
+          ...p,
+          assignedCounterparties: current.filter((num) => num !== residentNumber),
+        }
+      }
+      return p
+    })
+    setPrices(newPrices)
+    savePrices(newPrices)
+  }
+
   const getEditingPrice = () => {
     if (!editingPriceId) return null
     return prices.find((p) => p.id === editingPriceId)
   }
 
+  const getAssigningPrice = () => {
+    if (!assigningPriceId) return null
+    return prices.find((p) => p.id === assigningPriceId)
+  }
+
   const editingPrice = getEditingPrice()
+  const assigningPrice = getAssigningPrice()
   const nextPriceNumber = prices.length + 1
 
   const getPriceBadge = (price: Price) => {
@@ -202,15 +253,22 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 width: 'fit-content',
               }}
             >
-              <span
-                onClick={() => handlePriceClick(price.id)}
-                style={{
-                  cursor: 'pointer',
-                }}
-              >
-                {price.name}
-                {getPriceBadge(price)}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <span
+                  onClick={() => handlePriceClick(price.id)}
+                  style={{
+                    cursor: 'pointer',
+                  }}
+                >
+                  {price.name}
+                  {getPriceBadge(price)}
+                </span>
+                {(price.assignedCounterparties?.length || 0) > 0 && (
+                  <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>
+                    Контрагенты: {price.assignedCounterparties?.length || 0}
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={(e) => {
@@ -317,7 +375,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                       textAlign: 'left',
                       background: 'none',
                       border: 'none',
-                      borderTop: price.kind === 'base' ? '1px solid #e5e7eb' : 'none',
+                      borderTop: '1px solid #e5e7eb',
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       color: '#111827',
@@ -331,6 +389,29 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                     }}
                   >
                     Редактировать
+                  </button>
+                  <button
+                    onClick={() => handleAssignCounterparty(price.id)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderTop: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9fafb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    Назначить контрагента
                   </button>
                 </div>
               </>
@@ -355,6 +436,17 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         onClose={() => setIsCreateDerivedModalOpen(false)}
         onCreate={handleCreateDerived}
         nextPriceNumber={nextPriceNumber}
+      />
+
+      <AssignCounterpartyModal
+        isOpen={isAssignCounterpartyModalOpen}
+        onClose={() => {
+          setIsAssignCounterpartyModalOpen(false)
+          setAssigningPriceId(null)
+        }}
+        assignedCounterparties={assigningPrice?.assignedCounterparties || []}
+        onAssign={handleCounterpartyAssign}
+        onRemove={handleCounterpartyRemove}
       />
     </main>
   )
