@@ -495,6 +495,17 @@ export default function BusinessProfileEditor({
     }
   }
 
+  const handleCopyResidentNumber = async () => {
+    if (!residentNumber) return
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(residentNumber)
+      }
+    } catch {
+      // ignore clipboard errors
+    }
+  }
+
   const handleSave = async () => {
     // Валидация перед сохранением
     if (displayName && !isLatinOnly(displayName)) {
@@ -1408,6 +1419,62 @@ export default function BusinessProfileEditor({
           Профиль успешно сохранён
         </div>
       )}
+
+      {/* Индивидуальный номер резидента */}
+      <div
+        style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          background: '#f9fafb',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.25rem' }}>Индивидуальный номер резидента</div>
+          {residentNumber ? (
+            <input
+              type="text"
+              readOnly
+              value={residentNumber}
+              style={{
+                width: '100%',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '4px',
+                border: '1px solid #d1d5db',
+                fontSize: '0.875rem',
+                fontFamily: 'inherit',
+                background: '#f3f4f6',
+                color: '#111827',
+              }}
+            />
+          ) : (
+            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>Будет присвоен после сохранения</div>
+          )}
+        </div>
+        {residentNumber && (
+          <button
+            type="button"
+            onClick={handleCopyResidentNumber}
+            style={{
+              flexShrink: 0,
+              padding: '0.5rem 0.75rem',
+              borderRadius: '4px',
+              border: '1px solid #d1d5db',
+              background: 'white',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              color: '#374151',
+            }}
+          >
+            копировать
+          </button>
+        )}
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         {/* Основной контент */}
