@@ -495,17 +495,6 @@ export default function BusinessProfileEditor({
     }
   }
 
-  const handleCopyResidentNumber = async () => {
-    if (!residentNumber) return
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(residentNumber)
-      }
-    } catch {
-      // ignore clipboard errors
-    }
-  }
-
   const handleSave = async () => {
     // Валидация перед сохранением
     if (displayName && !isLatinOnly(displayName)) {
@@ -1361,25 +1350,8 @@ export default function BusinessProfileEditor({
                 Индивидуальный номер резидента
               </div>
               {residentNumber ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 500, color: '#111827', fontFamily: 'monospace' }}>
-                    {residentNumber}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyResidentNumber}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px',
-                      border: '1px solid #d1d5db',
-                      background: 'white',
-                      fontSize: '0.7rem',
-                      cursor: 'pointer',
-                      color: '#374151',
-                    }}
-                  >
-                    копировать
-                  </button>
+                <div style={{ fontSize: '0.875rem', fontWeight: 500, color: '#111827', fontFamily: 'monospace' }}>
+                  {residentNumber}
                 </div>
               ) : (
                 <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Будет присвоен после сохранения</div>
