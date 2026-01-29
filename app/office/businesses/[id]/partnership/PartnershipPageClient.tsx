@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import PriceUploadModal from './PriceUploadModal'
+import CreateDerivedPriceModal from './CreateDerivedPriceModal'
 
 interface Row {
   [columnId: string]: string
@@ -15,17 +16,29 @@ interface Column {
   isBase: boolean
 }
 
+interface Price {
+  id: string
+  name: string
+  kind: 'base' | 'derived'
+  baseId?: string
+  modifierType?: 'markup' | 'discount'
+  percent?: number
+  rows: Row[]
+  columns: Column[]
+}
+
 interface PartnershipPageClientProps {
   businessId: string
 }
 
 export default function PartnershipPageClient({ businessId }: PartnershipPageClientProps) {
+  const [prices, setPrices] = useState<Price[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [savedRows, setSavedRows] = useState<Row[] | null>(null)
-  const [savedColumns, setSavedColumns] = useState<Column[] | null>(null)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isCreateDerivedModalOpen, setIsCreateDerivedModalOpen] = useState(false)
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
+  const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
 
-  const storageKey = `partnership_price_${businessId}`
+  const storageKey = `partnership_prices_${businessId}`
 
   // Загрузка данных из localStorage при монтировании
   useEffect(() => {
@@ -33,37 +46,112 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       const saved = localStorage.getItem(storageKey)
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (parsed.rows && parsed.columns) {
-          setSavedRows(parsed.rows)
-          setSavedColumns(parsed.columns)
+        if (Array.isArray(parsed)) {
+          setPrices(parsed)
+        } else if (parsed.rows && parsed.columns) {
+          // Миграция старого формата (один прайс) в новый (массив)
+          const basePrice: Price = {
+            id: 'price_1',
+            name: 'Прайс 1',
+            kind: 'base',
+            rows: parsed.rows,
+            columns: parsed.columns,
+          }
+          setPrices([basePrice])
         }
       }
     } catch (error) {
-      console.error('Failed to load price from localStorage', error)
+      console.error('Failed to load prices from localStorage', error)
     }
   }, [storageKey])
 
-  const handleSave = (rows: Row[], columns: Column[]) => {
-    setSavedRows(rows)
-    setSavedColumns(columns)
-    // Сохранение в localStorage
+  // Сохранение в localStorage
+  const savePrices = (newPrices: Price[]) => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ rows, columns }))
+      localStorage.setItem(storageKey, JSON.stringify(newPrices))
     } catch (error) {
-      console.error('Failed to save price to localStorage', error)
+      console.error('Failed to save prices to localStorage', error)
     }
   }
 
-  const handleEdit = () => {
-    setIsModalOpen(true)
-    setIsMenuOpen(false)
+  const handleSave = (rows: Row[], columns: Column[]) => {
+    if (editingPriceId) {
+      // Редактирование существующего прайса
+      const newPrices = prices.map((p) =>
+        p.id === editingPriceId ? { ...p, rows, columns } : p
+      )
+      setPrices(newPrices)
+      savePrices(newPrices)
+    } else {
+      // Создание нового базового прайса
+      const newPrice: Price = {
+        id: `price_${Date.now()}`,
+        name: 'Прайс 1',
+        kind: 'base',
+        rows,
+        columns,
+      }
+      const newPrices = [...prices, newPrice]
+      setPrices(newPrices)
+      savePrices(newPrices)
+    }
+    setIsModalOpen(false)
+    setEditingPriceId(null)
   }
 
-  const handlePriceClick = () => {
+  const handleCreateDerived = (data: { name: string; modifierType: 'markup' | 'discount'; percent: number }) => {
+    const basePrice = prices.find((p) => p.kind === 'base')
+    if (!basePrice) return
+
+    const newPrice: Price = {
+      id: `price_${Date.now()}`,
+      name: data.name,
+      kind: 'derived',
+      baseId: basePrice.id,
+      modifierType: data.modifierType,
+      percent: data.percent,
+      rows: JSON.parse(JSON.stringify(basePrice.rows)), // Глубокое копирование
+      columns: JSON.parse(JSON.stringify(basePrice.columns)), // Глубокое копирование
+    }
+
+    const newPrices = [...prices, newPrice]
+    setPrices(newPrices)
+    savePrices(newPrices)
+  }
+
+  const handleEdit = (priceId: string) => {
+    setEditingPriceId(priceId)
+    setIsModalOpen(true)
+    setMenuOpenPriceId(null)
+  }
+
+  const handleView = (priceId: string) => {
+    setEditingPriceId(priceId)
+    setIsModalOpen(true)
+    setMenuOpenPriceId(null)
+  }
+
+  const handlePriceClick = (priceId: string) => {
+    setEditingPriceId(priceId)
     setIsModalOpen(true)
   }
 
-  const rowCount = savedRows ? savedRows.length : 0
+  const getEditingPrice = () => {
+    if (!editingPriceId) return null
+    return prices.find((p) => p.id === editingPriceId)
+  }
+
+  const editingPrice = getEditingPrice()
+  const nextPriceNumber = prices.length + 1
+
+  const getPriceBadge = (price: Price) => {
+    let modifierText = ''
+    if (price.kind === 'derived' && price.modifierType && price.percent !== undefined) {
+      const sign = price.modifierType === 'markup' ? '+' : '−'
+      modifierText = ` (${sign}${price.percent}%)`
+    }
+    return modifierText
+  }
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
@@ -79,153 +167,223 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       </p>
 
       {/* Кнопка загрузки прайса */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: '#0070f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            fontWeight: 500,
-          }}
-        >
-          Загрузить прайс
-        </button>
-      </div>
-
-      {/* Бейдж о сохранённом прайсе */}
-      {savedRows && savedRows.length > 0 && (
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <div
+      {prices.length === 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <button
+            onClick={() => {
+              setEditingPriceId(null)
+              setIsModalOpen(true)
+            }}
             style={{
-              padding: '0.75rem 1rem',
-              background: '#dbeafe',
-              border: '1px solid #93c5fd',
+              padding: '0.75rem 1.5rem',
+              background: '#0070f3',
+              color: 'white',
+              border: 'none',
               borderRadius: '6px',
-              color: '#1e40af',
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 500,
             }}
           >
-            <span
-              onClick={handlePriceClick}
-              style={{
-                cursor: 'pointer',
-              }}
-            >
-              Прайс 1
-            </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setIsMenuOpen(!isMenuOpen)
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: '0',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '3px',
-                alignItems: 'center',
-              }}
-            >
-              <div
-                style={{
-                  width: '16px',
-                  height: '2px',
-                  background: '#1e40af',
-                }}
-              />
-              <div
-                style={{
-                  width: '16px',
-                  height: '2px',
-                  background: '#1e40af',
-                }}
-              />
-              <div
-                style={{
-                  width: '16px',
-                  height: '2px',
-                  background: '#1e40af',
-                }}
-              />
-            </button>
-          </div>
-
-          {/* Меню гамбургера */}
-          {isMenuOpen && (
-            <>
-              <div
-                style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 998,
-                }}
-                onClick={() => setIsMenuOpen(false)}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: '0.25rem',
-                  background: 'white',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                  border: '1px solid #e5e7eb',
-                  minWidth: '150px',
-                  zIndex: 999,
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  onClick={handleEdit}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    textAlign: 'left',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    color: '#111827',
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f9fafb'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }}
-                >
-                  Редактировать
-                </button>
-              </div>
-            </>
-          )}
+            Загрузить прайс
+          </button>
         </div>
       )}
 
+      {/* Список прайсов */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {prices.map((price) => (
+          <div key={price.id} style={{ position: 'relative', display: 'inline-block' }}>
+            <div
+              style={{
+                padding: '0.75rem 1rem',
+                background: '#dbeafe',
+                border: '1px solid #93c5fd',
+                borderRadius: '6px',
+                color: '#1e40af',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}
+            >
+              <span
+                onClick={() => handlePriceClick(price.id)}
+                style={{
+                  cursor: 'pointer',
+                }}
+              >
+                {price.name}
+                {getPriceBadge(price)}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setMenuOpenPriceId(menuOpenPriceId === price.id ? null : price.id)
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: '16px',
+                    height: '2px',
+                    background: '#1e40af',
+                  }}
+                />
+                <div
+                  style={{
+                    width: '16px',
+                    height: '2px',
+                    background: '#1e40af',
+                  }}
+                />
+                <div
+                  style={{
+                    width: '16px',
+                    height: '2px',
+                    background: '#1e40af',
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Меню гамбургера */}
+            {menuOpenPriceId === price.id && (
+              <>
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 998,
+                  }}
+                  onClick={() => setMenuOpenPriceId(null)}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.25rem',
+                    background: 'white',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    border: '1px solid #e5e7eb',
+                    minWidth: '150px',
+                    zIndex: 999,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {price.kind === 'base' && (
+                    <button
+                      onClick={() => {
+                        setIsCreateDerivedModalOpen(true)
+                        setMenuOpenPriceId(null)
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#111827',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f9fafb'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      Создать производный прайс
+                    </button>
+                  )}
+                  {price.kind === 'derived' && (
+                    <button
+                      onClick={() => handleView(price.id)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        color: '#111827',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f9fafb'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      Просмотр
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleEdit(price.id)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderTop: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9fafb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    Редактировать
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
       <PriceUploadModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false)
+          setEditingPriceId(null)
+        }}
         onSave={handleSave}
-        initialRows={savedRows || undefined}
-        initialColumns={savedColumns || undefined}
+        initialRows={editingPrice?.rows}
+        initialColumns={editingPrice?.columns}
+      />
+
+      <CreateDerivedPriceModal
+        isOpen={isCreateDerivedModalOpen}
+        onClose={() => setIsCreateDerivedModalOpen(false)}
+        onCreate={handleCreateDerived}
+        nextPriceNumber={nextPriceNumber}
       />
     </main>
   )
