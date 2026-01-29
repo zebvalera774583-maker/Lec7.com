@@ -32,6 +32,11 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
     setIsOpen(false)
   }
 
+  const handleOpenPartnership = () => {
+    router.push(`/office/businesses/${businessId}/partnership`)
+    setIsOpen(false)
+  }
+
   return (
     <div style={{ position: 'relative' }}>
       <button
@@ -194,6 +199,29 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
               }}
             >
               Открыть витрину
+            </button>
+            <button
+              onClick={handleOpenPartnership}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderTop: '1px solid #e5e7eb',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                color: '#111827',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f9fafb'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+            >
+              ПАРТНЕРСТВО
             </button>
           </div>
         </>
