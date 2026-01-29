@@ -1338,8 +1338,8 @@ export default function BusinessProfileEditor({
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       {/* Шапка */}
-      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
           <div
             style={{
               width: '60px',
@@ -1349,11 +1349,42 @@ export default function BusinessProfileEditor({
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               border: '2px solid #e5e7eb',
+              flexShrink: 0,
             }}
           />
-          <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{displayName || 'Бизнес'}</h1>
-            <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>/{initialSlug}</p>
+          <div style={{ flex: '0 1 auto', minWidth: 0 }}>
+            <h1 style={{ margin: 0, fontSize: '1.5rem', marginBottom: '0.25rem' }}>{displayName || 'Бизнес'}</h1>
+            <p style={{ margin: 0, color: '#666', fontSize: '0.875rem', marginBottom: '0.5rem' }}>/{initialSlug}</p>
+            {/* Индивидуальный номер резидента */}
+            <div style={{ marginTop: '0.5rem' }}>
+              <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '0.25rem' }}>
+                Индивидуальный номер резидента
+              </div>
+              {residentNumber ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 500, color: '#111827', fontFamily: 'monospace' }}>
+                    {residentNumber}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyResidentNumber}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      fontSize: '0.7rem',
+                      cursor: 'pointer',
+                      color: '#374151',
+                    }}
+                  >
+                    копировать
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Будет присвоен после сохранения</div>
+              )}
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1419,62 +1450,6 @@ export default function BusinessProfileEditor({
           Профиль успешно сохранён
         </div>
       )}
-
-      {/* Индивидуальный номер резидента */}
-      <div
-        style={{
-          marginBottom: '1rem',
-          padding: '0.75rem 1rem',
-          background: '#f9fafb',
-          borderRadius: '6px',
-          border: '1px solid #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-        }}
-      >
-        <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#6b7280', whiteSpace: 'nowrap' }}>
-          Индивидуальный номер резидента:
-        </div>
-        {residentNumber ? (
-          <>
-            <input
-              type="text"
-              readOnly
-              value={residentNumber}
-              style={{
-                flex: 1,
-                padding: '0.375rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.8125rem',
-                fontFamily: 'inherit',
-                background: '#f3f4f6',
-                color: '#111827',
-                minWidth: 0,
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleCopyResidentNumber}
-              style={{
-                flexShrink: 0,
-                padding: '0.375rem 0.625rem',
-                borderRadius: '4px',
-                border: '1px solid #d1d5db',
-                background: 'white',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                color: '#374151',
-              }}
-            >
-              копировать
-            </button>
-          </>
-        ) : (
-          <div style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>Будет присвоен после сохранения</div>
-        )}
-      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         {/* Основной контент */}
