@@ -58,6 +58,7 @@ model BusinessProfile {
   avatarUrl       String?
   phone           String?
   telegramUsername String?
+  residentNumber  String?  @unique
   statsCases      Int      @default(40)
   statsProjects   Int      @default(2578)
   statsCities     Int      @default(4)

@@ -31,7 +31,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     // Получаем или создаём профиль (upsert)
-    const profile = await prisma.businessProfile.upsert({
+    let profile = await prisma.businessProfile.upsert({
       where: { businessId },
       create: {
         businessId,
@@ -167,6 +167,46 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         servicesRaw: servicesRaw !== undefined ? servicesRaw || null : undefined,
       },
     })
+
+    // Генерация residentNumber при первом сохранении, если его ещё нет
+    if (!profile.residentNumber) {
+      const generateResidentNumber = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        let result = 'L7-'
+        for (let i = 0; i < 8; i++) {
+          const idx = Math.floor(Math.random() * chars.length)
+          result += chars[idx]
+        }
+        return result
+      }
+
+      let attempts = 0
+      // Пытаемся сгенерировать уникальный номер, учитывая возможные коллизии unique-индекса
+      while (attempts < 5 && !profile.residentNumber) {
+        attempts++
+        const candidate = generateResidentNumber()
+        try {
+          profile = await prisma.businessProfile.update({
+            where: { businessId },
+            data: {
+              residentNumber: candidate,
+            },
+          })
+        } catch (error: any) {
+          // При конфликте уникальности пробуем ещё раз с новым номером
+          const isUniqueError =
+            error &&
+            typeof error === 'object' &&
+            error.code === 'P2002' &&
+            Array.isArray(error.meta?.target) &&
+            error.meta?.target.includes('residentNumber')
+
+          if (!isUniqueError) {
+            throw error
+          }
+        }
+      }
+    }
 
     return NextResponse.json(profile)
   } catch (error) {

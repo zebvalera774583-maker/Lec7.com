@@ -20,6 +20,7 @@ interface BusinessProfile {
   avatarUrl: string | null
   phone: string | null
   telegramUsername: string | null
+  residentNumber: string | null
   statsCases: number
   statsProjects: number
   statsCities: number
@@ -66,6 +67,7 @@ export default function BusinessProfileEditor({
   const [avatarUrl, setAvatarUrl] = useState('')
   const [phone, setPhone] = useState('')
   const [telegramUsername, setTelegramUsername] = useState('')
+  const [residentNumber, setResidentNumber] = useState('')
   const [cities, setCities] = useState<string[]>([])
   const [services, setServices] = useState<string[]>([])
   const [featuredServices, setFeaturedServices] = useState<string[]>(['', '', '', ''])
@@ -153,6 +155,7 @@ export default function BusinessProfileEditor({
         setAvatarUrl(profile.avatarUrl || '')
         setPhone(profile.phone || '')
         setTelegramUsername(profile.telegramUsername || '')
+        setResidentNumber(profile.residentNumber || '')
         setCities(profile.cities || [])
         setServices(profile.services || [])
         setServicesRaw(profile.servicesRaw || '')
@@ -527,10 +530,13 @@ export default function BusinessProfileEditor({
         body: JSON.stringify(payload),
       })
 
+      const data = await response.json()
       if (!response.ok) {
-        const data = await response.json()
         throw new Error(data.error || 'Ошибка сохранения профиля')
       }
+
+      // Обновляем номер резидента, если он был присвоен на сервере
+      setResidentNumber(data.residentNumber || '')
 
       // Подсказки показываем только после успешного сохранения
       const phoneTrimmed = (payload.phone || '').trim()
