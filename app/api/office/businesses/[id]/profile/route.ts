@@ -139,7 +139,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
           : undefined
 
     // Обновляем или создаём профиль (upsert)
-    const profile = await prisma.businessProfile.upsert({
+    let profile = await prisma.businessProfile.upsert({
       where: { businessId },
       create: {
         businessId,
