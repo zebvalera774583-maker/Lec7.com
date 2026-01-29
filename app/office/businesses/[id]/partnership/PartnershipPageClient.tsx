@@ -125,12 +125,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
     setMenuOpenPriceId(null)
   }
 
-  const handleView = (priceId: string) => {
-    setEditingPriceId(priceId)
-    setIsModalOpen(true)
-    setMenuOpenPriceId(null)
-  }
-
   const handlePriceClick = (priceId: string) => {
     setEditingPriceId(priceId)
     setIsModalOpen(true)
@@ -315,30 +309,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                       Создать производный прайс
                     </button>
                   )}
-                  {price.kind === 'derived' && (
-                    <button
-                      onClick={() => handleView(price.id)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 1rem',
-                        textAlign: 'left',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        color: '#111827',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f9fafb'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      Просмотр
-                    </button>
-                  )}
                   <button
                     onClick={() => handleEdit(price.id)}
                     style={{
@@ -347,7 +317,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                       textAlign: 'left',
                       background: 'none',
                       border: 'none',
-                      borderTop: '1px solid #e5e7eb',
+                      borderTop: price.kind === 'base' ? '1px solid #e5e7eb' : 'none',
                       cursor: 'pointer',
                       fontSize: '0.875rem',
                       color: '#111827',
