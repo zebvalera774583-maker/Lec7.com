@@ -111,21 +111,32 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
               display: 'flex',
               alignItems: 'center',
               gap: '0.75rem',
-              cursor: 'pointer',
             }}
-            onClick={handlePriceClick}
           >
-            <span>Прайс 1</span>
-            <div
+            <span
+              onClick={handlePriceClick}
               style={{
+                cursor: 'pointer',
+              }}
+            >
+              Прайс 1
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsMenuOpen(!isMenuOpen)
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '0',
+                cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '3px',
-                cursor: 'pointer',
-              }}
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsMenuOpen(!isMenuOpen)
+                alignItems: 'center',
               }}
             >
               <div
@@ -149,7 +160,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                   background: '#1e40af',
                 }}
               />
-            </div>
+            </button>
           </div>
 
           {/* Меню гамбургера */}
