@@ -6,6 +6,13 @@ import type { UserRole, AuthRole, AuthUser } from '@/types'
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production'
 
 /**
+ * Нормализация email – единая точка истины
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+/**
  * Guard-функция для проверки валидности роли
  */
 export function isUserRole(value: unknown): value is UserRole {
@@ -55,11 +62,18 @@ export function verifyToken(token: string): AuthUser | null {
 }
 
 /**
- * Получение пользователя из БД по email
+ * Получение пользователя из БД по email (регистронезависимо)
  */
 export async function getUserByEmail(email: string) {
-  return prisma.user.findUnique({
-    where: { email },
+  const normalized = normalizeEmail(email)
+
+  return prisma.user.findFirst({
+    where: {
+      email: {
+        equals: normalized,
+        mode: 'insensitive',
+      },
+    },
     include: {
       businesses: true,
     },
@@ -87,11 +101,12 @@ export async function createUser(
   name?: string,
   role: UserRole = 'BUSINESS_OWNER'
 ) {
+  const normalizedEmail = normalizeEmail(email)
   const hashedPassword = await hashPassword(password)
   
   return prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       name,
       role,

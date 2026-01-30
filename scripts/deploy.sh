@@ -18,7 +18,7 @@ echo "🚀 Starting containers..."
 docker-compose up -d
 
 echo "📊 Running database migrations..."
-docker-compose exec -T postgres npx prisma migrate deploy || echo "⚠️  Migrations skipped (database might be empty)"
+docker-compose exec -T app npx prisma migrate deploy || echo "⚠️  Migrations skipped (database might be empty)"
 
 echo "✅ Deployment complete!"
 docker-compose ps

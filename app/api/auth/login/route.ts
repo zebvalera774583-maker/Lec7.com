@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserByEmail, verifyPassword, createToken, isUserRole } from '@/lib/auth'
+import { getUserByEmail, verifyPassword, createToken, isUserRole, normalizeEmail } from '@/lib/auth'
 import type { UserRole } from '@/types'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    const email =
+    const rawEmail =
       typeof body.email === 'string'
-        ? body.email.trim().toLowerCase()
+        ? body.email
         : ''
+    const email = normalizeEmail(rawEmail)
 
     const password =
       typeof body.password === 'string'

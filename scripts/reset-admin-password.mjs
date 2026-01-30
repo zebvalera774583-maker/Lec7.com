@@ -17,12 +17,13 @@ const prisma = new PrismaClient()
 
 async function resetAdminPassword() {
   try {
-    const email = process.env.EMAIL
+    const emailRaw = process.env.EMAIL
     const newPassword = process.env.NEW_PASS
 
-    if (!email || !newPassword) {
+    if (!emailRaw || !newPassword) {
       throw new Error('Требуются переменные окружения: EMAIL и NEW_PASS')
     }
+    const email = emailRaw.trim()
 
     if (newPassword.length < 6) {
       throw new Error('Пароль должен быть не менее 6 символов')
@@ -33,8 +34,13 @@ async function resetAdminPassword() {
     console.log(`Длина пароля: ${newPassword.length} символов\n`)
 
     // Находим пользователя
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
+      },
       select: {
         id: true,
         email: true,

@@ -22,8 +22,13 @@ async function resetTestUserPassword() {
     console.log(`Новый пароль: ${newPassword}\n`)
 
     // Находим пользователя
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive',
+        },
+      },
     })
 
     if (!user) {
