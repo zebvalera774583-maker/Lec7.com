@@ -28,7 +28,7 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
   }
 
   const handleOpenRequests = () => {
-    router.push('/office/requests')
+    router.push(`/office/businesses/${businessId}/requests`)
     setIsOpen(false)
   }
 
