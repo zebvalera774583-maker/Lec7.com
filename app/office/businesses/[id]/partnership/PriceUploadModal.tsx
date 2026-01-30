@@ -19,6 +19,7 @@ interface PriceUploadModalProps {
   onSave: (rows: Row[], columns: Column[]) => void
   initialRows?: Row[]
   initialColumns?: Column[]
+  readOnly?: boolean // Режим только просмотра (для назначенных прайсов)
 }
 
 const BASE_COLUMNS: Column[] = [
@@ -28,7 +29,7 @@ const BASE_COLUMNS: Column[] = [
   { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
 ]
 
-export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns }: PriceUploadModalProps) {
+export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, readOnly = false }: PriceUploadModalProps) {
   const [columns, setColumns] = useState<Column[]>(initialColumns || BASE_COLUMNS)
   const [rows, setRows] = useState<Row[]>(initialRows && initialRows.length > 0 ? initialRows : [{}])
   const [showAddColumnForm, setShowAddColumnForm] = useState(false)
@@ -136,7 +137,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Загрузка прайса</h2>
+            <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{readOnly ? 'Просмотр прайса' : 'Загрузка прайса'}</h2>
             <button
               onClick={onClose}
               style={{
@@ -153,36 +154,38 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
           </div>
 
           {/* Кнопки управления сверху */}
-          <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={handleAddRow}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-              }}
-            >
-              Добавить строку
-            </button>
-            <button
-              onClick={() => setShowAddColumnForm(!showAddColumnForm)}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#f3f4f6',
-                color: '#111827',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-              }}
-            >
-              Добавить столбец
-            </button>
-          </div>
+          {!readOnly && (
+            <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={handleAddRow}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#0070f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Добавить строку
+              </button>
+              <button
+                onClick={() => setShowAddColumnForm(!showAddColumnForm)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#f3f4f6',
+                  color: '#111827',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Добавить столбец
+              </button>
+            </div>
+          )}
 
           {/* Форма добавления столбца */}
           {showAddColumnForm && (
@@ -295,7 +298,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                       }}
                     >
                       {column.title}
-                      {!column.isBase && (
+                      {!readOnly && !column.isBase && (
                         <button
                           onClick={() => handleDeleteColumn(column.id)}
                           style={{
@@ -317,18 +320,20 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                       )}
                     </th>
                   ))}
-                  <th
-                    style={{
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      border: '1px solid #e5e7eb',
-                      background: '#f9fafb',
-                      fontWeight: 500,
-                      minWidth: '80px',
-                    }}
-                  >
-                    Действия
-                  </th>
+                  {!readOnly && (
+                    <th
+                      style={{
+                        padding: '0.75rem',
+                        textAlign: 'center',
+                        border: '1px solid #e5e7eb',
+                        background: '#f9fafb',
+                        fontWeight: 500,
+                        minWidth: '80px',
+                      }}
+                    >
+                      Действия
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -350,6 +355,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                           type={column.kind === 'number' ? 'number' : 'text'}
                           value={row[column.id] || ''}
                           onChange={(e) => handleCellChange(rowIndex, column.id, e.target.value)}
+                          readOnly={readOnly}
                           placeholder={
                             column.id === 'unit' ? 'кг/шт/л/упак' : column.id === 'name' ? 'Наименование' : ''
                           }
@@ -360,26 +366,30 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                             borderRadius: '4px',
                             fontSize: '0.875rem',
                             boxSizing: 'border-box',
+                            backgroundColor: readOnly ? '#f9fafb' : 'white',
+                            cursor: readOnly ? 'default' : 'text',
                           }}
                         />
                       </td>
                     ))}
-                    <td style={{ padding: '0.5rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleDeleteRow(rowIndex)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          background: '#fee2e2',
-                          color: '#991b1b',
-                          border: '1px solid #fecaca',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                        }}
-                      >
-                        Удалить
-                      </button>
-                    </td>
+                    {!readOnly && (
+                      <td style={{ padding: '0.5rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleDeleteRow(rowIndex)}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            background: '#fee2e2',
+                            color: '#991b1b',
+                            border: '1px solid #fecaca',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -402,20 +412,22 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
             >
               Закрыть
             </button>
-            <button
-              onClick={handleSave}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-              }}
-            >
-              Сохранить
-            </button>
+            {!readOnly && (
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#0070f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Сохранить
+              </button>
+            )}
           </div>
         </div>
       </div>

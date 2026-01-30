@@ -63,6 +63,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [assigningPriceId, setAssigningPriceId] = useState<string | null>(null)
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [editingPriceData, setEditingPriceData] = useState<{ rows: Row[]; columns: Column[] } | null>(null)
+  const [isViewOnlyMode, setIsViewOnlyMode] = useState(false)
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
 
@@ -422,6 +423,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const handleEdit = async (priceId: string) => {
     setEditingPriceId(priceId)
     await loadPriceData(priceId)
+    setIsViewOnlyMode(false) // Режим редактирования для своих прайсов
     setIsModalOpen(true)
     setMenuOpenPriceId(null)
   }
@@ -429,6 +431,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const handlePriceClick = async (priceId: string) => {
     setEditingPriceId(priceId)
     await loadPriceData(priceId)
+    setIsViewOnlyMode(false) // Режим редактирования для своих прайсов
     setIsModalOpen(true)
   }
 
@@ -569,6 +572,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             onClick={() => {
               setEditingPriceId(null)
               setEditingPriceData(null)
+              setIsViewOnlyMode(false)
               setIsModalOpen(true)
             }}
             style={{
@@ -729,6 +733,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
 
                     setEditingPriceData({ rows, columns })
                     setEditingPriceId(assigned.priceListId)
+                    setIsViewOnlyMode(true) // Режим только просмотра для назначенных прайсов
                     setIsModalOpen(true)
                   } catch (error) {
                     console.error('Failed to load assigned price:', error)
@@ -997,10 +1002,12 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           setIsModalOpen(false)
           setEditingPriceId(null)
           setEditingPriceData(null)
+          setIsViewOnlyMode(false)
         }}
         onSave={handleSave}
         initialRows={editingPriceData?.rows}
         initialColumns={editingPriceData?.columns}
+        readOnly={isViewOnlyMode}
       />
 
       <CreateDerivedPriceModal
