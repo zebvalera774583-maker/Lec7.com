@@ -21,6 +21,7 @@ interface BusinessProfile {
   phone: string | null
   telegramUsername: string | null
   residentNumber: string | null
+  legalName?: string | null
   statsCases: number
   statsProjects: number
   statsCities: number
@@ -65,6 +66,7 @@ export default function BusinessProfileEditor({
   const router = useRouter()
   const [displayName, setDisplayName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
+  const [legalName, setLegalName] = useState('')
   const [phone, setPhone] = useState('')
   const [telegramUsername, setTelegramUsername] = useState('')
   const [residentNumber, setResidentNumber] = useState('')
@@ -153,6 +155,7 @@ export default function BusinessProfileEditor({
         const profile: BusinessProfile = await response.json()
         setDisplayName(profile.displayName || '')
         setAvatarUrl(profile.avatarUrl || '')
+        setLegalName(profile.legalName ?? '')
         setPhone(profile.phone || '')
         setTelegramUsername(profile.telegramUsername || '')
         setResidentNumber(profile.residentNumber || '')
@@ -510,6 +513,7 @@ export default function BusinessProfileEditor({
       const payload = {
         displayName: displayName || null,
         avatarUrl: avatarUrl || null,
+        legalName: legalName.trim() || null,
         phone: phone || null,
         telegramUsername: telegramUsername || null,
         statsCases: metrics.cases,
@@ -1568,6 +1572,28 @@ export default function BusinessProfileEditor({
               )}
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
                 Только латинские буквы, цифры, пробелы и дефисы
+              </p>
+            </div>
+            <div style={{ marginBottom: '0' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                Юридическое название
+              </label>
+              <input
+                type="text"
+                value={legalName}
+                onChange={(e) => setLegalName(e.target.value)}
+                placeholder="ООО «Ромашка», ИП Иванов И.И."
+                maxLength={255}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '1rem',
+                }}
+              />
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
+                Используется в партнёрских приглашениях и других официальных взаимодействиях. Не отображается на публичной витрине.
               </p>
             </div>
           </section>

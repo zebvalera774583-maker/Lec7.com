@@ -32,6 +32,7 @@ model Business {
   city            String?
   category        String?
   logoUrl         String?
+  legalName       String?  // Юридическое название (партнёрства, не витрина)
   coverUrl        String?
   ownerId         String
   lifecycleStatus String   @default("DRAFT") // DRAFT | ACTIVE | SUSPENDED | ARCHIVED

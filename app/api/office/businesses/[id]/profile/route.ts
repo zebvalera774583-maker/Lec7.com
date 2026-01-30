@@ -45,6 +45,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       include: {
         business: {
           select: {
+            legalName: true,
             portfolios: {
               select: { id: true },
             },
@@ -53,7 +54,9 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       },
     })
 
-    return NextResponse.json(profile)
+    const { business, ...profileData } = profile
+    const legalName = business?.legalName ?? null
+    return NextResponse.json({ ...profileData, legalName })
   } catch (error) {
     console.error('Get business profile error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
@@ -90,6 +93,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       avatarUrl,
       phone,
       telegramUsername,
+      legalName: legalNameBody,
       statsCases,
       statsProjects,
       statsCities,
@@ -137,6 +141,15 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         : services !== undefined
           ? services
           : undefined
+
+    // Обновляем Business.legalName при передаче в теле
+    if (legalNameBody !== undefined) {
+      const value = legalNameBody === '' || legalNameBody === null ? null : String(legalNameBody).trim().slice(0, 255) || null
+      await prisma.business.update({
+        where: { id: businessId },
+        data: { legalName: value },
+      })
+    }
 
     // Обновляем или создаём профиль (upsert)
     let profile = await prisma.businessProfile.upsert({
