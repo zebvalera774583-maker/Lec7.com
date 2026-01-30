@@ -152,7 +152,7 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
                 e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              📥 Заявки
+              Заявки
             </button>
             <button
               onClick={handleOpenAds}
@@ -221,7 +221,7 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
                 e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              ПАРТНЕРСТВО
+              Партнерство
             </button>
           </div>
         </>
