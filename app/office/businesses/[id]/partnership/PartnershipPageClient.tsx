@@ -586,7 +586,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
               fontWeight: 500,
             }}
           >
-            Загрузить прайс
+            Создать прайс
           </button>
         ) : (
           <>
