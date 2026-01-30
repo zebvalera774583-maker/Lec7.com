@@ -82,6 +82,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     // Создаём назначение (upsert для идемпотентности)
     // Новые связи создаются со статусом PENDING (требуют подтверждения)
+    // Если заявка уже существует, но была отклонена или принята, сбрасываем на PENDING (повторное назначение)
     const assignment = await prisma.priceAssignment.upsert({
       where: {
         priceListId_counterpartyBusinessId: {
@@ -94,7 +95,10 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
         counterpartyBusinessId,
         status: 'PENDING',
       },
-      update: {}, // При обновлении статус не меняем (сохраняем текущий)
+      update: {
+        status: 'PENDING', // При повторном назначении сбрасываем статус на PENDING
+        respondedAt: null, // Сбрасываем дату ответа
+      },
     })
 
     // Возвращаем обновлённый список назначений
