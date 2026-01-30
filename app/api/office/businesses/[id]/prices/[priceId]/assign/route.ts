@@ -81,6 +81,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     // Создаём назначение (upsert для идемпотентности)
+    // Новые связи создаются со статусом PENDING (требуют подтверждения)
     const assignment = await prisma.priceAssignment.upsert({
       where: {
         priceListId_counterpartyBusinessId: {
@@ -91,8 +92,9 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       create: {
         priceListId: priceId,
         counterpartyBusinessId,
+        status: 'PENDING',
       },
-      update: {},
+      update: {}, // При обновлении статус не меняем (сохраняем текущий)
     })
 
     // Возвращаем обновлённый список назначений

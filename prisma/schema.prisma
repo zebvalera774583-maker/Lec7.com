@@ -375,6 +375,12 @@ enum PriceModifierType {
   DISCOUNT
 }
 
+enum PartnerLinkStatus {
+  PENDING
+  ACTIVE
+  DECLINED
+}
+
 model PriceList {
   id            String            @id @default(cuid())
   businessId    String
@@ -416,10 +422,12 @@ model PriceListRow {
 }
 
 model PriceAssignment {
-  id                    String    @id @default(cuid())
+  id                    String            @id @default(cuid())
   priceListId           String
   counterpartyBusinessId String
-  createdAt             DateTime  @default(now())
+  status                PartnerLinkStatus @default(PENDING)
+  respondedAt           DateTime?
+  createdAt             DateTime         @default(now())
 
   priceList           PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   counterpartyBusiness Business @relation("AssignedPrices", fields: [counterpartyBusinessId], references: [id], onDelete: Cascade)
@@ -427,4 +435,5 @@ model PriceAssignment {
   @@unique([priceListId, counterpartyBusinessId])
   @@index([priceListId])
   @@index([counterpartyBusinessId])
+  @@index([status])
 }

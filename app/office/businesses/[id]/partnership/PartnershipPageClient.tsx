@@ -53,6 +53,24 @@ interface AssignedPrice {
   assignedAt: string
 }
 
+interface ActiveCounterparty {
+  partnerBusinessId: string
+  legalName: string | null
+  name: string | null
+  slug: string | null
+  residentNumber: string | null
+}
+
+interface IncomingRequest {
+  linkId: string
+  fromBusinessId: string
+  fromLegalName: string | null
+  fromName: string | null
+  fromSlug: string | null
+  fromResidentNumber: string | null
+  createdAt: string
+}
+
 export default function PartnershipPageClient({ businessId }: PartnershipPageClientProps) {
   const [prices, setPrices] = useState<Price[]>([])
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
@@ -66,6 +84,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [isViewOnlyMode, setIsViewOnlyMode] = useState(false)
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
+  const [activeCounterparties, setActiveCounterparties] = useState<ActiveCounterparty[]>([])
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([])
+  const [activeCounterpartiesExpanded, setActiveCounterpartiesExpanded] = useState(false)
+  const [incomingRequestsExpanded, setIncomingRequestsExpanded] = useState(false)
+  const [loadingPartnership, setLoadingPartnership] = useState(false)
 
   // Скачать прайс в CSV
   const downloadPriceAsCsv = (rows: Row[], columns: Column[], filename: string) => {
@@ -162,9 +185,70 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
     }
   }
 
+  // Загрузка данных партнёрства
+  const loadPartnershipData = async () => {
+    try {
+      setLoadingPartnership(true)
+      const response = await fetch(`/api/office/businesses/${businessId}/partnership`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load partnership data')
+      }
+
+      const data = await response.json()
+      setActiveCounterparties(data.activeCounterparties || [])
+      setIncomingRequests(data.incomingRequests || [])
+    } catch (error) {
+      console.error('Failed to load partnership data:', error)
+    } finally {
+      setLoadingPartnership(false)
+    }
+  }
+
+  // Обработка принятия/отклонения заявки
+  const handleRequestAction = async (linkId: string, action: 'accept' | 'decline') => {
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/partnership/requests/${linkId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ action }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to process request')
+      }
+
+      // Перезагружаем данные партнёрства
+      await loadPartnershipData()
+    } catch (error) {
+      console.error('Failed to process request:', error)
+      alert('Ошибка обработки заявки')
+    }
+  }
+
+  // Функция для получения отображаемого названия контрагента
+  const getCounterpartyDisplayName = (counterparty: ActiveCounterparty | IncomingRequest) => {
+    const legalName = 'fromLegalName' in counterparty ? counterparty.fromLegalName : counterparty.legalName
+    const name = 'fromName' in counterparty ? counterparty.fromName : counterparty.name
+    const slug = 'fromSlug' in counterparty ? counterparty.fromSlug : counterparty.slug
+    const residentNumber = 'fromResidentNumber' in counterparty ? counterparty.fromResidentNumber : counterparty.residentNumber
+
+    if (legalName && legalName.trim().length > 0) return legalName.trim()
+    if (name) return name
+    if (slug) return slug
+    if (residentNumber) return residentNumber
+    return 'fromBusinessId' in counterparty ? counterparty.fromBusinessId : counterparty.partnerBusinessId
+  }
+
   useEffect(() => {
     loadPrices()
     loadAssignedPrices()
+    loadPartnershipData()
   }, [businessId])
 
   // Загрузка данных конкретного прайса (для редактирования)
@@ -787,6 +871,141 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           </div>
         </div>
       )}
+
+      {/* Действующие контрагенты */}
+      <div style={{ marginBottom: '2rem' }}>
+        <button
+          onClick={() => setActiveCounterpartiesExpanded(!activeCounterpartiesExpanded)}
+          style={{
+            width: '100%',
+            padding: '1rem',
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '1.125rem',
+            fontWeight: 500,
+          }}
+        >
+          <span>Действующие контрагенты</span>
+          <span>{activeCounterpartiesExpanded ? '▼' : '▶'}</span>
+        </button>
+        {activeCounterpartiesExpanded && (
+          <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+            {loadingPartnership ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+            ) : activeCounterparties.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет действующих контрагентов</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeCounterparties.map((counterparty, index) => (
+                    <tr key={counterparty.partnerBusinessId}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Запросы на подключение контрагентов */}
+      <div style={{ marginBottom: '2rem' }}>
+        <button
+          onClick={() => setIncomingRequestsExpanded(!incomingRequestsExpanded)}
+          style={{
+            width: '100%',
+            padding: '1rem',
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '1.125rem',
+            fontWeight: 500,
+          }}
+        >
+          <span>Запросы на подключение контрагентов</span>
+          <span>{incomingRequestsExpanded ? '▼' : '▶'}</span>
+        </button>
+        {incomingRequestsExpanded && (
+          <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+            {loadingPartnership ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+            ) : incomingRequests.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incomingRequests.map((request, index) => (
+                    <tr key={request.linkId}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        {new Date(request.createdAt).toLocaleDateString('ru-RU')}
+                      </td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            onClick={() => handleRequestAction(request.linkId, 'accept')}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#059669',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            Принять
+                          </button>
+                          <button
+                            onClick={() => handleRequestAction(request.linkId, 'decline')}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: '#dc2626',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.875rem',
+                            }}
+                          >
+                            Отклонить
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Список прайсов */}
       <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
