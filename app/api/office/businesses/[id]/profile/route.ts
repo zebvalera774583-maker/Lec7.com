@@ -16,17 +16,17 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
-    const business = await prisma.business.findUnique({
+    const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
       select: { id: true, ownerId: true },
     })
 
-    if (!business) {
+    if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
     // Резидент может видеть только свой бизнес
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
+    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -54,8 +54,8 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       },
     })
 
-    const { business, ...profileData } = profile
-    const legalName = business?.legalName ?? null
+    const { business: profileBusiness, ...profileData } = profile
+    const legalName = profileBusiness?.legalName ?? null
     return NextResponse.json({ ...profileData, legalName })
   } catch (error) {
     console.error('Get business profile error:', error)
@@ -73,17 +73,17 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     // Проверяем, что бизнес существует и принадлежит пользователю
-    const business = await prisma.business.findUnique({
+    const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
       select: { id: true, ownerId: true },
     })
 
-    if (!business) {
+    if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
     // Резидент может изменять только свой бизнес
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
+    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
