@@ -37,7 +37,11 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
         priceList: {
           include: {
             business: {
-              include: {
+              select: {
+                id: true,
+                legalName: true,
+                name: true,
+                slug: true,
                 profile: {
                   select: {
                     residentNumber: true,
@@ -62,6 +66,9 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       priceModifierType: assignment.priceList.modifierType,
       pricePercent: assignment.priceList.percent,
       sourceBusinessId: assignment.priceList.business.id,
+      sourceBusinessLegalName: assignment.priceList.business.legalName,
+      sourceBusinessName: assignment.priceList.business.name,
+      sourceBusinessSlug: assignment.priceList.business.slug,
       sourceBusinessDisplayName: assignment.priceList.business.profile?.displayName,
       sourceBusinessResidentNumber: assignment.priceList.business.profile?.residentNumber,
       assignedAt: assignment.createdAt,

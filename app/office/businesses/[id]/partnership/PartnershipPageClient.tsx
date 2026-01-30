@@ -45,6 +45,9 @@ interface AssignedPrice {
   priceModifierType: string | null
   pricePercent: number | null
   sourceBusinessId: string
+  sourceBusinessLegalName: string | null
+  sourceBusinessName: string | null
+  sourceBusinessSlug: string | null
   sourceBusinessDisplayName: string | null
   sourceBusinessResidentNumber: string | null
   assignedAt: string
@@ -702,9 +705,15 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                   </div>
                   <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                     От:{' '}
-                    {assigned.sourceBusinessDisplayName ||
-                      assigned.sourceBusinessResidentNumber ||
-                      assigned.sourceBusinessId}
+                    {(() => {
+                      // Защита от пустых legalName (только пробелы)
+                      const legalName = assigned.sourceBusinessLegalName?.trim() || null
+                      if (legalName) return legalName
+                      if (assigned.sourceBusinessName) return assigned.sourceBusinessName
+                      if (assigned.sourceBusinessSlug) return assigned.sourceBusinessSlug
+                      if (assigned.sourceBusinessResidentNumber) return assigned.sourceBusinessResidentNumber
+                      return assigned.sourceBusinessId
+                    })()}
                   </div>
                 </div>
                 <button
