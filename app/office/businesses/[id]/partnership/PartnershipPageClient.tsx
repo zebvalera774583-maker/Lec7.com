@@ -682,14 +682,75 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             {assignedPrices.map((assigned) => (
               <div
                 key={assigned.id}
+                onClick={async () => {
+                  // Загружаем данные прайса и открываем в режиме просмотра
+                  try {
+                    const response = await fetch(
+                      `/api/office/businesses/${assigned.sourceBusinessId}/prices/${assigned.priceListId}`,
+                      {
+                        credentials: 'include',
+                      }
+                    )
+
+                    if (!response.ok) {
+                      throw new Error('Failed to load price')
+                    }
+
+                    const data = await response.json()
+                    
+                    // Преобразуем rows
+                    const rows: Row[] = data.rows.map((row: any) => {
+                      const result: Row = {
+                        name: row.name || '',
+                        unit: row.unit || '',
+                        priceWithVat: row.priceWithVat ? String(row.priceWithVat) : '',
+                        priceWithoutVat: row.priceWithoutVat ? String(row.priceWithoutVat) : '',
+                      }
+                      
+                      if (row.extra && typeof row.extra === 'object') {
+                        Object.assign(result, row.extra)
+                      }
+                      
+                      return result
+                    })
+
+                    // Восстанавливаем колонки
+                    let columns: Column[] = [
+                      { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
+                      { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
+                      { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number', isBase: true },
+                      { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
+                    ]
+
+                    if (data.columns && Array.isArray(data.columns)) {
+                      const extraColumns = data.columns.filter((col: Column) => !col.isBase)
+                      columns = [...columns, ...extraColumns]
+                    }
+
+                    setEditingPriceData({ rows, columns })
+                    setEditingPriceId(assigned.priceListId)
+                    setIsModalOpen(true)
+                  } catch (error) {
+                    console.error('Failed to load assigned price:', error)
+                    alert('Ошибка загрузки прайса')
+                  }
+                }}
                 style={{
                   padding: '1rem',
                   background: '#f9fafb',
                   border: '1px solid #e5e7eb',
                   borderRadius: '6px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  width: 'fit-content',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s, border-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6'
+                  e.currentTarget.style.borderColor = '#d1d5db'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb'
+                  e.currentTarget.style.borderColor = '#e5e7eb'
                 }}
               >
                 <div>
@@ -716,72 +777,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                     })()}
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    // Загружаем данные прайса и открываем в режиме просмотра
-                    try {
-                      const response = await fetch(
-                        `/api/office/businesses/${assigned.sourceBusinessId}/prices/${assigned.priceListId}`,
-                        {
-                          credentials: 'include',
-                        }
-                      )
-
-                      if (!response.ok) {
-                        throw new Error('Failed to load price')
-                      }
-
-                      const data = await response.json()
-                      
-                      // Преобразуем rows
-                      const rows: Row[] = data.rows.map((row: any) => {
-                        const result: Row = {
-                          name: row.name || '',
-                          unit: row.unit || '',
-                          priceWithVat: row.priceWithVat ? String(row.priceWithVat) : '',
-                          priceWithoutVat: row.priceWithoutVat ? String(row.priceWithoutVat) : '',
-                        }
-                        
-                        if (row.extra && typeof row.extra === 'object') {
-                          Object.assign(result, row.extra)
-                        }
-                        
-                        return result
-                      })
-
-                      // Восстанавливаем колонки
-                      let columns: Column[] = [
-                        { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
-                        { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
-                        { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number', isBase: true },
-                        { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
-                      ]
-
-                      if (data.columns && Array.isArray(data.columns)) {
-                        const extraColumns = data.columns.filter((col: Column) => !col.isBase)
-                        columns = [...columns, ...extraColumns]
-                      }
-
-                      setEditingPriceData({ rows, columns })
-                      setEditingPriceId(assigned.priceListId)
-                      setIsModalOpen(true)
-                    } catch (error) {
-                      console.error('Failed to load assigned price:', error)
-                      alert('Ошибка загрузки прайса')
-                    }
-                  }}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#0070f3',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  Просмотр
-                </button>
               </div>
             ))}
           </div>
