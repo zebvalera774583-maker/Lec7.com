@@ -686,7 +686,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                   // Загружаем данные прайса и открываем в режиме просмотра
                   try {
                     const response = await fetch(
-                      `/api/office/businesses/${assigned.sourceBusinessId}/prices/${assigned.priceListId}`,
+                      `/api/office/businesses/${businessId}/prices/${assigned.priceListId}`,
                       {
                         credentials: 'include',
                       }

@@ -31,7 +31,8 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     // Получаем прайс с строками и назначениями
-    const priceList = await prisma.priceList.findFirst({
+    // Сначала ищем прайс, принадлежащий этому бизнесу
+    let priceList = await prisma.priceList.findFirst({
       where: {
         id: priceId,
         businessId,
@@ -56,6 +57,43 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
         },
       },
     })
+
+    // Если прайс не найден, проверяем, назначен ли он этому бизнесу (для просмотра назначенных прайсов)
+    if (!priceList) {
+      const assignment = await prisma.priceAssignment.findFirst({
+        where: {
+          priceListId: priceId,
+          counterpartyBusinessId: businessId,
+        },
+        include: {
+          priceList: {
+            include: {
+              rows: {
+                orderBy: { order: 'asc' },
+              },
+              assignments: {
+                include: {
+                  counterpartyBusiness: {
+                    include: {
+                      profile: {
+                        select: {
+                          residentNumber: true,
+                          displayName: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      if (assignment) {
+        priceList = assignment.priceList
+      }
+    }
 
     if (!priceList) {
       return NextResponse.json({ error: 'Price list not found' }, { status: 404 })
