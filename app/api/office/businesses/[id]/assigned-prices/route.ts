@@ -7,13 +7,13 @@ const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_AD
 export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
   try {
     const url = new URL(req.url)
-    const businessId = url.pathname.split('/').slice(-2, -1)[0]
+    const businessId = url.pathname.split('/').slice(-2, -1)[0] // /api/office/businesses/[id]/assigned-prices
 
     if (!businessId) {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    // Проверяем доступ
+    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: { id: true, ownerId: true },
@@ -23,6 +23,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
+    // Резидент может видеть только свой бизнес
     if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

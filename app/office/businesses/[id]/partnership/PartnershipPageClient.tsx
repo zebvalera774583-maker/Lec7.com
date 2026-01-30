@@ -61,6 +61,65 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
   const [editingPriceData, setEditingPriceData] = useState<{ rows: Row[]; columns: Column[] } | null>(null)
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
+
+  // Скачать прайс в CSV
+  const downloadPriceAsCsv = (rows: Row[], columns: Column[], filename: string) => {
+    const headers = columns.map((c) => c.title)
+    const escape = (v: string) => {
+      const s = String(v ?? '')
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+      return s
+    }
+    const lines = [headers.map(escape).join(';')]
+    rows.forEach((row) => {
+      const values = columns.map((col) => escape(row[col.id] ?? ''))
+      lines.push(values.join(';'))
+    })
+    const csv = '\uFEFF' + lines.join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${filename.replace(/[^\w\s-]/g, '')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadPrice = async (priceId: string, priceName: string) => {
+    setMenuOpenPriceId(null)
+    setDownloadMenuOpen(false)
+    try {
+      const response = await fetch(`/api/office/businesses/${businessId}/prices/${priceId}`, {
+        credentials: 'include',
+      })
+      if (!response.ok) throw new Error('Не удалось загрузить прайс')
+      const data = await response.json()
+      const rows: Row[] = (data.rows || []).map((row: any) => {
+        const result: Row = {
+          name: row.name || '',
+          unit: row.unit || '',
+          priceWithVat: row.priceWithVat != null ? String(row.priceWithVat) : '',
+          priceWithoutVat: row.priceWithoutVat != null ? String(row.priceWithoutVat) : '',
+        }
+        if (row.extra && typeof row.extra === 'object') Object.assign(result, row.extra)
+        return result
+      })
+      let columns: Column[] = [
+        { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
+        { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
+        { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number', isBase: true },
+        { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
+      ]
+      if (data.columns && Array.isArray(data.columns)) {
+        const extra = data.columns.filter((c: Column) => !c.isBase)
+        columns = [...columns, ...extra]
+      }
+      downloadPriceAsCsv(rows, columns, priceName)
+    } catch (e) {
+      console.error('Download price error:', e)
+    }
+  }
 
   // Загрузка прайсов из API
   const loadPrices = async () => {
@@ -500,9 +559,9 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
       </p>
 
-      {/* Кнопка загрузки прайса */}
-      {prices.length === 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
+      {/* Кнопки: загрузка / скачать и добавить прайс */}
+      <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        {prices.length === 0 ? (
           <button
             onClick={() => {
               setEditingPriceId(null)
@@ -522,8 +581,95 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           >
             Загрузить прайс
           </button>
-        </div>
-      )}
+        ) : (
+          <>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => {
+                  if (prices.length === 1) {
+                    handleDownloadPrice(prices[0].id, prices[0].name)
+                  } else {
+                    setDownloadMenuOpen((v) => !v)
+                  }
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                }}
+              >
+                Скачать прайс{prices.length > 1 ? ' ▾' : ''}
+              </button>
+              {prices.length > 1 && downloadMenuOpen && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                    onClick={() => setDownloadMenuOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '0.25rem',
+                      background: 'white',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      border: '1px solid #e5e7eb',
+                      minWidth: '200px',
+                      zIndex: 999,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {prices.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleDownloadPrice(p.id, p.name)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 1rem',
+                          textAlign: 'left',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          color: '#111827',
+                        }}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setEditingPriceId(null)
+                setEditingPriceData(null)
+                setIsModalOpen(true)
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: '#0070f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 500,
+              }}
+            >
+              Добавить прайс
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Блок "Назначенные вам прайсы" */}
       {assignedPrices.length > 0 && (
@@ -810,6 +956,29 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                     }}
                   >
                     Назначить контрагента
+                  </button>
+                  <button
+                    onClick={() => handleDownloadPrice(price.id, price.name)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderTop: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9fafb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    Скачать прайс
                   </button>
                 </div>
               </>
