@@ -551,6 +551,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         }
       }
       await loadPrices()
+      alert('Заявка отправлена. Контрагент увидит её в блоке «Запросы на подключение контрагентов» на своей странице партнёрства.')
     } catch (error: any) {
       console.error('Failed to assign counterparty:', error)
       alert(error.message || 'Ошибка назначения контрагента')
@@ -877,7 +878,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       {/* Действующие контрагенты */}
       <div style={{ marginBottom: '2rem' }}>
         <button
-          onClick={() => setActiveCounterpartiesExpanded(!activeCounterpartiesExpanded)}
+          onClick={() => {
+            const next = !activeCounterpartiesExpanded
+            setActiveCounterpartiesExpanded(next)
+            if (next) loadPartnershipData()
+          }}
           style={{
             width: '100%',
             padding: '1rem',
@@ -926,7 +931,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       {/* Запросы на подключение контрагентов */}
       <div style={{ marginBottom: '2rem' }}>
         <button
-          onClick={() => setIncomingRequestsExpanded(!incomingRequestsExpanded)}
+          onClick={() => {
+            const next = !incomingRequestsExpanded
+            setIncomingRequestsExpanded(next)
+            if (next) loadPartnershipData() // Перезагружаем при раскрытии, чтобы видеть новые заявки
+          }}
           style={{
             width: '100%',
             padding: '1rem',
@@ -949,7 +958,12 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             {loadingPartnership ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
             ) : incomingRequests.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+              <>
+                <div style={{ padding: '1rem 2rem 0', fontSize: '0.8125rem', color: '#6b7280' }}>
+                  Сюда попадают заявки, когда кто-то назначил ваш бизнес контрагентом в своём прайсе (по вашему ИНР).
+                </div>
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+              </>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
