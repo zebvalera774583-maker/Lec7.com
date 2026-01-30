@@ -41,8 +41,8 @@ jobs:
               git reset --hard origin/main
             }
             
-            # Убеждаемся, что скрипт деплоя исполняемый
-            chmod +x scripts/deploy.sh scripts/deploy-simple.sh 2>/dev/null || true
+            # Убеждаемся, что скрипты деплоя исполняемые
+            chmod +x scripts/deploy.sh scripts/deploy-simple.sh deploy-simple.sh 2>/dev/null || true
             
             # Используем скрипт деплоя (если есть) или выполняем команды напрямую
             if [ -f scripts/deploy-simple.sh ]; then
