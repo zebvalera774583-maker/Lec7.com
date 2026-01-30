@@ -544,9 +544,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       }
 
       // Обновляем данные назначений
-      const updatedData = await getAssigningPrice()
-      if (updatedData) {
-        setAssigningPriceData(updatedData)
+      if (assigningPriceId) {
+        const updatedData = await getAssigningPrice(assigningPriceId)
+        if (updatedData) {
+          setAssigningPriceData(updatedData)
+        }
       }
       await loadPrices()
     } catch (error: any) {
@@ -572,9 +574,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
       }
 
       // Перезагружаем данные текущего прайса
-      const updatedData = await getAssigningPrice()
-      if (updatedData) {
-        setAssigningPriceData(updatedData)
+      if (assigningPriceId) {
+        const updatedData = await getAssigningPrice(assigningPriceId)
+        if (updatedData) {
+          setAssigningPriceData(updatedData)
+        }
       }
       await loadPrices()
     } catch (error) {
@@ -583,11 +587,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
     }
   }
 
-  const getAssigningPrice = async () => {
-    if (!assigningPriceId) return null
+  const [assigningPriceData, setAssigningPriceData] = useState<{ assignedCounterparties: string[] } | null>(null)
 
+  const getAssigningPrice = async (priceId: string) => {
     try {
-      const response = await fetch(`/api/office/businesses/${businessId}/prices/${assigningPriceId}`, {
+      const response = await fetch(`/api/office/businesses/${businessId}/prices/${priceId}`, {
         credentials: 'include',
       })
 
@@ -605,15 +609,13 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
     }
   }
 
-  const [assigningPriceData, setAssigningPriceData] = useState<{ assignedCounterparties: string[] } | null>(null)
-
   useEffect(() => {
     if (isAssignCounterpartyModalOpen && assigningPriceId) {
-      getAssigningPrice().then(setAssigningPriceData)
+      getAssigningPrice(assigningPriceId).then(setAssigningPriceData)
     } else {
       setAssigningPriceData(null)
     }
-  }, [isAssignCounterpartyModalOpen, assigningPriceId])
+  }, [isAssignCounterpartyModalOpen, assigningPriceId, businessId])
 
   const nextPriceNumber = prices.length + 1
 
