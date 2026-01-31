@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 import PriceUploadModal from './PriceUploadModal'
 import CreateDerivedPriceModal from './CreateDerivedPriceModal'
 import AssignCounterpartyModal from './AssignCounterpartyModal'
@@ -90,27 +91,36 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [incomingRequestsExpanded, setIncomingRequestsExpanded] = useState(false)
   const [loadingPartnership, setLoadingPartnership] = useState(false)
 
-  // Скачать прайс в CSV
-  const downloadPriceAsCsv = (rows: Row[], columns: Column[], filename: string) => {
-    const headers = columns.map((c) => c.title)
-    const escape = (v: string) => {
-      const s = String(v ?? '')
-      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
-      return s
-    }
-    const lines = [headers.map(escape).join(';')]
-    rows.forEach((row) => {
-      const values = columns.map((col) => escape(row[col.id] ?? ''))
-      lines.push(values.join(';'))
-    })
-    const csv = '\uFEFF' + lines.join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${filename.replace(/[^\w\s-]/g, '')}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  // Скачать прайс в Excel (.xlsx): № п/п, ширина Наименование 28, Цена 22, только сохранённые колонки
+  const downloadPriceAsExcel = (rows: Row[], columns: Column[], filename: string) => {
+    const headerRow = ['№ п/п', ...columns.map((c) => c.title)]
+    const dataRows = rows.map((row, index) => [
+      index + 1,
+      ...columns.map((col) => {
+        const v = row[col.id] ?? ''
+        if (col.kind === 'number' && v !== '') {
+          const n = parseFloat(String(v))
+          return Number.isNaN(n) ? String(v) : n
+        }
+        return String(v)
+      }),
+    ])
+    const aoa = [headerRow, ...dataRows]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    // Ширины в единицах Excel: № п/п = 8, Наименование = 28, Цена* = 22, остальные 15
+    const colWidths = [
+      { wch: 8 },
+      ...columns.map((col) => {
+        if (col.id === 'name' || col.title === 'Наименование') return { wch: 28 }
+        if (col.id === 'priceWithVat' || col.id === 'priceWithoutVat' || /цена/i.test(col.title)) return { wch: 22 }
+        return { wch: 15 }
+      }),
+    ]
+    ws['!cols'] = colWidths
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Прайс')
+    const safeName = filename.replace(/[^\w\s\u0400-\u04FF-]/g, '').trim() || 'Прайс'
+    XLSX.writeFile(wb, `${safeName}.xlsx`)
   }
 
   const handleDownloadPrice = async (priceId: string, priceName: string) => {
@@ -132,17 +142,27 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         if (row.extra && typeof row.extra === 'object') Object.assign(result, row.extra)
         return result
       })
-      let columns: Column[] = [
+      // Используем полный сохранённый список колонок (если пользователь убрал столбец — его нет в выгрузке)
+      const baseDefs: Column[] = [
         { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
         { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
         { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number', isBase: true },
         { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
       ]
-      if (data.columns && Array.isArray(data.columns)) {
-        const extra = data.columns.filter((c: Column) => !c.isBase)
-        columns = [...columns, ...extra]
+      let columns: Column[]
+      if (data.columns && Array.isArray(data.columns) && data.columns.length > 0) {
+        columns = data.columns.map((col: any) => ({
+          id: col.id,
+          title: col.title || col.id,
+          kind: col.kind === 'number' ? 'number' : 'text',
+          isBase: ['name', 'unit', 'priceWithVat', 'priceWithoutVat'].includes(col.id),
+        }))
+        if (!columns.some((c) => c.id === 'name')) columns.unshift(baseDefs[0])
+        if (!columns.some((c) => c.id === 'unit')) columns.splice(1, 0, baseDefs[1])
+      } else {
+        columns = [...baseDefs]
       }
-      downloadPriceAsCsv(rows, columns, priceName)
+      downloadPriceAsExcel(rows, columns, priceName)
     } catch (e) {
       console.error('Download price error:', e)
     }
