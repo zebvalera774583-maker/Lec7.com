@@ -396,38 +396,58 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
             </table>
           </div>
 
-          {/* Кнопки сохранения */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#f3f4f6',
-                color: '#111827',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-              }}
-            >
-              Закрыть
-            </button>
-            {!readOnly && (
+          {/* Кнопки внизу: Добавить строку слева, Закрыть и Сохранить справа */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div>
+              {!readOnly && (
+                <button
+                  onClick={handleAddRow}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#0070f3',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Добавить строку
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
-                onClick={handleSave}
+                onClick={onClose}
                 style={{
                   padding: '0.5rem 1rem',
-                  background: '#0070f3',
-                  color: 'white',
-                  border: 'none',
+                  background: '#f3f4f6',
+                  color: '#111827',
+                  border: '1px solid #d1d5db',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '0.875rem',
                 }}
               >
-                Сохранить
+                Закрыть
               </button>
-            )}
+              {!readOnly && (
+                <button
+                  onClick={handleSave}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#0070f3',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Сохранить
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
