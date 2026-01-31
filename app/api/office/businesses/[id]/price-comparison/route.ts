@@ -16,6 +16,7 @@ WITH accepted_prices AS (
   JOIN "Business" s ON s.id = pl."businessId"
   WHERE pa."counterpartyBusinessId" = $1
     AND pa.status = 'ACTIVE'::"PartnerLinkStatus"
+    AND (pl.category = $2 OR (pl.category IS NULL AND $2 = 'Свежая плодоовощная продукция'))
 ),
 items AS (
   SELECT
@@ -83,6 +84,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
     const businessId = pathParts[pathParts.indexOf('businesses') + 1]
+    const categoryParam = url.searchParams.get('category')?.trim() || 'Свежая плодоовощная продукция'
 
     if (!businessId) {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
@@ -101,11 +103,15 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Suppliers: active assignments for this counterparty, dedupe by supplierBusinessId, sort by supplierLegalName
+    // Suppliers: active assignments for this counterparty and category, dedupe by supplierBusinessId
     const assignments = await prisma.priceAssignment.findMany({
       where: {
         counterpartyBusinessId: businessId,
         status: 'ACTIVE',
+        priceList:
+          categoryParam === 'Свежая плодоовощная продукция'
+            ? { OR: [{ category: categoryParam }, { category: null }] }
+            : { category: categoryParam },
       },
       include: {
         priceList: {
@@ -140,8 +146,8 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       a.supplierLegalName.localeCompare(b.supplierLegalName, 'ru')
     )
 
-    // Rows + offers from raw SQL
-    const rowsRaw = await prisma.$queryRawUnsafe<RowRaw[]>(ROWS_SQL, businessId)
+    // Rows + offers from raw SQL (filter by category)
+    const rowsRaw = await prisma.$queryRawUnsafe<RowRaw[]>(ROWS_SQL, businessId, categoryParam)
 
     const rows = rowsRaw.map((r, idx) => ({
       no: idx + 1,
@@ -160,6 +166,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     return NextResponse.json({
       counterpartyBusinessId: businessId,
+      category: categoryParam,
       suppliers,
       rows,
     })

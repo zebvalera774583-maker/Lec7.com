@@ -25,9 +25,12 @@ interface Row {
 
 interface ComparisonData {
   counterpartyBusinessId: string
+  category?: string
   suppliers: Supplier[]
   rows: Row[]
 }
+
+const PRICE_CATEGORIES = ['Свежая плодоовощная продукция'] as const
 
 interface PriceCompareClientProps {
   businessId: string
@@ -74,6 +77,7 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
   const [data, setData] = useState<ComparisonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string>(PRICE_CATEGORIES[0])
   const [onlyWith2Offers, setOnlyWith2Offers] = useState(false)
   const [hideEmptySuppliers, setHideEmptySuppliers] = useState(false)
 
@@ -81,7 +85,8 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetch(`/api/office/businesses/${businessId}/price-comparison`, { credentials: 'include' })
+    const categoryParam = encodeURIComponent(selectedCategory)
+    fetch(`/api/office/businesses/${businessId}/price-comparison?category=${categoryParam}`, { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error(res.status === 403 ? 'Доступ запрещён' : 'Ошибка загрузки')
         return res.json()
@@ -100,7 +105,7 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
     return () => {
       cancelled = true
     }
-  }, [businessId])
+  }, [businessId, selectedCategory])
 
   if (loading) {
     return (
@@ -158,12 +163,39 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
           ← Назад к партнёрству
         </Link>
       </div>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Сравнение прайсов</h1>
+      <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+        Сравнение прайсов
+        {data?.category && (
+          <span style={{ fontWeight: 500, color: '#4b5563', fontSize: '1.125rem' }}> — {data.category}</span>
+        )}
+      </h1>
 
       <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+          <span style={{ color: '#374151' }}>Категория товаров</span>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={{
+              padding: '0.5rem 0.75rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              minWidth: '240px',
+              background: 'white',
+              cursor: 'pointer',
+            }}
+          >
+            {PRICE_CATEGORIES.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
-          onClick={() => downloadComparisonAsExcel(filteredRows, visibleSuppliers, 'Сводная прайсов')}
+          onClick={() => downloadComparisonAsExcel(filteredRows, visibleSuppliers, `Сводная прайсов — ${selectedCategory}`)}
           disabled={filteredRows.length === 0}
           style={{
             padding: '0.5rem 1rem',
