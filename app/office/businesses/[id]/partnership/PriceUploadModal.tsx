@@ -29,6 +29,8 @@ const BASE_COLUMNS: Column[] = [
   { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
 ]
 
+const PRICE_CATEGORIES = ['Свежая плодоовощная продукция'] as const
+
 export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, readOnly = false }: PriceUploadModalProps) {
   const [columns, setColumns] = useState<Column[]>(initialColumns || BASE_COLUMNS)
   const [rows, setRows] = useState<Row[]>(initialRows && initialRows.length > 0 ? initialRows : [{}])
@@ -37,6 +39,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
   const [newColumnKind, setNewColumnKind] = useState<'text' | 'number'>('text')
   const lastRowFirstInputRef = useRef<HTMLInputElement | null>(null)
   const [focusNewRow, setFocusNewRow] = useState(false)
+  const [category, setCategory] = useState<string>(PRICE_CATEGORIES[0])
 
   const handleAddRow = () => {
     setRows([...rows, {}])
@@ -111,6 +114,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
       } else {
         setRows([{}])
       }
+      setCategory(PRICE_CATEGORIES[0])
     }
   }, [isOpen, initialRows, initialColumns])
 
@@ -169,39 +173,64 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
             </button>
           </div>
 
-          {/* Кнопки управления сверху */}
-          {!readOnly && (
-            <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-              <button
-                onClick={handleAddRow}
+          {/* Кнопки управления сверху и категория прайса */}
+          <div style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
+            {!readOnly && (
+              <>
+                <button
+                  onClick={handleAddRow}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#0070f3',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Добавить строку
+                </button>
+                <button
+                  onClick={() => setShowAddColumnForm(!showAddColumnForm)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#f3f4f6',
+                    color: '#111827',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Добавить столбец
+                </button>
+              </>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+              <span style={{ color: '#374151' }}>Категория прайса</span>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                disabled={readOnly}
                 style={{
-                  padding: '0.5rem 1rem',
-                  background: '#0070f3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                }}
-              >
-                Добавить строку
-              </button>
-              <button
-                onClick={() => setShowAddColumnForm(!showAddColumnForm)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#f3f4f6',
-                  color: '#111827',
+                  padding: '0.5rem 0.75rem',
                   border: '1px solid #d1d5db',
                   borderRadius: '4px',
-                  cursor: 'pointer',
                   fontSize: '0.875rem',
+                  minWidth: '220px',
+                  backgroundColor: readOnly ? '#f9fafb' : 'white',
+                  cursor: readOnly ? 'default' : 'pointer',
                 }}
               >
-                Добавить столбец
-              </button>
-            </div>
-          )}
+                {PRICE_CATEGORIES.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           {/* Форма добавления столбца */}
           {showAddColumnForm && (
