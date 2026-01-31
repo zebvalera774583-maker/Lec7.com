@@ -52,9 +52,8 @@ function downloadComparisonAsExcel(
     ...visibleSuppliers.map((s) => {
       const o = row.offers[s.supplierBusinessId]
       const price = o?.price ?? null
-      const unit = o?.unit ?? ''
       if (price == null) return '—'
-      return unit ? `${Number(price).toLocaleString('ru-RU')} (за ${unit})` : Number(price).toLocaleString('ru-RU')
+      return Number(price).toLocaleString('ru-RU')
     }),
   ])
   const aoa = [headerRow, ...dataRows]
@@ -286,20 +285,13 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
                   {visibleSuppliers.map((s) => {
                     const offer = row.offers[s.supplierBusinessId]
                     const price = offer?.price ?? null
-                    const unit = offer?.unit ?? null
                     const displayPrice = formatPrice(price)
                     return (
                       <td
                         key={s.supplierBusinessId}
                         style={{ padding: '0.5rem 0.75rem', border: '1px solid #e5e7eb' }}
-                        title={unit ? `за ${unit}` : undefined}
                       >
-                        <span>{displayPrice}</span>
-                        {unit && (
-                          <span style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginTop: '2px' }}>
-                            за {unit}
-                          </span>
-                        )}
+                        {displayPrice}
                       </td>
                     )
                   })}
