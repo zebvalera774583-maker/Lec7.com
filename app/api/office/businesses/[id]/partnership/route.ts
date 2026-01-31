@@ -28,8 +28,8 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Получаем активные контрагенты (ACTIVE, где текущий бизнес - получатель)
-    const activeAssignments = await prisma.priceAssignment.findMany({
+    // 1) Активные контрагенты, где мы получатель: кто нам назначил прайс и мы приняли
+    const activeAsRecipient = await prisma.priceAssignment.findMany({
       where: {
         counterpartyBusinessId: businessId,
         status: 'ACTIVE',
@@ -55,12 +55,50 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       },
     })
 
-    // Уникализируем по partnerBusinessId (один контрагент = одна запись)
+    // 2) Активные контрагенты, где мы отправитель: кому мы назначили прайс и они приняли
+    const activeAsSender = await prisma.priceAssignment.findMany({
+      where: {
+        status: 'ACTIVE',
+        priceList: {
+          businessId,
+        },
+      },
+      include: {
+        counterpartyBusiness: {
+          select: {
+            id: true,
+            legalName: true,
+            name: true,
+            slug: true,
+            profile: {
+              select: {
+                residentNumber: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Уникализируем по partnerBusinessId (один контрагент = одна запись), объединяя обе стороны
     const activeCounterpartiesMap = new Map()
-    activeAssignments.forEach((assignment) => {
+    activeAsRecipient.forEach((assignment) => {
       const partnerBusinessId = assignment.priceList.businessId
       if (!activeCounterpartiesMap.has(partnerBusinessId)) {
         const partner = assignment.priceList.business
+        activeCounterpartiesMap.set(partnerBusinessId, {
+          partnerBusinessId: partner.id,
+          legalName: partner.legalName,
+          name: partner.name,
+          slug: partner.slug,
+          residentNumber: partner.profile?.residentNumber || null,
+        })
+      }
+    })
+    activeAsSender.forEach((assignment) => {
+      const partnerBusinessId = assignment.counterpartyBusinessId
+      if (!activeCounterpartiesMap.has(partnerBusinessId)) {
+        const partner = assignment.counterpartyBusiness
         activeCounterpartiesMap.set(partnerBusinessId, {
           partnerBusinessId: partner.id,
           legalName: partner.legalName,
