@@ -56,9 +56,21 @@ export default async function OfficeLayout({
           }}
         >
           <h2>Office</h2>
-          <div>
-            <span>{user.email}</span>
-            <a href="/api/auth/logout" style={{ marginLeft: '1rem', color: '#666' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '0.8125rem', color: '#6b7280' }}>Вы вошли как:</span>
+            <span
+              style={{
+                padding: '0.35rem 0.75rem',
+                background: '#eff6ff',
+                color: '#1e40af',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}
+            >
+              {user.email}
+            </span>
+            <a href="/api/auth/logout" style={{ marginLeft: '0.25rem', color: '#6b7280', fontSize: '0.875rem', textDecoration: 'underline' }}>
               Выйти
             </a>
           </div>
