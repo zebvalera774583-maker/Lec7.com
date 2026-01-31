@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 
 interface Supplier {
   supplierBusinessId: string
@@ -37,6 +38,37 @@ function formatPrice(value: number | null): string {
   const n = Number(value)
   if (Number.isNaN(n)) return '—'
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
+function downloadComparisonAsExcel(
+  filteredRows: Row[],
+  visibleSuppliers: Supplier[],
+  filename: string
+) {
+  const headerRow = ['№', 'Наименование', ...visibleSuppliers.map((s) => s.supplierLegalName || s.supplierBusinessId)]
+  const dataRows = filteredRows.map((row, idx) => [
+    idx + 1,
+    row.title,
+    ...visibleSuppliers.map((s) => {
+      const o = row.offers[s.supplierBusinessId]
+      const price = o?.price ?? null
+      const unit = o?.unit ?? ''
+      if (price == null) return '—'
+      return unit ? `${Number(price).toLocaleString('ru-RU')} (за ${unit})` : Number(price).toLocaleString('ru-RU')
+    }),
+  ])
+  const aoa = [headerRow, ...dataRows]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const colWidths = [
+    { wch: 8 },
+    { wch: 28 },
+    ...visibleSuppliers.map(() => ({ wch: 18 })),
+  ]
+  ws['!cols'] = colWidths
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Сводная')
+  const safeName = filename.replace(/[^\w\s\u0400-\u04FF-]/g, '').trim() || 'Сводная прайсов'
+  XLSX.writeFile(wb, `${safeName}.xlsx`)
 }
 
 export default function PriceCompareClient({ businessId }: PriceCompareClientProps) {
@@ -130,6 +162,23 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
       <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Сравнение прайсов</h1>
 
       <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => downloadComparisonAsExcel(filteredRows, visibleSuppliers, 'Сводная прайсов')}
+          disabled={filteredRows.length === 0}
+          style={{
+            padding: '0.5rem 1rem',
+            background: filteredRows.length === 0 ? '#d1d5db' : '#059669',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: filteredRows.length === 0 ? 'not-allowed' : 'pointer',
+          }}
+        >
+          Скачать таблицу
+        </button>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
           <input
             type="checkbox"
