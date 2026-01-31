@@ -677,8 +677,23 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
       </p>
 
-      {/* Кнопки: загрузка / скачать и добавить прайс */}
+      {/* Кнопки: загрузка / скачать и добавить прайс / сравнение */}
       <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        <Link
+          href={`/office/businesses/${businessId}/prices/compare`}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: '#f3f4f6',
+            color: '#111827',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            fontSize: '1rem',
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          Сравнение прайсов
+        </Link>
         {prices.length === 0 ? (
           <button
             onClick={() => {
