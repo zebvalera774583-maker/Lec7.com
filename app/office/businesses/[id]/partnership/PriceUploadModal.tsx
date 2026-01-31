@@ -81,7 +81,9 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
 
   const handleDeleteColumn = (columnId: string) => {
     const column = columns.find((c) => c.id === columnId)
-    if (!column || column.isBase) return
+    // Не удаляем только «Наименование» и «Ед. изм»; столбцы цен с/без НДС можно удалять
+    const nonDeletable = column?.isBase && column.id !== 'priceWithVat' && column.id !== 'priceWithoutVat'
+    if (!column || nonDeletable) return
 
     setColumns(columns.filter((c) => c.id !== columnId))
     const newRows = rows.map((row) => {
@@ -313,20 +315,27 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                       }}
                     >
                       {column.title}
-                      {!readOnly && !column.isBase && (
+                      {!readOnly && (!column.isBase || column.id === 'priceWithVat' || column.id === 'priceWithoutVat') && (
                         <button
+                          type="button"
                           onClick={() => handleDeleteColumn(column.id)}
                           style={{
                             position: 'absolute',
-                            right: '0.25rem',
+                            right: '0.35rem',
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'none',
                             border: 'none',
-                            color: '#ef4444',
+                            color: '#6b7280',
                             cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            padding: '0.25rem',
+                            fontSize: '0.875rem',
+                            lineHeight: 1,
+                            padding: 0,
+                            width: '1.25rem',
+                            height: '1.25rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                           }}
                           title="Удалить столбец"
                         >
