@@ -35,6 +35,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
         id: true,
         name: true,
         kind: true,
+        category: true,
         derivedFromId: true,
         modifierType: true,
         percent: true,
@@ -83,7 +84,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     const body = await req.json()
-    const { name, kind, derivedFromId, modifierType, percent, columns, rows } = body
+    const { name, kind, category, derivedFromId, modifierType, percent, columns, rows } = body
 
     // Создаём прайс в транзакции
     const result = await prisma.$transaction(async (tx) => {
@@ -92,6 +93,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
           businessId,
           name: name || 'Прайс 1',
           kind: (kind || 'BASE') as 'BASE' | 'DERIVED',
+          category: category || null,
           derivedFromId: derivedFromId || null,
           modifierType: modifierType ? (modifierType as 'MARKUP' | 'DISCOUNT') : null,
           percent: percent || null,

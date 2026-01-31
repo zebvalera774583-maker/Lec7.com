@@ -16,9 +16,10 @@ interface Row {
 interface PriceUploadModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (rows: Row[], columns: Column[]) => void
+  onSave: (rows: Row[], columns: Column[], category?: string) => void
   initialRows?: Row[]
   initialColumns?: Column[]
+  initialCategory?: string | null
   readOnly?: boolean // Режим только просмотра (для назначенных прайсов)
 }
 
@@ -31,7 +32,7 @@ const BASE_COLUMNS: Column[] = [
 
 const PRICE_CATEGORIES = ['Свежая плодоовощная продукция'] as const
 
-export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, readOnly = false }: PriceUploadModalProps) {
+export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, initialCategory, readOnly = false }: PriceUploadModalProps) {
   const [columns, setColumns] = useState<Column[]>(initialColumns || BASE_COLUMNS)
   const [rows, setRows] = useState<Row[]>(initialRows && initialRows.length > 0 ? initialRows : [{}])
   const [showAddColumnForm, setShowAddColumnForm] = useState(false)
@@ -97,7 +98,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
   }
 
   const handleSave = () => {
-    onSave(rows, columns)
+    onSave(rows, columns, category)
     onClose()
   }
 
@@ -114,9 +115,9 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
       } else {
         setRows([{}])
       }
-      setCategory(PRICE_CATEGORIES[0])
+      setCategory(initialCategory?.trim() || PRICE_CATEGORIES[0])
     }
-  }, [isOpen, initialRows, initialColumns])
+  }, [isOpen, initialRows, initialColumns, initialCategory])
 
   if (!isOpen) return null
 

@@ -104,6 +104,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       id: priceList.id,
       name: priceList.name,
       kind: priceList.kind,
+      category: priceList.category,
       derivedFromId: priceList.derivedFromId,
       modifierType: priceList.modifierType,
       percent: priceList.percent,
@@ -162,7 +163,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
     }
 
     const body = await req.json()
-    const { name, columns, rows } = body
+    const { name, category, columns, rows } = body
 
     // Проверяем существование прайса
     const existingPrice = await prisma.priceList.findFirst({
@@ -183,6 +184,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
         where: { id: priceId },
         data: {
           ...(name !== undefined && { name }),
+          ...(category !== undefined && { category: category || null }),
           ...(columns !== undefined && { columns }),
         },
       })

@@ -62,6 +62,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       id: assignment.id,
       priceListId: assignment.priceList.id,
       priceName: assignment.priceList.name,
+      priceCategory: assignment.priceList.category,
       priceKind: assignment.priceList.kind,
       priceModifierType: assignment.priceList.modifierType,
       pricePercent: assignment.priceList.percent,

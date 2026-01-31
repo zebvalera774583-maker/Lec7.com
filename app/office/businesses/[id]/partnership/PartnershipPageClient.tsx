@@ -42,6 +42,7 @@ interface AssignedPrice {
   id: string
   priceListId: string
   priceName: string
+  priceCategory: string | null
   priceKind: string
   priceModifierType: string | null
   pricePercent: number | null
@@ -81,7 +82,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [isAssignCounterpartyModalOpen, setIsAssignCounterpartyModalOpen] = useState(false)
   const [assigningPriceId, setAssigningPriceId] = useState<string | null>(null)
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null)
-  const [editingPriceData, setEditingPriceData] = useState<{ rows: Row[]; columns: Column[] } | null>(null)
+  const [editingPriceData, setEditingPriceData] = useState<{ rows: Row[]; columns: Column[]; category?: string | null } | null>(null)
   const [isViewOnlyMode, setIsViewOnlyMode] = useState(false)
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
   const [activeCounterparties, setActiveCounterparties] = useState<ActiveCounterparty[]>([])
@@ -321,13 +322,13 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         columns = [...BASE_COLUMN_DEFS]
       }
 
-      setEditingPriceData({ rows, columns })
+      setEditingPriceData({ rows, columns, category: data.category })
     } catch (error) {
       console.error('Failed to load price data:', error)
     }
   }
 
-  const handleSave = async (rows: Row[], columns: Column[]) => {
+  const handleSave = async (rows: Row[], columns: Column[], category?: string) => {
     try {
       // Фильтруем пустые строки (где все поля пустые)
       const nonEmptyRows = rows.filter((row) => {
@@ -389,6 +390,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           body: JSON.stringify({
             rows: dbRows,
             columns,
+            category: category || null,
           }),
         })
 
@@ -445,6 +447,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           body: JSON.stringify({
             name: 'Прайс 1',
             kind: 'BASE',
+            category: category || null,
             rows: dbRows,
             columns,
           }),
@@ -801,7 +804,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                       columns = [...baseDefs]
                     }
 
-                    setEditingPriceData({ rows, columns })
+                    setEditingPriceData({ rows, columns, category: data.category })
                     setEditingPriceId(assigned.priceListId)
                     setIsViewOnlyMode(true) // Режим только просмотра для назначенных прайсов
                     setIsModalOpen(true)
@@ -829,20 +832,21 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
-                    {assigned.priceName}
+                  <div style={{ fontWeight: 600, marginBottom: '0.35rem', fontSize: '1rem' }}>
+                    Прайс
                     {assigned.priceModifierType && assigned.pricePercent !== null && (
-                      <span style={{ color: '#6b7280', fontWeight: 'normal' }}>
+                      <span style={{ color: '#6b7280', fontWeight: 500 }}>
                         {' '}
                         ({assigned.priceModifierType === 'MARKUP' ? '+' : '−'}
                         {assigned.pricePercent}%)
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    От:{' '}
+                  <div style={{ fontSize: '0.9375rem', marginBottom: '0.2rem', color: '#111827' }}>
+                    {assigned.priceCategory?.trim() || 'Свежая плодоовощная продукция'}
+                  </div>
+                  <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>
                     {(() => {
-                      // Защита от пустых legalName (только пробелы)
                       const legalName = assigned.sourceBusinessLegalName?.trim() || null
                       if (legalName) return legalName
                       if (assigned.sourceBusinessName) return assigned.sourceBusinessName
@@ -1225,6 +1229,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         onSave={handleSave}
         initialRows={editingPriceData?.rows}
         initialColumns={editingPriceData?.columns}
+        initialCategory={editingPriceData?.category}
         readOnly={isViewOnlyMode}
       />
 

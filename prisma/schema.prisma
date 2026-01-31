@@ -386,6 +386,7 @@ model PriceList {
   businessId    String
   name          String            // "Прайс 1", "Прайс 2"
   kind          PriceListKind     @default(BASE)
+  category      String?           // Категория прайса (напр. "Свежая плодоовощная продукция")
   derivedFromId String?
   modifierType PriceModifierType?
   percent       Int?               // Процент наценки/скидки (0-999)
