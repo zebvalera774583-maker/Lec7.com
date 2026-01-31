@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 
 interface Column {
   id: string
@@ -35,10 +35,20 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
   const [showAddColumnForm, setShowAddColumnForm] = useState(false)
   const [newColumnTitle, setNewColumnTitle] = useState('')
   const [newColumnKind, setNewColumnKind] = useState<'text' | 'number'>('text')
+  const lastRowFirstInputRef = useRef<HTMLInputElement | null>(null)
+  const [focusNewRow, setFocusNewRow] = useState(false)
 
   const handleAddRow = () => {
     setRows([...rows, {}])
+    setFocusNewRow(true)
   }
+
+  useEffect(() => {
+    if (focusNewRow && rows.length > 0 && lastRowFirstInputRef.current) {
+      lastRowFirstInputRef.current.focus()
+      setFocusNewRow(false)
+    }
+  }, [focusNewRow, rows.length])
 
   const handleDeleteRow = (index: number) => {
     setRows(rows.filter((_, i) => i !== index))
@@ -349,9 +359,10 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                     >
                       {rowIndex + 1}
                     </td>
-                    {columns.map((column) => (
+                    {columns.map((column, colIndex) => (
                       <td key={column.id} style={{ padding: '0.5rem', border: '1px solid #e5e7eb' }}>
                         <input
+                          ref={colIndex === 0 && rowIndex === rows.length - 1 ? lastRowFirstInputRef : undefined}
                           type={column.kind === 'number' ? 'number' : 'text'}
                           value={row[column.id] || ''}
                           onChange={(e) => handleCellChange(rowIndex, column.id, e.target.value)}
