@@ -58,8 +58,7 @@ export async function uploadPublicFile(
         const auth = new GoogleAuth({
           scopes: ['https://www.googleapis.com/auth/cloud-platform'],
         })
-        const client = await auth.getClient()
-        const credentials = await client.getCredentials()
+        const credentials = await auth.getCredentials()
         console.error('[GCS Identity]', {
           serviceAccount: credentials.client_email || 'unknown',
           project: process.env.GOOGLE_CLOUD_PROJECT || 'not set',
