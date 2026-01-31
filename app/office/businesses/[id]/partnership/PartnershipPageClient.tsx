@@ -281,17 +281,26 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         return result
       })
 
-      // Восстанавливаем структуру колонок
-      let columns: Column[] = [
+      // Восстанавливаем структуру колонок: сохраняем полный список (в т.ч. удалённые «с НДС»/«без НДС»)
+      const BASE_COLUMN_DEFS: Column[] = [
         { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
         { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
         { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number', isBase: true },
         { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
       ]
-
-      if (data.columns && typeof data.columns === 'object' && Array.isArray(data.columns)) {
-        const extraColumns = data.columns.filter((col: Column) => !col.isBase)
-        columns = [...columns, ...extraColumns]
+      let columns: Column[]
+      if (data.columns && typeof data.columns === 'object' && Array.isArray(data.columns) && data.columns.length > 0) {
+        columns = data.columns.map((col: any) => ({
+          id: col.id,
+          title: col.title || col.id,
+          kind: col.kind === 'number' ? 'number' : 'text',
+          isBase: ['name', 'unit', 'priceWithVat', 'priceWithoutVat'].includes(col.id),
+        }))
+        // Гарантируем наличие обязательных колонок (их нельзя удалить)
+        if (!columns.some((c) => c.id === 'name')) columns.unshift(BASE_COLUMN_DEFS[0])
+        if (!columns.some((c) => c.id === 'unit')) columns.splice(1, 0, BASE_COLUMN_DEFS[1])
+      } else {
+        columns = [...BASE_COLUMN_DEFS]
       }
 
       setEditingPriceData({ rows, columns })
@@ -352,9 +361,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           }
         })
 
-        // Сохраняем только добавленные колонки (не базовые)
-        const extraColumns = columns.filter((col) => !col.isBase)
-
+        // Сохраняем полный список колонок (в т.ч. если пользователь удалил «с НДС» или «без НДС»)
         const response = await fetch(`/api/office/businesses/${businessId}/prices/${editingPriceId}`, {
           method: 'PUT',
           headers: {
@@ -363,7 +370,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           credentials: 'include',
           body: JSON.stringify({
             rows: dbRows,
-            columns: extraColumns.length > 0 ? extraColumns : null,
+            columns,
           }),
         })
 
@@ -411,8 +418,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           }
         })
 
-        const extraColumns = columns.filter((col) => !col.isBase)
-
         const response = await fetch(`/api/office/businesses/${businessId}/prices`, {
           method: 'POST',
           headers: {
@@ -423,7 +428,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             name: 'Прайс 1',
             kind: 'BASE',
             rows: dbRows,
-            columns: extraColumns.length > 0 ? extraColumns : null,
+            columns,
           }),
         })
 
@@ -805,17 +810,25 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                       return result
                     })
 
-                    // Восстанавливаем колонки
-                    let columns: Column[] = [
+                    // Восстанавливаем колонки (полный список из БД)
+                    const baseDefs: Column[] = [
                       { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
                       { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
                       { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number', isBase: true },
                       { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
                     ]
-
-                    if (data.columns && Array.isArray(data.columns)) {
-                      const extraColumns = data.columns.filter((col: Column) => !col.isBase)
-                      columns = [...columns, ...extraColumns]
+                    let columns: Column[]
+                    if (data.columns && Array.isArray(data.columns) && data.columns.length > 0) {
+                      columns = data.columns.map((col: any) => ({
+                        id: col.id,
+                        title: col.title || col.id,
+                        kind: col.kind === 'number' ? 'number' : 'text',
+                        isBase: ['name', 'unit', 'priceWithVat', 'priceWithoutVat'].includes(col.id),
+                      }))
+                      if (!columns.some((c) => c.id === 'name')) columns.unshift(baseDefs[0])
+                      if (!columns.some((c) => c.id === 'unit')) columns.splice(1, 0, baseDefs[1])
+                    } else {
+                      columns = [...baseDefs]
                     }
 
                     setEditingPriceData({ rows, columns })
