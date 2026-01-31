@@ -132,21 +132,25 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
         }}
         onClick={onClose}
       >
-        {/* Modal */}
+        {/* Modal: фиксированная высота 90vh, колонка flex, таблица скроллится, футер внизу */}
         <div
           style={{
             background: 'white',
             borderRadius: '8px',
             padding: '1.5rem',
             maxWidth: '90vw',
+            width: '90vw',
+            height: '90vh',
             maxHeight: '90vh',
-            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             zIndex: 1001,
             minWidth: '800px',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{readOnly ? 'Просмотр прайса' : 'Загрузка прайса'}</h2>
             <button
               onClick={onClose}
@@ -165,7 +169,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
 
           {/* Кнопки управления сверху */}
           {!readOnly && (
-            <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+            <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
               <button
                 onClick={handleAddRow}
                 style={{
@@ -209,6 +213,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                 display: 'flex',
                 gap: '0.5rem',
                 alignItems: 'center',
+                flexShrink: 0,
               }}
             >
               <input
@@ -271,8 +276,8 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
             </div>
           )}
 
-          {/* Таблица */}
-          <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
+          {/* Таблица: единственная скроллируемая область (flex: 1 + minHeight: 0 обязательно) */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' }}>
             <table
               style={{
                 width: '100%',
@@ -407,8 +412,8 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
             </table>
           </div>
 
-          {/* Кнопки внизу: Добавить строку слева, Закрыть и Сохранить справа */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {/* Футер: кнопки всегда видны */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', flexShrink: 0, paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
             <div>
               {!readOnly && (
                 <button
