@@ -84,7 +84,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [editingPriceData, setEditingPriceData] = useState<{ rows: Row[]; columns: Column[] } | null>(null)
   const [isViewOnlyMode, setIsViewOnlyMode] = useState(false)
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
-  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
   const [activeCounterparties, setActiveCounterparties] = useState<ActiveCounterparty[]>([])
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([])
   const [activeCounterpartiesExpanded, setActiveCounterpartiesExpanded] = useState(false)
@@ -125,7 +124,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
 
   const handleDownloadPrice = async (priceId: string, priceName: string) => {
     setMenuOpenPriceId(null)
-    setDownloadMenuOpen(false)
     try {
       const response = await fetch(`/api/office/businesses/${businessId}/prices/${priceId}`, {
         credentials: 'include',
@@ -719,71 +717,6 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           </button>
         ) : (
           <>
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => {
-                  if (prices.length === 1) {
-                    handleDownloadPrice(prices[0].id, prices[0].name)
-                  } else {
-                    setDownloadMenuOpen((v) => !v)
-                  }
-                }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                }}
-              >
-                Скачать прайс{prices.length > 1 ? ' ▾' : ''}
-              </button>
-              {prices.length > 1 && downloadMenuOpen && (
-                <>
-                  <div
-                    style={{ position: 'fixed', inset: 0, zIndex: 998 }}
-                    onClick={() => setDownloadMenuOpen(false)}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: '0.25rem',
-                      background: 'white',
-                      borderRadius: '6px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      border: '1px solid #e5e7eb',
-                      minWidth: '200px',
-                      zIndex: 999,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {prices.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => handleDownloadPrice(p.id, p.name)}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 1rem',
-                          textAlign: 'left',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                          color: '#111827',
-                        }}
-                      >
-                        {p.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
             <button
               onClick={() => {
                 setEditingPriceId(null)
