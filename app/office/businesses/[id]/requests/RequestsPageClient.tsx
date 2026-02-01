@@ -205,6 +205,12 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                                 type={col.kind === 'number' ? 'number' : 'text'}
                                 value={row[col.id] ?? ''}
                                 onChange={(e) => handleCellChange(rowIndex, col.id, e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (col.id === 'unit' && e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleAddRow()
+                                  }
+                                }}
                                 style={{ width: '100%', padding: '0.75rem', border: 'none', fontSize: '0.875rem', background: 'white', boxSizing: 'border-box' }}
                               />
                             </td>
@@ -241,7 +247,6 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                 </div>
                 {summaryData && (() => {
                   const sumByCounterparty: Record<string, number> = {}
-                  let totalMinSum = 0
                   summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
                   summaryData.items.forEach((item, idx) => {
                     const itemKey = String(idx)
@@ -251,13 +256,19 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       const exact = item.offers[c.id]
                       const applied = appliedAnalogue[itemKey]?.[c.id]?.price
                       const p = exact ?? applied ?? null
-                      if (p != null) {
+                      if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+                    })
+                    summaryData.counterparties.forEach((c) => {
+                      const exact = item.offers[c.id]
+                      const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+                      const p = exact ?? applied ?? null
+                      if (p != null && rowMin != null && p === rowMin) {
                         sumByCounterparty[c.id] += p * qty
-                        if (rowMin == null || p < rowMin) rowMin = p
                       }
                     })
-                    if (rowMin != null) totalMinSum += rowMin * qty
                   })
+                  const totals = summaryData.counterparties.map((c) => sumByCounterparty[c.id]).filter((t) => t > 0)
+                  const totalMinSum = totals.length > 0 ? Math.min(...totals) : 0
                   return (
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
