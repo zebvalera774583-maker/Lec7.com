@@ -25,34 +25,44 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Заявки</h1>
 
-      <Link
-        href={`/office/businesses/${businessId}`}
-        style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content', marginBottom: '0.25rem' }}
-      >
-        Назад
-      </Link>
+      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Левая часть: Назад, Создать заявку, Поступившие заявки, Архив заявок */}
+        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <Link
+            href={`/office/businesses/${businessId}`}
+            style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}
+          >
+            Назад
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowCreateBlock(!showCreateBlock)}
+            style={{
+              padding: '0.25rem 0',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 500,
+              color: '#111827',
+              textAlign: 'left',
+              display: 'inline-block',
+              width: 'fit-content',
+            }}
+          >
+            Создать заявку
+          </button>
+          <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
+            Поступившие заявки
+          </p>
+          <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
+            Архив заявок
+          </p>
+        </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => setShowCreateBlock(!showCreateBlock)}
-          style={{
-            padding: '0.25rem 0',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            fontWeight: 500,
-            color: '#111827',
-            textAlign: 'left',
-            display: 'inline-block',
-            width: 'fit-content',
-          }}
-        >
-          Создать заявку
-        </button>
+        {/* Справа: блок выбора категории (при нажатии Создать заявку) */}
         {showCreateBlock && (
-          <div>
+          <div style={{ flex: '0 0 auto', minWidth: '280px' }}>
             <p style={{ marginBottom: '0.35rem', color: '#374151', fontSize: '0.9375rem' }}>
               Выберите категорию, в которой хотите сделать заявку
             </p>
@@ -62,6 +72,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               style={{
                 padding: '0.5rem 0.75rem',
                 fontSize: '1rem',
+                width: '100%',
                 minWidth: '280px',
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
@@ -78,14 +89,6 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           </div>
         )}
       </div>
-
-      <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
-        Поступившие заявки
-      </p>
-
-      <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
-        Архив заявок
-      </p>
     </main>
   )
 }
