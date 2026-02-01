@@ -517,22 +517,6 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       onClick={handleCreateRequest}
                       style={{
                         padding: '0.5rem 1rem',
-                        background: '#0070f3',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Создать заявку
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('form')}
-                      style={{
-                        padding: '0.5rem 1rem',
                         background: 'none',
                         color: '#111827',
                         border: '1px solid #d1d5db',
@@ -542,7 +526,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                         fontWeight: 500,
                       }}
                     >
-                      Назад к заявке
+                      Создать заявку
                     </button>
                   </div>
                 </div>
