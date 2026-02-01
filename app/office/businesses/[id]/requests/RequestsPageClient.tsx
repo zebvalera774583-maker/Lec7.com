@@ -27,6 +27,26 @@ interface Counterparty {
   legalName: string
 }
 
+interface IncomingRequestItem {
+  id: string
+  name: string
+  quantity: string
+  unit: string
+  price: number
+  sum: number
+}
+
+interface IncomingRequestRow {
+  id: string
+  senderBusinessId: string
+  senderLegalName: string
+  category: string | null
+  total: number | null
+  status: string
+  createdAt: string
+  items: IncomingRequestItem[]
+}
+
 const REQUEST_COLUMNS = [
   { id: 'name', title: 'Наименование', kind: 'text' as const },
   { id: 'quantity', title: 'Количество', kind: 'number' as const },
@@ -69,6 +89,11 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [appliedAnalogue, setAppliedAnalogue] = useState<Record<string, Record<string, { name: string; price: number }>>>({})
   const [useForRequest, setUseForRequest] = useState<Record<string, boolean>>({})
   const [menuOpenCardId, setMenuOpenCardId] = useState<'summary' | string | null>(null)
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequestRow[]>([])
+  const [incomingLoading, setIncomingLoading] = useState(false)
+  const [selectedIncomingId, setSelectedIncomingId] = useState<string | null>(null)
+  const [sendStatus, setSendStatus] = useState<{ ok: boolean; message: string } | null>(null)
+  const [viewSection, setViewSection] = useState<'create' | 'incoming'>('create')
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
   const menuContainerRef = useRef<HTMLDivElement>(null)
@@ -218,6 +243,85 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
     if (summaryData) saveCreatedToStorage(newCreated, summaryData, appliedAnalogue)
   }
 
+  const getRowsForCounterparty = (counterpartyId: string): { item: SummaryItem; price: number; qty: number; sum: number }[] => {
+    if (!summaryData) return []
+    const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
+    if (!c) return []
+    return summaryData.items
+      .map((item, idx) => {
+        const itemKey = String(idx)
+        let rowMin: number | null = null
+        summaryData.counterparties.forEach((cc) => {
+          const exact = item.offers[cc.id]
+          const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
+          const p = exact ?? applied ?? null
+          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+        })
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        const price = exact ?? applied ?? null
+        const isMin = price != null && rowMin != null && Number.isFinite(price) && Math.abs(price - rowMin) < 1e-6
+        if (!isMin) return null
+        const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+        return { item, price, qty, sum: price * qty }
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null)
+  }
+
+  const handleSendRequest = async (counterpartyId: string) => {
+    if (!summaryData || !createdRequest) return
+    setMenuOpenCardId(null)
+    setSendStatus(null)
+    const rows = getRowsForCounterparty(counterpartyId)
+    if (rows.length === 0) {
+      setSendStatus({ ok: false, message: 'Нет позиций для отправки' })
+      return
+    }
+    const total = rows.reduce((a, r) => a + r.sum, 0)
+    const items = rows.map((r) => ({
+      name: r.item.name,
+      quantity: r.item.quantity || '',
+      unit: r.item.unit || '',
+      price: r.price,
+      sum: r.sum,
+    }))
+    try {
+      const res = await fetch(`/api/office/businesses/${businessId}/requests/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          recipientBusinessId: counterpartyId,
+          category: createdRequest.category,
+          total,
+          items,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Ошибка отправки')
+      }
+      const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
+      setSendStatus({ ok: true, message: `Заявка отправлена ${c?.legalName || 'контрагенту'}` })
+    } catch (e: any) {
+      setSendStatus({ ok: false, message: e.message || 'Ошибка отправки' })
+    }
+  }
+
+  const fetchIncomingRequests = async () => {
+    setIncomingLoading(true)
+    try {
+      const res = await fetch(`/api/office/businesses/${businessId}/requests/incoming`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setIncomingRequests(data.requests || [])
+      }
+    } catch (_) {}
+    finally {
+      setIncomingLoading(false)
+    }
+  }
+
   const handleAddRow = () => {
     setRows([...rows, {}])
   }
@@ -345,6 +449,16 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   }, [summaryData?.counterparties, useForRequest])
 
   useEffect(() => {
+    if (viewSection === 'incoming') fetchIncomingRequests()
+  }, [viewSection])
+
+  useEffect(() => {
+    if (!sendStatus) return
+    const t = setTimeout(() => setSendStatus(null), 5000)
+    return () => clearTimeout(t)
+  }, [sendStatus])
+
+  useEffect(() => {
     if (menuOpenCardId == null) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenuOpenCardId(null)
@@ -377,7 +491,8 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           <button
             type="button"
             onClick={() => {
-              setShowCreateBlock(!showCreateBlock)
+              setViewSection('create')
+              setShowCreateBlock(true)
               if (!showCreateBlock) setViewMode('form')
             }}
             style={{
@@ -395,15 +510,118 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           >
             Создать заявку
           </button>
-          <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
+          <button
+            type="button"
+            onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
+            style={{
+              padding: '0.25rem 0',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 500,
+              color: '#111827',
+              textAlign: 'left',
+              display: 'inline-block',
+              width: 'fit-content',
+            }}
+          >
             Поступившие заявки
-          </p>
+          </button>
           <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
             Архив заявок
           </p>
         </div>
 
-        {showCreateBlock && (
+        {sendStatus && (
+          <div style={{ marginBottom: '0.75rem', padding: '0.5rem 1rem', borderRadius: '6px', background: sendStatus.ok ? '#dcfce7' : '#fee2e2', color: sendStatus.ok ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
+            {sendStatus.message}
+          </div>
+        )}
+
+        {viewSection === 'incoming' ? (
+          <div style={{ flex: '1', minWidth: '320px', maxWidth: '900px' }}>
+            <div style={{ marginBottom: '0.75rem', fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Поступившие заявки</div>
+            {incomingLoading ? (
+              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Загрузка...</p>
+            ) : selectedIncomingId ? (() => {
+              const req = incomingRequests.find((r) => r.id === selectedIncomingId)
+              if (!req) return null
+              const total = req.items.reduce((a, i) => a + i.sum, 0)
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIncomingId(null)}
+                    style={{ alignSelf: 'flex-start', padding: '0.5rem 1rem', background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}
+                  >
+                    Назад к списку
+                  </button>
+                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827' }}>Заявка от {req.senderLegalName}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.5rem' }}>{req.category || '—'}. {req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}</div>
+                  <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>№</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Наименование</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Кол-во</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Ед.</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Цена</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Сумма</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {req.items.map((r, i) => (
+                          <tr key={r.id}>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.quantity}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.price)}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.sum)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                          <td colSpan={5} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )
+            })() : incomingRequests.length === 0 ? (
+              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Нет поступивших заявок</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {incomingRequests.map((req) => (
+                  <button
+                    key={req.id}
+                    type="button"
+                    onClick={() => setSelectedIncomingId(req.id)}
+                    style={{
+                      padding: '1rem 1.25rem',
+                      textAlign: 'left',
+                      background: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      maxWidth: '22em',
+                    }}
+                  >
+                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Заявка от {req.senderLegalName}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{req.category || '—'}</div>
+                    <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}. {req.total != null ? formatPrice(req.total) : ''}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : showCreateBlock && (
           <div style={{ flex: '1', minWidth: '320px', maxWidth: '900px' }}>
             {viewMode === 'form' ? (
               <>
@@ -618,7 +836,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                             <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                             <button type="button" onClick={downloadSummaryAsExcel} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
                             <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
-                            <button type="button" onClick={() => { setMenuOpenCardId(null); alert('Функция в разработке') }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
+                            <button type="button" onClick={() => { setMenuOpenCardId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#6b7280' }}>Отправить (сводная)</button>
                             <button type="button" onClick={handleDeleteCreated} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                           </div>
                           )}
@@ -649,7 +867,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                             <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                               <button type="button" onClick={() => downloadCounterpartyAsExcel(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
                               <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
-                              <button type="button" onClick={() => { setMenuOpenCardId(null); alert('Функция в разработке') }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
+                              <button type="button" onClick={() => handleSendRequest(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
                               <button type="button" onClick={() => handleDeleteCounterpartyCard(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                             </div>
                           )}
