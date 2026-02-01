@@ -71,6 +71,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [menuOpenCardId, setMenuOpenCardId] = useState<'summary' | string | null>(null)
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
+  const menuContainerRef = useRef<HTMLDivElement>(null)
 
   const storageKey = `${STORAGE_KEY_PREFIX}${businessId}`
 
@@ -343,6 +344,24 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
     el.indeterminate = some && !every
   }, [summaryData?.counterparties, useForRequest])
 
+  useEffect(() => {
+    if (menuOpenCardId == null) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpenCardId(null)
+    }
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (menuContainerRef.current && menuContainerRef.current.contains(target)) return
+      setMenuOpenCardId(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('click', onClick, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('click', onClick, true)
+    }
+  }, [menuOpenCardId])
+
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Заявки</h1>
@@ -474,7 +493,25 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               <>
                 <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {createdRequest && (
+                      <button
+                        type="button"
+                        onClick={() => { setViewMode('created'); setSelectedCounterpartyId(null) }}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: 'none',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Назад к заявкам
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleCreateRequest}
@@ -600,22 +637,24 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                         <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{formatRequestDate(createdRequest.createdAt)}</div>
                       </button>
                       <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setMenuOpenCardId(menuOpenCardId === 'summary' ? null : 'summary') }}
-                          aria-label="Меню"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280' }}
-                        >
-                          ☰
-                        </button>
-                        {menuOpenCardId === 'summary' && (
-                          <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
+                        <div ref={menuOpenCardId === 'summary' ? menuContainerRef : undefined} style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenCardId(menuOpenCardId === 'summary' ? null : 'summary') }}
+                            aria-label="Меню"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280' }}
+                          >
+                            ☰
+                          </button>
+                          {menuOpenCardId === 'summary' && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                             <button type="button" onClick={downloadSummaryAsExcel} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
                             <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
                             <button type="button" onClick={() => { setMenuOpenCardId(null); alert('Функция в разработке') }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
                             <button type="button" onClick={handleDeleteCreated} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                           </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                     {createdRequest.counterpartyCards.map((c) => (
@@ -629,7 +668,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                           <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{createdRequest.category}</div>
                           <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{formatRequestDate(createdRequest.createdAt)}</div>
                         </button>
-                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={{ position: 'relative', flexShrink: 0 }} ref={menuOpenCardId === c.id ? menuContainerRef : undefined}>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setMenuOpenCardId(menuOpenCardId === c.id ? null : c.id) }}
