@@ -700,11 +700,10 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         <Link
           href={`/office/businesses/${businessId}/prices/compare`}
           style={{
-            padding: '0.75rem 1.5rem',
-            background: '#059669',
-            color: 'white',
+            padding: '0.25rem 0',
+            background: 'none',
+            color: '#111827',
             border: 'none',
-            borderRadius: '6px',
             fontSize: '1rem',
             fontWeight: 500,
             textDecoration: 'none',
@@ -716,6 +715,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
         </Link>
         {prices.length === 0 ? (
           <button
+            type="button"
             onClick={() => {
               setEditingPriceId(null)
               setEditingPriceData(null)
@@ -723,11 +723,11 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
               setIsModalOpen(true)
             }}
             style={{
-              padding: '0.75rem 1.5rem',
-              background: '#0070f3',
-              color: 'white',
+              padding: '0.25rem 0',
+              background: 'none',
+              color: '#111827',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: 0,
               cursor: 'pointer',
               fontSize: '1rem',
               fontWeight: 500,
