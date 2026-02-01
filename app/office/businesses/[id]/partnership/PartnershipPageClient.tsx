@@ -667,104 +667,252 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-        <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'underline' }}>
-          Назад
-        </Link>
-        <Link
-          href={`/office/businesses/${businessId}/requests`}
-          style={{
-            padding: '0.5rem 1rem',
-            background: '#f3f4f6',
-            color: '#111827',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-          }}
-        >
-          Создать заявку
-        </Link>
-      </div>
-
-      <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Партнёрство</h1>
-      <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-        Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
-      </p>
-
-      {/* Кнопки: сравнение (сводная таблица), создать / скачать / добавить прайс */}
-      <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-        <Link
-          href={`/office/businesses/${businessId}/prices/compare`}
-          style={{
-            padding: '0.25rem 0',
-            background: 'none',
-            color: '#111827',
-            border: 'none',
-            fontSize: '1rem',
-            fontWeight: 500,
-            textDecoration: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-          }}
-        >
-          Сводная таблица прайсов
-        </Link>
-        {prices.length === 0 ? (
-          <button
-            type="button"
-            onClick={() => {
-              setEditingPriceId(null)
-              setEditingPriceData(null)
-              setIsViewOnlyMode(false)
-              setIsModalOpen(true)
-            }}
+      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Левая колонка: заголовок, описание, ссылки, заголовки секций, аккордеоны */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: '200px', flex: '0 0 auto' }}>
+          <h1 style={{ marginBottom: '0.25rem', fontSize: '2rem' }}>Партнёрство</h1>
+          <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '0.25rem' }}>
+            Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
+          </p>
+          <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'underline' }}>
+            Назад
+          </Link>
+          <Link
+            href={`/office/businesses/${businessId}/requests`}
             style={{
               padding: '0.25rem 0',
               background: 'none',
               color: '#111827',
               border: 'none',
-              borderRadius: 0,
-              cursor: 'pointer',
               fontSize: '1rem',
               fontWeight: 500,
+              textDecoration: 'none',
             }}
           >
-            Создать прайс
-          </button>
-        ) : (
-          <>
+            Создать заявку
+          </Link>
+          <Link
+            href={`/office/businesses/${businessId}/prices/compare`}
+            style={{
+              padding: '0.25rem 0',
+              background: 'none',
+              color: '#111827',
+              border: 'none',
+              fontSize: '1rem',
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            Сводная таблица прайсов
+          </Link>
+          {prices.length === 0 ? (
             <button
+              type="button"
+              onClick={() => {
+                setEditingPriceId(null)
+                setEditingPriceData(null)
+                setIsViewOnlyMode(false)
+                setIsModalOpen(true)
+              }}
+              style={{
+                padding: '0.25rem 0',
+                background: 'none',
+                color: '#111827',
+                border: 'none',
+                borderRadius: 0,
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 500,
+                textAlign: 'left',
+              }}
+            >
+              Создать прайс
+            </button>
+          ) : (
+            <button
+              type="button"
               onClick={() => {
                 setEditingPriceId(null)
                 setEditingPriceData(null)
                 setIsModalOpen(true)
               }}
               style={{
-                padding: '0.75rem 1.5rem',
-                background: '#0070f3',
-                color: 'white',
+                padding: '0.25rem 0',
+                background: 'none',
+                color: '#111827',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: 0,
                 cursor: 'pointer',
                 fontSize: '1rem',
                 fontWeight: 500,
+                textAlign: 'left',
               }}
             >
               Добавить прайс
             </button>
-          </>
-        )}
-      </div>
+          )}
+          <h2 style={{ fontSize: '1.25rem', marginTop: '0.5rem', marginBottom: '0.25rem' }}>Назначенные вам прайсы</h2>
 
-      {/* Блок "Назначенные вам прайсы" */}
-      {assignedPrices.length > 0 && (
-        <div style={{ marginBottom: '2rem' }}>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Назначенные вам прайсы</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Действующие контрагенты */}
+          <div style={{ marginTop: '0.5rem', width: '100%' }}>
+            <button
+              onClick={() => {
+                const next = !activeCounterpartiesExpanded
+                setActiveCounterpartiesExpanded(next)
+                if (next) loadPartnershipData()
+              }}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '1.125rem',
+                fontWeight: 500,
+              }}
+            >
+              <span>Действующие контрагенты</span>
+              <span>{activeCounterpartiesExpanded ? '▼' : '▶'}</span>
+            </button>
+            {activeCounterpartiesExpanded && (
+              <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+                {loadingPartnership ? (
+                  <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+                ) : activeCounterparties.length === 0 ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет действующих контрагентов</div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeCounterparties.map((counterparty, index) => (
+                        <tr key={counterparty.partnerBusinessId}>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Запросы на подключение контрагентов */}
+          <div style={{ marginTop: '0.5rem', width: '100%' }}>
+            <button
+              onClick={() => {
+                const next = !incomingRequestsExpanded
+                setIncomingRequestsExpanded(next)
+                if (next) loadPartnershipData()
+              }}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                background: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '1.125rem',
+                fontWeight: 500,
+              }}
+            >
+              <span>Запросы на подключение контрагентов</span>
+              <span>{incomingRequestsExpanded ? '▼' : '▶'}</span>
+            </button>
+            {incomingRequestsExpanded && (
+              <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+                {loadingPartnership ? (
+                  <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+                ) : incomingRequests.length === 0 ? (
+                  <>
+                    <div style={{ padding: '1rem 2rem 0', fontSize: '0.8125rem', color: '#6b7280' }}>
+                      Сюда попадают заявки, когда кто-то назначил ваш бизнес контрагентом в своём прайсе (по вашему ИНР).
+                    </div>
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+                  </>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb' }}>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {incomingRequests.map((request, index) => (
+                        <tr key={request.linkId}>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                            {new Date(request.createdAt).toLocaleDateString('ru-RU')}
+                          </td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRequestAction(request.linkId, 'accept')
+                              }}
+                              style={{
+                                padding: '0.35rem 0.75rem',
+                                marginRight: '0.5rem',
+                                background: '#059669',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.8125rem',
+                              }}
+                            >
+                              Принять
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRequestAction(request.linkId, 'decline')
+                              }}
+                              style={{
+                                padding: '0.35rem 0.75rem',
+                                background: '#f3f4f6',
+                                color: '#111827',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.8125rem',
+                              }}
+                            >
+                              Отклонить
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Правая колонка: карточки назначенных прайсов и свои прайсы */}
+        <div style={{ flex: '1', minWidth: '280px', display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }}>
+          {assignedPrices.length > 0 && (
+            <>
             {assignedPrices.map((assigned) => (
               <div
                 key={assigned.id}
@@ -875,159 +1023,8 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Действующие контрагенты */}
-      <div style={{ marginBottom: '2rem' }}>
-        <button
-          onClick={() => {
-            const next = !activeCounterpartiesExpanded
-            setActiveCounterpartiesExpanded(next)
-            if (next) loadPartnershipData()
-          }}
-          style={{
-            width: '100%',
-            padding: '1rem',
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '1.125rem',
-            fontWeight: 500,
-          }}
-        >
-          <span>Действующие контрагенты</span>
-          <span>{activeCounterpartiesExpanded ? '▼' : '▶'}</span>
-        </button>
-        {activeCounterpartiesExpanded && (
-          <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
-            {loadingPartnership ? (
-              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
-            ) : activeCounterparties.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет действующих контрагентов</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeCounterparties.map((counterparty, index) => (
-                    <tr key={counterparty.partnerBusinessId}>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Запросы на подключение контрагентов */}
-      <div style={{ marginBottom: '2rem' }}>
-        <button
-          onClick={() => {
-            const next = !incomingRequestsExpanded
-            setIncomingRequestsExpanded(next)
-            if (next) loadPartnershipData() // Перезагружаем при раскрытии, чтобы видеть новые заявки
-          }}
-          style={{
-            width: '100%',
-            padding: '1rem',
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '1.125rem',
-            fontWeight: 500,
-          }}
-        >
-          <span>Запросы на подключение контрагентов</span>
-          <span>{incomingRequestsExpanded ? '▼' : '▶'}</span>
-        </button>
-        {incomingRequestsExpanded && (
-          <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
-            {loadingPartnership ? (
-              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
-            ) : incomingRequests.length === 0 ? (
-              <>
-                <div style={{ padding: '1rem 2rem 0', fontSize: '0.8125rem', color: '#6b7280' }}>
-                  Сюда попадают заявки, когда кто-то назначил ваш бизнес контрагентом в своём прайсе (по вашему ИНР).
-                </div>
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
-              </>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incomingRequests.map((request, index) => (
-                    <tr key={request.linkId}>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                        {new Date(request.createdAt).toLocaleDateString('ru-RU')}
-                      </td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => handleRequestAction(request.linkId, 'accept')}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#059669',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                            }}
-                          >
-                            Принять
-                          </button>
-                          <button
-                            onClick={() => handleRequestAction(request.linkId, 'decline')}
-                            style={{
-                              padding: '0.5rem 1rem',
-                              background: '#dc2626',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.875rem',
-                            }}
-                          >
-                            Отклонить
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Список прайсов */}
+            </>
+          )}
       <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
         {prices.map((price) => (
           <div key={price.id} style={{ position: 'relative' }}>
@@ -1233,6 +1230,8 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             )}
           </div>
         ))}
+      </div>
+        </div>
       </div>
 
       <PriceUploadModal
