@@ -93,6 +93,8 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [incomingLoading, setIncomingLoading] = useState(false)
   const [selectedIncomingId, setSelectedIncomingId] = useState<string | null>(null)
   const [sendStatus, setSendStatus] = useState<{ ok: boolean; message: string } | null>(null)
+  const [sendingCounterpartyId, setSendingCounterpartyId] = useState<string | null>(null)
+  const [sendingAll, setSendingAll] = useState(false)
   const [viewSection, setViewSection] = useState<'create' | 'incoming'>('create')
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
@@ -285,6 +287,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       price: r.price,
       sum: r.sum,
     }))
+    setSendingCounterpartyId(counterpartyId)
     try {
       const res = await fetch(`/api/office/businesses/${businessId}/requests/send`, {
         method: 'POST',
@@ -305,6 +308,57 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       setSendStatus({ ok: true, message: `Заявка отправлена ${c?.legalName || 'контрагенту'}` })
     } catch (e: any) {
       setSendStatus({ ok: false, message: e.message || 'Ошибка отправки' })
+    } finally {
+      setSendingCounterpartyId(null)
+    }
+  }
+
+  const handleSendAllRequests = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!summaryData || !createdRequest || sendingCounterpartyId != null || sendingAll) return
+    setMenuOpenCardId(null)
+    setSendStatus(null)
+    setSendingAll(true)
+    let sent = 0
+    let errMsg: string | null = null
+    try {
+      for (const c of createdRequest.counterpartyCards) {
+        const rows = getRowsForCounterparty(c.id)
+        if (rows.length === 0) continue
+        const total = rows.reduce((a, r) => a + r.sum, 0)
+        const items = rows.map((r) => ({
+          name: r.item.name,
+          quantity: r.item.quantity || '',
+          unit: r.item.unit || '',
+          price: r.price,
+          sum: r.sum,
+        }))
+        try {
+          const res = await fetch(`/api/office/businesses/${businessId}/requests/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              recipientBusinessId: c.id,
+              category: createdRequest.category,
+              total,
+              items,
+            }),
+          })
+          if (res.ok) sent++
+          else {
+            const data = await res.json().catch(() => ({}))
+            errMsg = data.error || 'Ошибка отправки'
+          }
+        } catch (_) {
+          errMsg = 'Ошибка отправки'
+        }
+      }
+      if (errMsg && sent === 0) setSendStatus({ ok: false, message: errMsg })
+      else if (sent > 0) setSendStatus({ ok: true, message: `Отправлено заявок: ${sent}${errMsg ? `. Ошибки: ${errMsg}` : ''}` })
+    } finally {
+      setSendingAll(false)
     }
   }
 
@@ -836,7 +890,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                             <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                             <button type="button" onClick={downloadSummaryAsExcel} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
                             <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
-                            <button type="button" onClick={() => { setMenuOpenCardId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#6b7280' }}>Отправить (сводная)</button>
+                            <button type="button" onClick={handleSendAllRequests} disabled={sendingAll || sendingCounterpartyId != null} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: sendingAll ? 'wait' : 'pointer', fontSize: '0.875rem', color: sendingAll ? '#9ca3af' : '#6b7280' }}>{sendingAll ? 'Отправка...' : 'Отправить (сводная)'}</button>
                             <button type="button" onClick={handleDeleteCreated} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                           </div>
                           )}
@@ -867,7 +921,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                             <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                               <button type="button" onClick={() => downloadCounterpartyAsExcel(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
                               <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
-                              <button type="button" onClick={() => handleSendRequest(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
+                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSendRequest(c.id) }} disabled={sendingCounterpartyId != null || sendingAll} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: sendingCounterpartyId != null || sendingAll ? 'wait' : 'pointer', fontSize: '0.875rem', opacity: sendingCounterpartyId != null || sendingAll ? 0.7 : 1 }}>{sendingCounterpartyId === c.id ? 'Отправка...' : 'Отправить'}</button>
                               <button type="button" onClick={() => handleDeleteCounterpartyCard(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                             </div>
                           )}
