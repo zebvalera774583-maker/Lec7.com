@@ -672,21 +672,6 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                         </div>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() => { setViewMode('summary'); setSelectedCounterpartyId(null) }}
-                      style={{
-                        padding: '0.5rem 0',
-                        background: 'none',
-                        border: 'none',
-                        color: '#6b7280',
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                        alignSelf: 'flex-start',
-                      }}
-                    >
-                      Назад к сводной таблице
-                    </button>
                   </div>
                 ) : summaryData ? (() => {
                   const sumByCounterparty: Record<string, number> = {}
