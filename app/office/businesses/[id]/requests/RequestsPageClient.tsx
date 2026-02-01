@@ -330,10 +330,19 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                   if (!c) return null
                   const rowsForCounterparty = summaryData.items
                     .map((item, idx) => {
+                      const itemKey = String(idx)
+                      let rowMin: number | null = null
+                      summaryData.counterparties.forEach((cc) => {
+                        const exact = item.offers[cc.id]
+                        const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
+                        const p = exact ?? applied ?? null
+                        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+                      })
                       const exact = item.offers[c.id]
-                      const applied = appliedAnalogue[String(idx)]?.[c.id]?.price
+                      const applied = appliedAnalogue[itemKey]?.[c.id]?.price
                       const price = exact ?? applied ?? null
-                      if (price == null || !Number.isFinite(price)) return null
+                      const isMin = price != null && rowMin != null && Number.isFinite(price) && Math.abs(price - rowMin) < 1e-6
+                      if (!isMin) return null
                       const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
                       return { item, price, qty, sum: price * qty }
                     })
