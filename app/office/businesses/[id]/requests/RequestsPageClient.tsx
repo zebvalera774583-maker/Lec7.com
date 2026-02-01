@@ -30,13 +30,24 @@ const REQUEST_COLUMNS = [
   { id: 'unit', title: 'Ед. изм.', kind: 'text' as const },
 ]
 
+const DEFAULT_CATEGORY = 'Свежая плодоовощная продукция'
+
 function formatPrice(value: number): string {
   return value.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
+function formatRequestDate(d: Date): string {
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 export default function RequestsPageClient({ businessId }: RequestsPageClientProps) {
   const [showCreateBlock, setShowCreateBlock] = useState(false)
-  const [viewMode, setViewMode] = useState<'form' | 'summary'>('form')
+  const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created'>('form')
+  const [createdRequest, setCreatedRequest] = useState<{
+    category: string
+    createdAt: Date
+    counterpartyCards: { id: string; legalName: string }[]
+  } | null>(null)
   const [rows, setRows] = useState<Row[]>([{}])
   const [summaryData, setSummaryData] = useState<{ items: SummaryItem[]; counterparties: Counterparty[] } | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -93,6 +104,25 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
     } finally {
       setSummaryLoading(false)
     }
+  }
+
+  const handleCreateRequest = () => {
+    if (!summaryData) return
+    const selected = summaryData.counterparties.filter((c) => useForRequest[c.id])
+    const withAtLeastOnePosition = selected.filter((c) => {
+      const hasOffer = summaryData.items.some((item, idx) => {
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[String(idx)]?.[c.id]?.price
+        return exact != null || applied != null
+      })
+      return hasOffer
+    })
+    setCreatedRequest({
+      category: DEFAULT_CATEGORY,
+      createdAt: new Date(),
+      counterpartyCards: withAtLeastOnePosition.map((c) => ({ id: c.id, legalName: c.legalName })),
+    })
+    setViewMode('created')
   }
 
   useEffect(() => {
@@ -240,24 +270,95 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               <>
                 <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('form')}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'none',
-                      color: '#111827',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                    }}
-                  >
-                    Назад к заявке
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleCreateRequest}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#0070f3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Создать заявку
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('form')}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'none',
+                        color: '#111827',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Назад к заявке
+                    </button>
+                  </div>
                 </div>
-                {summaryData && (() => {
+                {viewMode === 'created' && createdRequest ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div
+                      style={{
+                        padding: '1rem 1.25rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        background: '#f9fafb',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      }}
+                    >
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem' }}>
+                        Сводная таблица
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
+                        {createdRequest.category}. {formatRequestDate(createdRequest.createdAt)}
+                      </div>
+                    </div>
+                    {createdRequest.counterpartyCards.map((c) => (
+                      <div
+                        key={c.id}
+                        style={{
+                          padding: '1rem 1.25rem',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          background: 'white',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        }}
+                      >
+                        <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem' }}>
+                          Заявка на {c.legalName}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
+                          {createdRequest.category}. {formatRequestDate(createdRequest.createdAt)}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('summary')}
+                      style={{
+                        padding: '0.5rem 0',
+                        background: 'none',
+                        border: 'none',
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      Назад к сводной таблице
+                    </button>
+                  </div>
+                ) : summaryData ? (() => {
                   const sumByCounterparty: Record<string, number> = {}
                   summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
                   summaryData.items.forEach((item, idx) => {
@@ -434,7 +535,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                     </table>
                   </div>
                   )
-                })()}
+                })() : null}
               </>
             )}
           </div>
