@@ -239,7 +239,25 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                     Назад к заявке
                   </button>
                 </div>
-                {summaryData && (
+                {summaryData && (() => {
+                  const sumByCounterparty: Record<string, number> = {}
+                  let totalMinSum = 0
+                  summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
+                  summaryData.items.forEach((item, idx) => {
+                    const itemKey = String(idx)
+                    let rowMin: number | null = null
+                    summaryData.counterparties.forEach((c) => {
+                      const exact = item.offers[c.id]
+                      const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+                      const p = exact ?? applied ?? null
+                      if (p != null) {
+                        sumByCounterparty[c.id] += p
+                        if (rowMin == null || p < rowMin) rowMin = p
+                      }
+                    })
+                    if (rowMin != null) totalMinSum += rowMin
+                  })
+                  return (
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                       <thead>
@@ -251,6 +269,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                           {summaryData.counterparties.map((c) => (
                             <th key={c.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>{c.legalName}</th>
                           ))}
+                          <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>Итоговая сумма</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -328,13 +347,30 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                                   </td>
                                 )
                               })}
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: minPrice != null ? 600 : 400 }}>
+                                {minPrice != null ? formatPrice(minPrice) : '—'}
+                              </td>
                             </tr>
                           )
                         })}
                       </tbody>
+                      <tfoot>
+                        <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                          {summaryData.counterparties.map((c) => (
+                            <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                              {sumByCounterparty[c.id] > 0 ? formatPrice(sumByCounterparty[c.id]) : '—'}
+                            </td>
+                          ))}
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                            {totalMinSum > 0 ? formatPrice(totalMinSum) : '—'}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
-                )}
+                  )
+                })()}
               </>
             )}
           </div>
