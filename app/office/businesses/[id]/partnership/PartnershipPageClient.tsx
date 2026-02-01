@@ -667,9 +667,27 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'underline' }}>
-          ← Назад к бизнесу
+          ← Назад
+        </Link>
+        <Link
+          href={`/office/businesses/${businessId}/requests`}
+          style={{
+            padding: '0.5rem 1rem',
+            background: '#f3f4f6',
+            color: '#111827',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+          }}
+        >
+          Создать заявку →
         </Link>
       </div>
 
