@@ -32,6 +32,16 @@ const REQUEST_COLUMNS = [
 
 const DEFAULT_CATEGORY = 'Свежая плодоовощная продукция'
 
+const REQUEST_CARD_STYLE: { maxWidth: string; padding: string; border: string; borderRadius: string; boxShadow: string; cursor: string; textAlign: 'left' } = {
+  maxWidth: '22em',
+  padding: '1rem 1.25rem',
+  border: '1px solid #e5e7eb',
+  borderRadius: '8px',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+  cursor: 'pointer',
+  textAlign: 'left',
+}
+
 function formatPrice(value: number): string {
   return value.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
@@ -113,7 +123,8 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       const hasOffer = summaryData.items.some((item, idx) => {
         const exact = item.offers[c.id]
         const applied = appliedAnalogue[String(idx)]?.[c.id]?.price
-        return exact != null || applied != null
+        const price = exact ?? applied ?? null
+        return typeof price === 'number' && Number.isFinite(price) && price > 0
       })
       return hasOffer
     })
@@ -307,40 +318,38 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                 </div>
                 {viewMode === 'created' && createdRequest ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div
-                      style={{
-                        padding: '1rem 1.25rem',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        background: '#f9fafb',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                      }}
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('summary')}
+                      style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%' }}
                     >
-                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
                         Сводная таблица
                       </div>
-                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
-                        {createdRequest.category}. {formatRequestDate(createdRequest.createdAt)}
+                      <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>
+                        {createdRequest.category}
                       </div>
-                    </div>
+                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
+                        {formatRequestDate(createdRequest.createdAt)}
+                      </div>
+                    </button>
                     {createdRequest.counterpartyCards.map((c) => (
-                      <div
+                      <button
                         key={c.id}
-                        style={{
-                          padding: '1rem 1.25rem',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px',
-                          background: 'white',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                        }}
+                        type="button"
+                        onClick={() => setViewMode('summary')}
+                        style={{ ...REQUEST_CARD_STYLE, background: 'white', width: '100%' }}
                       >
-                        <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.25rem' }}>
-                          Заявка на {c.legalName}
+                        <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
+                          Заявка {c.legalName}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>
+                          {createdRequest.category}
                         </div>
                         <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
-                          {createdRequest.category}. {formatRequestDate(createdRequest.createdAt)}
+                          {formatRequestDate(createdRequest.createdAt)}
                         </div>
-                      </div>
+                      </button>
                     ))}
                     <button
                       type="button"
