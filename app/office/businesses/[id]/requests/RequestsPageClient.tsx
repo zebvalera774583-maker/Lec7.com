@@ -16,9 +16,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
     fetch('/api/categories?type=PRICE', { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : []))
       .then((list: { id: string; name: string }[]) => {
-        const arr = Array.isArray(list) ? list : []
-        setCategories(arr)
-        if (arr.length > 0 && !selectedCategory) setSelectedCategory(arr[0].name)
+        setCategories(Array.isArray(list) ? list : [])
       })
       .catch(() => {})
   }, [])
@@ -34,54 +32,52 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
         Назад
       </Link>
 
-      {showCreateBlock && (
-        <div style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
-          <p style={{ marginBottom: '0.5rem', color: '#374151', fontSize: '1rem' }}>
-            Выберите категорию, в которой хотите сделать заявку
-          </p>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            style={{
-              padding: '0.5rem 0.75rem',
-              fontSize: '1rem',
-              minWidth: '280px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              background: 'white',
-            }}
-          >
-            {categories.length === 0 ? (
-              <option value="">Загрузка...</option>
-            ) : (
-              categories.map((c) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setShowCreateBlock(!showCreateBlock)}
+          style={{
+            padding: '0.25rem 0',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: 500,
+            color: '#111827',
+            textAlign: 'left',
+            display: 'inline-block',
+            width: 'fit-content',
+          }}
+        >
+          Создать заявку
+        </button>
+        {showCreateBlock && (
+          <div>
+            <p style={{ marginBottom: '0.35rem', color: '#374151', fontSize: '0.9375rem' }}>
+              Выберите категорию, в которой хотите сделать заявку
+            </p>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              style={{
+                padding: '0.5rem 0.75rem',
+                fontSize: '1rem',
+                minWidth: '280px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                background: 'white',
+              }}
+            >
+              <option value="">Выберите категорию</option>
+              {categories.map((c) => (
                 <option key={c.id} value={c.name}>
                   {c.name}
                 </option>
-              ))
-            )}
-          </select>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setShowCreateBlock(!showCreateBlock)}
-        style={{
-          padding: '0.25rem 0',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '1rem',
-          fontWeight: 500,
-          color: '#111827',
-          textAlign: 'left',
-          display: 'inline-block',
-          width: 'fit-content',
-        }}
-      >
-        Создать заявку
-      </button>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
         Поступившие заявки
