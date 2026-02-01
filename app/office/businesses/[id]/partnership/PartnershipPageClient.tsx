@@ -674,34 +674,18 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '0.25rem' }}>
             Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
           </p>
-          <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'none' }}>
+          <Link href={`/office/businesses/${businessId}`} style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}>
             Назад
           </Link>
           <Link
             href={`/office/businesses/${businessId}/requests`}
-            style={{
-              padding: '0.25rem 0',
-              background: 'none',
-              color: '#111827',
-              border: 'none',
-              fontSize: '1rem',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
+            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
           >
             Создать заявку
           </Link>
           <Link
             href={`/office/businesses/${businessId}/prices/compare`}
-            style={{
-              padding: '0.25rem 0',
-              background: 'none',
-              color: '#111827',
-              border: 'none',
-              fontSize: '1rem',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
+            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
           >
             Сводная таблица прайсов
           </Link>
@@ -714,17 +698,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 setIsViewOnlyMode(false)
                 setIsModalOpen(true)
               }}
-              style={{
-                padding: '0.25rem 0',
-                background: 'none',
-                color: '#111827',
-                border: 'none',
-                borderRadius: 0,
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 500,
-                textAlign: 'left',
-              }}
+              style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left' }}
             >
               Создать прайс
             </button>
@@ -736,41 +710,23 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 setEditingPriceData(null)
                 setIsModalOpen(true)
               }}
-              style={{
-                padding: '0.25rem 0',
-                background: 'none',
-                color: '#111827',
-                border: 'none',
-                borderRadius: 0,
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 500,
-                textAlign: 'left',
-              }}
+              style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left' }}
             >
               Добавить прайс
             </button>
           )}
 
           {/* Действующие контрагенты */}
-          <div style={{ marginTop: '0.5rem', width: '100%' }}>
+          <div style={{ width: '100%' }}>
             <button
               type="button"
               onClick={() => {
                 const next = !activeCounterpartiesExpanded
                 setActiveCounterpartiesExpanded(next)
+                setIncomingRequestsExpanded(false)
                 if (next) loadPartnershipData()
               }}
-              style={{
-                padding: '0.25rem 0',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 500,
-                color: '#111827',
-                textAlign: 'left',
-              }}
+              style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 500, color: '#111827', textAlign: 'left' }}
             >
               Действующие контрагенты
             </button>
@@ -803,24 +759,16 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           </div>
 
           {/* Запросы на подключение контрагентов */}
-          <div style={{ marginTop: '0.5rem', width: '100%' }}>
+          <div style={{ width: '100%' }}>
             <button
               type="button"
               onClick={() => {
                 const next = !incomingRequestsExpanded
                 setIncomingRequestsExpanded(next)
+                setActiveCounterpartiesExpanded(false)
                 if (next) loadPartnershipData()
               }}
-              style={{
-                padding: '0.25rem 0',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 500,
-                color: '#111827',
-                textAlign: 'left',
-              }}
+              style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 500, color: '#111827', textAlign: 'left' }}
             >
               Запросы на подключение контрагентов
             </button>
