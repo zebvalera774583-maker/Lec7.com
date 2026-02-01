@@ -23,6 +23,10 @@ export default function RequestsPage({ params }: RequestsPageProps) {
       <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
         Поступившие заявки
       </p>
+
+      <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
+        Архив заявок
+      </p>
     </main>
   )
 }
