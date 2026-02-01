@@ -557,22 +557,6 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <span style={{ fontSize: '1rem', fontWeight: 600, color: '#111827' }}>Заявка на {c.legalName}</span>
-                        <button
-                          type="button"
-                          onClick={() => { setViewMode('created'); setSelectedCounterpartyId(null) }}
-                          style={{
-                            padding: '0.5rem 1rem',
-                            background: 'none',
-                            color: '#111827',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                          }}
-                        >
-                          Назад к заявкам
-                        </button>
                       </div>
                       <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
