@@ -67,14 +67,18 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       },
     })
 
-    // По нормализованному названию — список предложений: { supplierBusinessId, supplierLegalName, price }
+    // Точные совпадения: norm -> список { supplierId, price }
     const normToOffers = new Map<string, { supplierBusinessId: string; supplierLegalName: string; price: number }[]>()
     const counterpartySet = new Map<string, string>()
+    // По контрагенту — список строк прайса: { name, norm, price } (для поиска аналогов)
+    const supplierRows = new Map<string, { name: string; norm: string; price: number }[]>()
+    const emptyRowList: { name: string; norm: string; price: number }[] = []
 
     for (const a of assignments) {
       const supplierId = a.priceList.business.id
       const supplierName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
       counterpartySet.set(supplierId, supplierName)
+      const rows: { name: string; norm: string; price: number }[] = []
 
       for (const row of a.priceList.rows) {
         const norm = normalizeName(row.name)
@@ -89,7 +93,9 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
         const list = normToOffers.get(norm) || []
         list.push({ supplierBusinessId: supplierId, supplierLegalName: supplierName, price })
         normToOffers.set(norm, list)
+        rows.push({ name: row.name, norm, price })
       }
+      supplierRows.set(supplierId, rows)
     }
 
     const counterparties = Array.from(counterpartySet.entries())
@@ -101,6 +107,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       quantity: string
       unit: string
       offers: Record<string, number>
+      analogues: Record<string, { name: string; price: number }[]>
     }[] = []
 
     for (const it of requestItems) {
@@ -110,11 +117,27 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       for (const o of offersList) {
         offers[o.supplierBusinessId] = o.price
       }
+      const analogues: Record<string, { name: string; price: number }[]> = {}
+      if (norm) {
+        for (const c of counterparties) {
+          if (offers[c.id] != null) continue
+          const rows = supplierRows.get(c.id) || emptyRowList
+          const list = rows.filter(
+            (r) =>
+              r.norm !== norm &&
+              (r.norm.includes(norm) || norm.includes(r.norm))
+          )
+          if (list.length > 0) {
+            analogues[c.id] = list.map((r) => ({ name: r.name, price: r.price }))
+          }
+        }
+      }
       resultItems.push({
         name: it.name,
         quantity: it.quantity,
         unit: it.unit,
         offers,
+        analogues,
       })
     }
 

@@ -16,6 +16,7 @@ interface SummaryItem {
   quantity: string
   unit: string
   offers: Record<string, number>
+  analogues?: Record<string, { name: string; price: number }[]>
 }
 
 interface Counterparty {
@@ -40,6 +41,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [summaryData, setSummaryData] = useState<{ items: SummaryItem[]; counterparties: Counterparty[] } | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [appliedAnalogue, setAppliedAnalogue] = useState<Record<string, Record<string, { name: string; price: number }>>>({})
   const lastRowRef = useRef<HTMLInputElement>(null)
 
   const handleAddRow = () => {
@@ -80,6 +82,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       }
       const data = await res.json()
       setSummaryData({ items: data.items, counterparties: data.counterparties || [] })
+      setAppliedAnalogue({})
       setViewMode('summary')
     } catch (e: any) {
       setSummaryError(e.message || 'Ошибка')
@@ -252,8 +255,13 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       </thead>
                       <tbody>
                         {summaryData.items.map((item, idx) => {
-                          const prices = summaryData.counterparties.map((c) => item.offers[c.id] ?? null).filter((p): p is number => p != null)
-                          const minPrice = prices.length > 0 ? Math.min(...prices) : null
+                          const itemKey = String(idx)
+                          const effectivePrices = summaryData.counterparties.map((c) => {
+                            const exact = item.offers[c.id]
+                            const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+                            return exact ?? applied ?? null
+                          }).filter((p): p is number => p != null)
+                          const minPrice = effectivePrices.length > 0 ? Math.min(...effectivePrices) : null
                           return (
                             <tr key={idx}>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
@@ -261,8 +269,12 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{item.quantity || '—'}</td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.unit || '—'}</td>
                               {summaryData.counterparties.map((c) => {
-                                const price = item.offers[c.id]
-                                const isMin = minPrice != null && price === minPrice
+                                const exactPrice = item.offers[c.id]
+                                const appliedVal = appliedAnalogue[itemKey]?.[c.id]
+                                const effectivePrice = exactPrice ?? appliedVal?.price ?? null
+                                const isMin = minPrice != null && effectivePrice === minPrice
+                                const analogues = item.analogues?.[c.id] || []
+                                const hasAnalogue = analogues.length > 0 && exactPrice == null && !appliedVal
                                 return (
                                   <td
                                     key={c.id}
@@ -272,9 +284,47 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                                       textAlign: 'right',
                                       backgroundColor: isMin ? '#dcfce7' : 'white',
                                       fontWeight: isMin ? 600 : 400,
+                                      verticalAlign: 'top',
                                     }}
                                   >
-                                    {price != null ? formatPrice(price) : '—'}
+                                    {effectivePrice != null ? (
+                                      formatPrice(effectivePrice)
+                                    ) : hasAnalogue ? (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-end' }}>
+                                        {analogues.slice(0, 3).map((a, i) => (
+                                          <div key={i} style={{ fontSize: '0.8125rem' }}>
+                                            <span style={{ color: '#4b5563' }}>{a.name}</span>
+                                            <span style={{ marginLeft: '0.35rem' }}>{formatPrice(a.price)}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setAppliedAnalogue((prev) => ({
+                                                  ...prev,
+                                                  [itemKey]: {
+                                                    ...(prev[itemKey] || {}),
+                                                    [c.id]: { name: a.name, price: a.price },
+                                                  },
+                                                }))
+                                              }}
+                                              style={{
+                                                marginLeft: '0.35rem',
+                                                padding: '0.2rem 0.5rem',
+                                                fontSize: '0.75rem',
+                                                background: '#e0f2fe',
+                                                color: '#0369a1',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                              }}
+                                            >
+                                              Применить аналог
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      '—'
+                                    )}
                                   </td>
                                 )
                               })}
