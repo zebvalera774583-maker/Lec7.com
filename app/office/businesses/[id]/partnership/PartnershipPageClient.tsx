@@ -674,7 +674,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '0.25rem' }}>
             Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
           </p>
-          <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'underline' }}>
+          <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'none' }}>
             Назад
           </Link>
           <Link
@@ -751,35 +751,31 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
               Добавить прайс
             </button>
           )}
-          <h2 style={{ fontSize: '1.25rem', marginTop: '0.5rem', marginBottom: '0.25rem' }}>Назначенные вам прайсы</h2>
 
           {/* Действующие контрагенты */}
           <div style={{ marginTop: '0.5rem', width: '100%' }}>
             <button
+              type="button"
               onClick={() => {
                 const next = !activeCounterpartiesExpanded
                 setActiveCounterpartiesExpanded(next)
                 if (next) loadPartnershipData()
               }}
               style={{
-                width: '100%',
-                padding: '1rem',
-                background: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
+                padding: '0.25rem 0',
+                background: 'none',
+                border: 'none',
                 cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '1.125rem',
+                fontSize: '1rem',
                 fontWeight: 500,
+                color: '#111827',
+                textAlign: 'left',
               }}
             >
-              <span>Действующие контрагенты</span>
-              <span>{activeCounterpartiesExpanded ? '▼' : '▶'}</span>
+              Действующие контрагенты
             </button>
             {activeCounterpartiesExpanded && (
-              <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>
                 {loadingPartnership ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : activeCounterparties.length === 0 ? (
@@ -809,30 +805,27 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           {/* Запросы на подключение контрагентов */}
           <div style={{ marginTop: '0.5rem', width: '100%' }}>
             <button
+              type="button"
               onClick={() => {
                 const next = !incomingRequestsExpanded
                 setIncomingRequestsExpanded(next)
                 if (next) loadPartnershipData()
               }}
               style={{
-                width: '100%',
-                padding: '1rem',
-                background: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
+                padding: '0.25rem 0',
+                background: 'none',
+                border: 'none',
                 cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '1.125rem',
+                fontSize: '1rem',
                 fontWeight: 500,
+                color: '#111827',
+                textAlign: 'left',
               }}
             >
-              <span>Запросы на подключение контрагентов</span>
-              <span>{incomingRequestsExpanded ? '▼' : '▶'}</span>
+              Запросы на подключение контрагентов
             </button>
             {incomingRequestsExpanded && (
-              <div style={{ marginTop: '0.5rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>
                 {loadingPartnership ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : incomingRequests.length === 0 ? (
