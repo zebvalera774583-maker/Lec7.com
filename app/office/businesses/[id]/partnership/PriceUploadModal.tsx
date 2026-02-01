@@ -30,7 +30,7 @@ const BASE_COLUMNS: Column[] = [
   { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number', isBase: true },
 ]
 
-const PRICE_CATEGORIES = ['Свежая плодоовощная продукция'] as const
+const FALLBACK_CATEGORY = 'Свежая плодоовощная продукция'
 
 export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, initialCategory, readOnly = false }: PriceUploadModalProps) {
   const [columns, setColumns] = useState<Column[]>(initialColumns || BASE_COLUMNS)
@@ -40,7 +40,20 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
   const [newColumnKind, setNewColumnKind] = useState<'text' | 'number'>('text')
   const lastRowFirstInputRef = useRef<HTMLInputElement | null>(null)
   const [focusNewRow, setFocusNewRow] = useState(false)
-  const [category, setCategory] = useState<string>(PRICE_CATEGORIES[0])
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [category, setCategory] = useState<string>(FALLBACK_CATEGORY)
+
+  useEffect(() => {
+    fetch('/api/categories?type=PRICE', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: { id: string; name: string }[]) => {
+        setCategories(Array.isArray(list) ? list : [])
+        if (Array.isArray(list) && list.length > 0 && category === FALLBACK_CATEGORY) {
+          setCategory(list[0].name)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handleAddRow = () => {
     setRows([...rows, {}])
@@ -115,9 +128,9 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
       } else {
         setRows([{}])
       }
-      setCategory(initialCategory?.trim() || PRICE_CATEGORIES[0])
+      setCategory(initialCategory?.trim() || (categories.length > 0 ? categories[0].name : FALLBACK_CATEGORY))
     }
-  }, [isOpen, initialRows, initialColumns, initialCategory])
+  }, [isOpen, initialRows, initialColumns, initialCategory, categories.length])
 
   if (!isOpen) return null
 
@@ -224,9 +237,9 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                   cursor: readOnly ? 'default' : 'pointer',
                 }}
               >
-                {PRICE_CATEGORIES.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
+                {(categories.length > 0 ? categories : [{ id: '', name: FALLBACK_CATEGORY }]).map((c) => (
+                  <option key={c.id || c.name} value={c.name}>
+                    {c.name}
                   </option>
                 ))}
               </select>

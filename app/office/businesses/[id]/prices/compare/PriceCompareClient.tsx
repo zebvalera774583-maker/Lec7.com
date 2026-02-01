@@ -30,7 +30,7 @@ interface ComparisonData {
   rows: Row[]
 }
 
-const PRICE_CATEGORIES = ['Свежая плодоовощная продукция'] as const
+const FALLBACK_CATEGORY = 'Свежая плодоовощная продукция'
 
 interface PriceCompareClientProps {
   businessId: string
@@ -77,9 +77,23 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
   const [data, setData] = useState<ComparisonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<string>(PRICE_CATEGORIES[0])
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>(FALLBACK_CATEGORY)
   const [onlyWith2Offers, setOnlyWith2Offers] = useState(false)
   const [hideEmptySuppliers, setHideEmptySuppliers] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/categories?type=PRICE', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: { id: string; name: string }[]) => {
+        const arr = Array.isArray(list) ? list : []
+        setCategories(arr)
+        if (arr.length > 0 && selectedCategory === FALLBACK_CATEGORY) {
+          setSelectedCategory(arr[0].name)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -186,9 +200,9 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
               cursor: 'pointer',
             }}
           >
-            {PRICE_CATEGORIES.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+            {(categories.length > 0 ? categories : [{ id: '', name: FALLBACK_CATEGORY }]).map((c) => (
+              <option key={c.id || c.name} value={c.name}>
+                {c.name}
               </option>
             ))}
           </select>
