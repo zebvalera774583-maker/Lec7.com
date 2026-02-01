@@ -15,7 +15,6 @@ const REQUEST_COLUMNS = [
   { id: 'name', title: 'Наименование', kind: 'text' as const },
   { id: 'quantity', title: 'Количество', kind: 'number' as const },
   { id: 'unit', title: 'Ед. изм.', kind: 'text' as const },
-  { id: 'note', title: 'Примечание', kind: 'text' as const },
 ]
 
 export default function RequestsPageClient({ businessId }: RequestsPageClientProps) {
