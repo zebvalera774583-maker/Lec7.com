@@ -5,6 +5,15 @@ import { Decimal } from '@prisma/client/runtime/library'
 
 const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
 
+interface SendRequestItem {
+  name: string
+  quantity: string
+  unit: string
+  price: number
+  sum: number
+  sortOrder: number
+}
+
 export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
   try {
     const url = new URL(req.url)
@@ -46,16 +55,15 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Recipient business not found' }, { status: 404 })
     }
 
-    const requestItems = items
-      .map((it: any, idx: number) => ({
-        name: typeof it.name === 'string' ? it.name.trim() : '',
-        quantity: typeof it.quantity === 'string' ? it.quantity : String(it.quantity ?? ''),
-        unit: typeof it.unit === 'string' ? it.unit.trim() : '',
-        price: typeof it.price === 'number' && Number.isFinite(it.price) ? it.price : (it.price != null ? Number(it.price) : 0),
-        sum: typeof it.sum === 'number' && Number.isFinite(it.sum) ? it.sum : (it.sum != null ? Number(it.sum) : 0),
-        sortOrder: idx,
-      }))
-      .filter((it) => it.name.length > 0)
+    const mapped: SendRequestItem[] = items.map((it: { name?: unknown; quantity?: unknown; unit?: unknown; price?: unknown; sum?: unknown }, idx: number) => ({
+      name: typeof it.name === 'string' ? it.name.trim() : '',
+      quantity: typeof it.quantity === 'string' ? it.quantity : String(it.quantity ?? ''),
+      unit: typeof it.unit === 'string' ? it.unit.trim() : '',
+      price: typeof it.price === 'number' && Number.isFinite(it.price) ? it.price : (it.price != null ? Number(it.price) : 0),
+      sum: typeof it.sum === 'number' && Number.isFinite(it.sum) ? it.sum : (it.sum != null ? Number(it.sum) : 0),
+      sortOrder: idx,
+    }))
+    const requestItems = mapped.filter((it: SendRequestItem) => it.name.length > 0)
 
     const incomingRequest = await prisma.incomingRequest.create({
       data: {
