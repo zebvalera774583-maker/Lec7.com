@@ -674,18 +674,18 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
           <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '0.25rem' }}>
             Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
           </p>
-          <Link href={`/office/businesses/${businessId}`} style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}>
+          <Link href={`/office/businesses/${businessId}`} style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}>
             Назад
           </Link>
           <Link
             href={`/office/businesses/${businessId}/requests`}
-            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
+            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}
           >
             Создать заявку
           </Link>
           <Link
             href={`/office/businesses/${businessId}/prices/compare`}
-            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
+            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}
           >
             Сводная таблица прайсов
           </Link>
@@ -698,7 +698,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 setIsViewOnlyMode(false)
                 setIsModalOpen(true)
               }}
-              style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left' }}
+              style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
             >
               Создать прайс
             </button>
@@ -710,7 +710,7 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 setEditingPriceData(null)
                 setIsModalOpen(true)
               }}
-              style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left' }}
+              style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
             >
               Добавить прайс
             </button>
@@ -726,12 +726,22 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 setIncomingRequestsExpanded(false)
                 if (next) loadPartnershipData()
               }}
-              style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 500, color: '#111827', textAlign: 'left' }}
+              style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 500, color: '#111827', textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
             >
               Действующие контрагенты
             </button>
             {activeCounterpartiesExpanded && (
               <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.25rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCounterpartiesExpanded(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280', padding: '0.25rem' }}
+                    title="Закрыть"
+                  >
+                    ×
+                  </button>
+                </div>
                 {loadingPartnership ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : activeCounterparties.length === 0 ? (
@@ -768,12 +778,22 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
                 setActiveCounterpartiesExpanded(false)
                 if (next) loadPartnershipData()
               }}
-              style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 500, color: '#111827', textAlign: 'left' }}
+              style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 500, color: '#111827', textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
             >
               Запросы на подключение контрагентов
             </button>
             {incomingRequestsExpanded && (
               <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.25rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIncomingRequestsExpanded(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280', padding: '0.25rem' }}
+                    title="Закрыть"
+                  >
+                    ×
+                  </button>
+                </div>
                 {loadingPartnership ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : incomingRequests.length === 0 ? (
