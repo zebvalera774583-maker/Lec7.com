@@ -267,8 +267,19 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       }
                     })
                   })
-                  const totals = summaryData.counterparties.map((c) => sumByCounterparty[c.id]).filter((t) => t > 0)
-                  const totalMinSum = totals.length > 0 ? Math.min(...totals) : 0
+                  const rowTotals = summaryData.items.map((item, idx) => {
+                    const itemKey = String(idx)
+                    const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                    let rowMin: number | null = null
+                    summaryData.counterparties.forEach((c) => {
+                      const exact = item.offers[c.id]
+                      const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+                      const p = exact ?? applied ?? null
+                      if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+                    })
+                    return rowMin != null ? rowMin * qty : 0
+                  })
+                  const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
                   return (
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
@@ -287,12 +298,14 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       <tbody>
                         {summaryData.items.map((item, idx) => {
                           const itemKey = String(idx)
+                          const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
                           const effectivePrices = summaryData.counterparties.map((c) => {
                             const exact = item.offers[c.id]
                             const applied = appliedAnalogue[itemKey]?.[c.id]?.price
                             return exact ?? applied ?? null
                           }).filter((p): p is number => p != null)
                           const minPrice = effectivePrices.length > 0 ? Math.min(...effectivePrices) : null
+                          const rowTotalSum = minPrice != null ? minPrice * qty : 0
                           return (
                             <tr key={idx}>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
@@ -359,8 +372,8 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                                   </td>
                                 )
                               })}
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: minPrice != null ? 600 : 400 }}>
-                                {minPrice != null ? formatPrice(minPrice) : '—'}
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: rowTotalSum > 0 ? 600 : 400 }}>
+                                {rowTotalSum > 0 ? formatPrice(rowTotalSum) : '—'}
                               </td>
                             </tr>
                           )
