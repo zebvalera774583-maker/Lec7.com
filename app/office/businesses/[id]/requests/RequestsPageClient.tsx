@@ -52,7 +52,8 @@ function formatRequestDate(d: Date): string {
 
 export default function RequestsPageClient({ businessId }: RequestsPageClientProps) {
   const [showCreateBlock, setShowCreateBlock] = useState(false)
-  const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created'>('form')
+  const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>('form')
+  const [selectedCounterpartyId, setSelectedCounterpartyId] = useState<string | null>(null)
   const [createdRequest, setCreatedRequest] = useState<{
     category: string
     createdAt: Date
@@ -119,20 +120,28 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const handleCreateRequest = () => {
     if (!summaryData) return
     const selected = summaryData.counterparties.filter((c) => useForRequest[c.id])
-    const withAtLeastOnePosition = selected.filter((c) => {
-      const hasOffer = summaryData.items.some((item, idx) => {
+    const withAtLeastOneOrder = selected.filter((c) => {
+      return summaryData.items.some((item, idx) => {
+        const itemKey = String(idx)
+        let rowMin: number | null = null
+        summaryData.counterparties.forEach((cc) => {
+          const exact = item.offers[cc.id]
+          const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
+          const p = exact ?? applied ?? null
+          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+        })
         const exact = item.offers[c.id]
-        const applied = appliedAnalogue[String(idx)]?.[c.id]?.price
-        const price = exact ?? applied ?? null
-        return typeof price === 'number' && Number.isFinite(price) && price > 0
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        const p = exact ?? applied ?? null
+        return p != null && rowMin != null && p === rowMin
       })
-      return hasOffer
     })
     setCreatedRequest({
       category: DEFAULT_CATEGORY,
       createdAt: new Date(),
-      counterpartyCards: withAtLeastOnePosition.map((c) => ({ id: c.id, legalName: c.legalName })),
+      counterpartyCards: withAtLeastOneOrder.map((c) => ({ id: c.id, legalName: c.legalName })),
     })
+    setSelectedCounterpartyId(null)
     setViewMode('created')
   }
 
@@ -316,11 +325,80 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                     </button>
                   </div>
                 </div>
-                {viewMode === 'created' && createdRequest ? (
+                {viewMode === 'requestDetail' && selectedCounterpartyId && summaryData ? (() => {
+                  const c = summaryData.counterparties.find((x) => x.id === selectedCounterpartyId)
+                  if (!c) return null
+                  const rowsForCounterparty = summaryData.items
+                    .map((item, idx) => {
+                      const exact = item.offers[c.id]
+                      const applied = appliedAnalogue[String(idx)]?.[c.id]?.price
+                      const price = exact ?? applied ?? null
+                      if (price == null || !Number.isFinite(price)) return null
+                      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                      return { item, price, qty, sum: price * qty }
+                    })
+                    .filter((r): r is NonNullable<typeof r> => r != null)
+                  const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1rem', fontWeight: 600, color: '#111827' }}>Заявка на {c.legalName}</span>
+                        <button
+                          type="button"
+                          onClick={() => { setViewMode('created'); setSelectedCounterpartyId(null) }}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'none',
+                            color: '#111827',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.875rem',
+                            fontWeight: 500,
+                          }}
+                        >
+                          Назад к заявкам
+                        </button>
+                      </div>
+                      <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>№</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Наименование</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Кол-во</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Ед.</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Цена</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Сумма</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rowsForCounterparty.map((r, i) => (
+                              <tr key={i}>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.name}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.item.quantity || '—'}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.unit || '—'}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.price)}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.sum)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                              <td colSpan={5} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(total)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })() : viewMode === 'created' && createdRequest ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <button
                       type="button"
-                      onClick={() => setViewMode('summary')}
+                      onClick={() => { setViewMode('summary'); setSelectedCounterpartyId(null) }}
                       style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%' }}
                     >
                       <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
@@ -337,7 +415,10 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => setViewMode('summary')}
+                        onClick={() => {
+                          setSelectedCounterpartyId(c.id)
+                          setViewMode('requestDetail')
+                        }}
                         style={{ ...REQUEST_CARD_STYLE, background: 'white', width: '100%' }}
                       >
                         <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
@@ -353,7 +434,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                     ))}
                     <button
                       type="button"
-                      onClick={() => setViewMode('summary')}
+                      onClick={() => { setViewMode('summary'); setSelectedCounterpartyId(null) }}
                       style={{
                         padding: '0.5rem 0',
                         background: 'none',
