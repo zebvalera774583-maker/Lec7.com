@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
+
+const STORAGE_KEY_PREFIX = 'lec7_request_created_'
 
 interface RequestsPageClientProps {
   businessId: string
@@ -65,8 +68,154 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [appliedAnalogue, setAppliedAnalogue] = useState<Record<string, Record<string, { name: string; price: number }>>>({})
   const [useForRequest, setUseForRequest] = useState<Record<string, boolean>>({})
+  const [menuOpenCardId, setMenuOpenCardId] = useState<'summary' | string | null>(null)
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
+
+  const storageKey = `${STORAGE_KEY_PREFIX}${businessId}`
+
+  const saveCreatedToStorage = (cr: typeof createdRequest, sd: typeof summaryData, aa: typeof appliedAnalogue) => {
+    if (typeof window === 'undefined' || !cr || !sd) return
+    try {
+      const payload = {
+        createdRequest: { ...cr, createdAt: cr.createdAt.toISOString() },
+        summaryData: sd,
+        appliedAnalogue: aa,
+      }
+      window.localStorage.setItem(storageKey, JSON.stringify(payload))
+    } catch (_) {}
+  }
+
+  const clearCreatedFromStorage = () => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.removeItem(storageKey)
+    } catch (_) {}
+  }
+
+  const downloadSummaryAsExcel = () => {
+    if (!summaryData || !createdRequest) return
+    setMenuOpenCardId(null)
+    const sumByCounterparty: Record<string, number> = {}
+    summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
+    summaryData.items.forEach((item, idx) => {
+      const itemKey = String(idx)
+      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+      let rowMin: number | null = null
+      summaryData.counterparties.forEach((c) => {
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        const p = exact ?? applied ?? null
+        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+      })
+      summaryData.counterparties.forEach((c) => {
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        const p = exact ?? applied ?? null
+        if (p != null && rowMin != null && Math.abs(p - rowMin) < 1e-6) sumByCounterparty[c.id] += p * qty
+      })
+    })
+    const rowTotals = summaryData.items.map((item, idx) => {
+      const itemKey = String(idx)
+      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+      let rowMin: number | null = null
+      summaryData.counterparties.forEach((c) => {
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        const p = exact ?? applied ?? null
+        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+      })
+      return rowMin != null ? rowMin * qty : 0
+    })
+    const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
+    const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...summaryData.counterparties.map((c) => c.legalName), 'Итоговая сумма']
+    const dataRows = summaryData.items.map((item, idx) => {
+      const itemKey = String(idx)
+      const effectivePrices = summaryData.counterparties.map((c) => {
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        return exact ?? applied ?? null
+      })
+      const minPrice = effectivePrices.find((p) => p != null) != null ? Math.min(...(effectivePrices.filter((p): p is number => p != null))) : null
+      const rowTotalSum = minPrice != null ? minPrice * Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0) : 0
+      return [
+        idx + 1,
+        item.name,
+        item.quantity || '',
+        item.unit || '',
+        ...summaryData.counterparties.map((c) => {
+          const exact = item.offers[c.id]
+          const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+          const p = exact ?? applied ?? null
+          return p != null ? p : ''
+        }),
+        rowTotalSum > 0 ? rowTotalSum : '',
+      ]
+    })
+    const footerRow = ['Итого', '', '', '', ...summaryData.counterparties.map((c) => sumByCounterparty[c.id] > 0 ? sumByCounterparty[c.id] : ''), totalMinSum > 0 ? totalMinSum : '']
+    const aoa = [headerRow, ...dataRows, footerRow]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, ...summaryData.counterparties.map(() => ({ wch: 14 })), { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Сводная')
+    const safeName = `Сводная_${formatRequestDate(createdRequest.createdAt).replace(/\./g, '-')}`.replace(/[^\w\s\u0400-\u04FF-]/g, '').trim() || 'Сводная'
+    XLSX.writeFile(wb, `${safeName}.xlsx`)
+  }
+
+  const downloadCounterpartyAsExcel = (counterpartyId: string) => {
+    if (!summaryData || !createdRequest) return
+    setMenuOpenCardId(null)
+    const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
+    if (!c) return
+    const rowsForCounterparty = summaryData.items
+      .map((item, idx) => {
+        const itemKey = String(idx)
+        let rowMin: number | null = null
+        summaryData.counterparties.forEach((cc) => {
+          const exact = item.offers[cc.id]
+          const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
+          const p = exact ?? applied ?? null
+          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+        })
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        const price = exact ?? applied ?? null
+        const isMin = price != null && rowMin != null && Number.isFinite(price) && Math.abs(price - rowMin) < 1e-6
+        if (!isMin) return null
+        const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+        return { item, price, qty, sum: price * qty }
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null)
+    const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
+    const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена', 'Сумма']
+    const dataRows = rowsForCounterparty.map((r, i) => [i + 1, r.item.name, r.item.quantity || '', r.item.unit || '', r.price, r.sum])
+    const footerRow = ['Итого', '', '', '', '', total]
+    const aoa = [headerRow, ...dataRows, footerRow]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Заявка')
+    const safeName = `Заявка_${(c.legalName || '').replace(/[^\w\s\u0400-\u04FF-]/g, '').trim() || 'контрагент'}_${formatRequestDate(createdRequest.createdAt).replace(/\./g, '-')}`.trim() || 'Заявка'
+    XLSX.writeFile(wb, `${safeName}.xlsx`)
+  }
+
+  const handleDeleteCreated = () => {
+    setMenuOpenCardId(null)
+    clearCreatedFromStorage()
+    setCreatedRequest(null)
+    setSummaryData(null)
+    setViewMode('form')
+    setShowCreateBlock(false)
+  }
+
+  const handleDeleteCounterpartyCard = (counterpartyId: string) => {
+    if (!createdRequest) return
+    setMenuOpenCardId(null)
+    const next = createdRequest.counterpartyCards.filter((x) => x.id !== counterpartyId)
+    const newCreated = { ...createdRequest, counterpartyCards: next }
+    setCreatedRequest(newCreated)
+    if (summaryData) saveCreatedToStorage(newCreated, summaryData, appliedAnalogue)
+  }
 
   const handleAddRow = () => {
     setRows([...rows, {}])
@@ -136,14 +285,41 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
         return p != null && rowMin != null && p === rowMin
       })
     })
-    setCreatedRequest({
+    const newCreated = {
       category: DEFAULT_CATEGORY,
       createdAt: new Date(),
       counterpartyCards: withAtLeastOneOrder.map((c) => ({ id: c.id, legalName: c.legalName })),
-    })
+    }
+    setCreatedRequest(newCreated)
     setSelectedCounterpartyId(null)
     setViewMode('created')
+    saveCreatedToStorage(newCreated, summaryData, appliedAnalogue)
   }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !businessId) return
+    const key = `${STORAGE_KEY_PREFIX}${businessId}`
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      const cr = parsed?.createdRequest
+      const sd = parsed?.summaryData
+      if (!cr || !sd?.items?.length || !Array.isArray(sd?.counterparties)) return
+      const createdAt = cr.createdAt ? new Date(cr.createdAt) : new Date()
+      if (Number.isNaN(createdAt.getTime())) return
+      setSummaryData(sd)
+      setCreatedRequest({
+        category: cr.category || DEFAULT_CATEGORY,
+        createdAt,
+        counterpartyCards: Array.isArray(cr.counterpartyCards) ? cr.counterpartyCards : [],
+      })
+      setAppliedAnalogue(parsed?.appliedAnalogue && typeof parsed.appliedAnalogue === 'object' ? parsed.appliedAnalogue : {})
+      setUseForRequest(Object.fromEntries((sd.counterparties as Counterparty[]).map((c) => [c.id, true])))
+      setShowCreateBlock(true)
+      setViewMode('created')
+    } catch (_) {}
+  }, [businessId])
 
   useEffect(() => {
     if (showCreateBlock && viewMode === 'form' && rows.length > 0 && lastRowRef.current) {
@@ -403,43 +579,71 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       </div>
                     </div>
                   )
-                })() : viewMode === 'created' && createdRequest ? (
+                })(                ) : viewMode === 'created' && createdRequest ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => { setViewMode('summary'); setSelectedCounterpartyId(null) }}
-                      style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%' }}
-                    >
-                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
-                        Сводная таблица
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>
-                        {createdRequest.category}
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
-                        {formatRequestDate(createdRequest.createdAt)}
-                      </div>
-                    </button>
-                    {createdRequest.counterpartyCards.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCounterpartyId(c.id)
-                          setViewMode('requestDetail')
-                        }}
-                        style={{ ...REQUEST_CARD_STYLE, background: 'white', width: '100%' }}
+                    <div style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%', maxWidth: '22em', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', paddingRight: '0.5rem' }}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => { setViewMode('summary'); setSelectedCounterpartyId(null) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewMode('summary'); setSelectedCounterpartyId(null) } }}
+                        style={{ flex: 1, minWidth: 0 }}
                       >
-                        <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
-                          Заявка {c.legalName}
+                        <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Сводная таблица</div>
+                        <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{createdRequest.category}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{formatRequestDate(createdRequest.createdAt)}</div>
+                      </div>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setMenuOpenCardId(menuOpenCardId === 'summary' ? null : 'summary') }}
+                          aria-label="Меню"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280' }}
+                        >
+                          ☰
+                        </button>
+                        {menuOpenCardId === 'summary' && (
+                          <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
+                            <button type="button" onClick={downloadSummaryAsExcel} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
+                            <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
+                            <button type="button" onClick={() => { setMenuOpenCardId(null); alert('Функция в разработке') }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
+                            <button type="button" onClick={handleDeleteCreated} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {createdRequest.counterpartyCards.map((c) => (
+                      <div key={c.id} style={{ ...REQUEST_CARD_STYLE, background: 'white', width: '100%', maxWidth: '22em', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', paddingRight: '0.5rem' }}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => { setSelectedCounterpartyId(c.id); setViewMode('requestDetail') }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCounterpartyId(c.id); setViewMode('requestDetail') } }}
+                          style={{ flex: 1, minWidth: 0 }}
+                        >
+                          <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Заявка {c.legalName}</div>
+                          <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{createdRequest.category}</div>
+                          <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{formatRequestDate(createdRequest.createdAt)}</div>
                         </div>
-                        <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>
-                          {createdRequest.category}
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenCardId(menuOpenCardId === c.id ? null : c.id) }}
+                            aria-label="Меню"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280' }}
+                          >
+                            ☰
+                          </button>
+                          {menuOpenCardId === c.id && (
+                            <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
+                              <button type="button" onClick={() => downloadCounterpartyAsExcel(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
+                              <button type="button" onClick={() => { setMenuOpenCardId(null); setViewMode('summary'); setSelectedCounterpartyId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
+                              <button type="button" onClick={() => { setMenuOpenCardId(null); alert('Функция в разработке') }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Отправить</button>
+                              <button type="button" onClick={() => handleDeleteCounterpartyCard(c.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>
-                          {formatRequestDate(createdRequest.createdAt)}
-                        </div>
-                      </button>
+                      </div>
                     ))}
                     <button
                       type="button"
