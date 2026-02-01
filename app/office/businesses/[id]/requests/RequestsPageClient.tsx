@@ -308,14 +308,22 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       if (!cr || !sd?.items?.length || !Array.isArray(sd?.counterparties)) return
       const createdAt = cr.createdAt ? new Date(cr.createdAt) : new Date()
       if (Number.isNaN(createdAt.getTime())) return
-      setSummaryData(sd)
+      const items: SummaryItem[] = sd.items.map((it: any) => ({
+        name: typeof it.name === 'string' ? it.name : '',
+        quantity: typeof it.quantity === 'string' ? it.quantity : String(it.quantity ?? ''),
+        unit: typeof it.unit === 'string' ? it.unit : String(it.unit ?? ''),
+        offers: it.offers && typeof it.offers === 'object' ? it.offers : {},
+        analogues: it.analogues && typeof it.analogues === 'object' ? it.analogues : {},
+      }))
+      const counterparties: Counterparty[] = sd.counterparties.map((x: any) => ({ id: String(x.id), legalName: String(x.legalName ?? '') }))
+      setSummaryData({ items, counterparties })
       setCreatedRequest({
         category: cr.category || DEFAULT_CATEGORY,
         createdAt,
         counterpartyCards: Array.isArray(cr.counterpartyCards) ? cr.counterpartyCards : [],
       })
       setAppliedAnalogue(parsed?.appliedAnalogue && typeof parsed.appliedAnalogue === 'object' ? parsed.appliedAnalogue : {})
-      setUseForRequest(Object.fromEntries((sd.counterparties as Counterparty[]).map((c) => [c.id, true])))
+      setUseForRequest(Object.fromEntries(counterparties.map((c) => [c.id, true])))
       setShowCreateBlock(true)
       setViewMode('created')
     } catch (_) {}
@@ -582,17 +590,15 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                 })(                ) : viewMode === 'created' && createdRequest ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%', maxWidth: '22em', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', paddingRight: '0.5rem' }}>
-                      <div
-                        role="button"
-                        tabIndex={0}
+                      <button
+                        type="button"
                         onClick={() => { setViewMode('summary'); setSelectedCounterpartyId(null) }}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewMode('summary'); setSelectedCounterpartyId(null) } }}
-                        style={{ flex: 1, minWidth: 0 }}
+                        style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}
                       >
                         <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Сводная таблица</div>
                         <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{createdRequest.category}</div>
                         <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{formatRequestDate(createdRequest.createdAt)}</div>
-                      </div>
+                      </button>
                       <div style={{ position: 'relative', flexShrink: 0 }}>
                         <button
                           type="button"
@@ -614,17 +620,15 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                     </div>
                     {createdRequest.counterpartyCards.map((c) => (
                       <div key={c.id} style={{ ...REQUEST_CARD_STYLE, background: 'white', width: '100%', maxWidth: '22em', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', paddingRight: '0.5rem' }}>
-                        <div
-                          role="button"
-                          tabIndex={0}
+                        <button
+                          type="button"
                           onClick={() => { setSelectedCounterpartyId(c.id); setViewMode('requestDetail') }}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCounterpartyId(c.id); setViewMode('requestDetail') } }}
-                          style={{ flex: 1, minWidth: 0 }}
+                          style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' }}
                         >
                           <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Заявка {c.legalName}</div>
                           <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{createdRequest.category}</div>
                           <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{formatRequestDate(createdRequest.createdAt)}</div>
-                        </div>
+                        </button>
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                           <button
                             type="button"
