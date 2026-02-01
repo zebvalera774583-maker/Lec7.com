@@ -42,7 +42,9 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [appliedAnalogue, setAppliedAnalogue] = useState<Record<string, Record<string, { name: string; price: number }>>>({})
+  const [useForRequest, setUseForRequest] = useState<Record<string, boolean>>({})
   const lastRowRef = useRef<HTMLInputElement>(null)
+  const allCheckboxRef = useRef<HTMLInputElement>(null)
 
   const handleAddRow = () => {
     setRows([...rows, {}])
@@ -81,8 +83,10 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
         throw new Error(data.error || 'Ошибка загрузки')
       }
       const data = await res.json()
-      setSummaryData({ items: data.items, counterparties: data.counterparties || [] })
+      const counterparties = data.counterparties || []
+      setSummaryData({ items: data.items, counterparties })
       setAppliedAnalogue({})
+      setUseForRequest(Object.fromEntries(counterparties.map((c: Counterparty) => [c.id, true])))
       setViewMode('summary')
     } catch (e: any) {
       setSummaryError(e.message || 'Ошибка')
@@ -96,6 +100,14 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       lastRowRef.current.focus()
     }
   }, [showCreateBlock, viewMode, rows.length])
+
+  useEffect(() => {
+    const el = allCheckboxRef.current
+    if (!el || !summaryData?.counterparties.length) return
+    const some = summaryData.counterparties.some((c) => useForRequest[c.id])
+    const every = summaryData.counterparties.every((c) => useForRequest[c.id])
+    el.indeterminate = some && !every
+  }, [summaryData?.counterparties, useForRequest])
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
@@ -289,8 +301,36 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '140px' }}>Наименование</th>
                           <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '80px' }}>Кол-во</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '60px' }}>Ед.</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f3f4f6', fontWeight: 500, minWidth: '100px', verticalAlign: 'top' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#4b5563', marginBottom: '0.35rem' }}>Использовать для заявки</div>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              <input
+                                ref={allCheckboxRef}
+                                type="checkbox"
+                                checked={summaryData.counterparties.length > 0 && summaryData.counterparties.every((c) => useForRequest[c.id])}
+                                onChange={() => {
+                                  const allChecked = summaryData.counterparties.every((c) => useForRequest[c.id])
+                                  const next = Object.fromEntries(summaryData.counterparties.map((c) => [c.id, !allChecked]))
+                                  setUseForRequest(next)
+                                }}
+                              />
+                              Все
+                            </label>
+                          </th>
                           {summaryData.counterparties.map((c) => (
-                            <th key={c.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>{c.legalName}</th>
+                            <th key={c.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px', verticalAlign: 'top' }}>
+                              <div style={{ marginBottom: '0.35rem' }}>{c.legalName}</div>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 400, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!useForRequest[c.id]}
+                                  onChange={() => {
+                                    setUseForRequest((prev) => ({ ...prev, [c.id]: !prev[c.id] }))
+                                  }}
+                                />
+                                В заявку
+                              </label>
+                            </th>
                           ))}
                           <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>Итоговая сумма</th>
                         </tr>
@@ -312,6 +352,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.name}</td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{item.quantity || '—'}</td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.unit || '—'}</td>
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', background: '#f9fafb' }} />
                               {summaryData.counterparties.map((c) => {
                                 const exactPrice = item.offers[c.id]
                                 const appliedVal = appliedAnalogue[itemKey]?.[c.id]
@@ -382,6 +423,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                       <tfoot>
                         <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
                           <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }} />
                           {summaryData.counterparties.map((c) => (
                             <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
                               {sumByCounterparty[c.id] > 0 ? formatPrice(sumByCounterparty[c.id]) : '—'}
