@@ -245,17 +245,18 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                   summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
                   summaryData.items.forEach((item, idx) => {
                     const itemKey = String(idx)
+                    const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
                     let rowMin: number | null = null
                     summaryData.counterparties.forEach((c) => {
                       const exact = item.offers[c.id]
                       const applied = appliedAnalogue[itemKey]?.[c.id]?.price
                       const p = exact ?? applied ?? null
                       if (p != null) {
-                        sumByCounterparty[c.id] += p
+                        sumByCounterparty[c.id] += p * qty
                         if (rowMin == null || p < rowMin) rowMin = p
                       }
                     })
-                    if (rowMin != null) totalMinSum += rowMin
+                    if (rowMin != null) totalMinSum += rowMin * qty
                   })
                   return (
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
