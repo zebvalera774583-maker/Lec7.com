@@ -882,7 +882,9 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
               {botStartUrl && connectToken && (
                 <div style={{ marginBottom: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <a
-                    href={getBotStartAppUrl()}
+                    href={botStartUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     style={{
                       display: 'inline-block',
                       padding: '0.5rem 1rem',
@@ -898,9 +900,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                     Открыть Telegram
                   </a>
                   <a
-                    href={botStartUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={getBotStartAppUrl()}
                     style={{
                       display: 'inline-block',
                       padding: '0.5rem 1rem',
@@ -914,7 +914,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                       textAlign: 'center',
                     }}
                   >
-                    Открыть в браузере
+                    Открыть в приложении
                   </a>
                 </div>
               )}
