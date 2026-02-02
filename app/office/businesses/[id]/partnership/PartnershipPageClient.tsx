@@ -98,6 +98,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [telegramChatId, setTelegramChatId] = useState<string | null>(initialTelegramChatId)
   const [telegramLoading, setTelegramLoading] = useState(false)
   const [botStartUrl, setBotStartUrl] = useState<string>('')
+  const [connectToken, setConnectToken] = useState<string>('')
   const [telegramError, setTelegramError] = useState<string>('')
 
   // Скачать прайс в Excel (.xlsx): № п/п, ширина Наименование 28, Цена 22, только сохранённые колонки
@@ -286,11 +287,24 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       const data = await r.json()
       if (!r.ok) throw new Error(data?.error ?? "connect failed")
       setBotStartUrl(data.botStartUrl)
+      setConnectToken(data.connectToken || '')
     } catch (err: any) {
       setTelegramError(err.message || 'Ошибка подключения')
     } finally {
       setTelegramLoading(false)
     }
+  }
+
+  // Построение URL для открытия в Telegram приложении
+  const getBotStartAppUrl = (): string => {
+    if (!connectToken || !botStartUrl) return ''
+    // Извлекаем username из botStartUrl (формат: https://t.me/username?start=token)
+    const match = botStartUrl.match(/https:\/\/t\.me\/([^?]+)/)
+    if (match && match[1]) {
+      const botUsername = match[1]
+      return `tg://resolve?domain=${botUsername}&start=${connectToken}`
+    }
+    return ''
   }
 
   // Обновление статуса подключения
@@ -307,9 +321,10 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   // Обновляем telegramChatId при изменении пропса
   useEffect(() => {
     setTelegramChatId(initialTelegramChatId)
-    // Если подключение успешно, очищаем botStartUrl
+    // Если подключение успешно, очищаем botStartUrl и connectToken
     if (initialTelegramChatId) {
       setBotStartUrl('')
+      setConnectToken('')
       setTelegramError('')
     }
   }, [initialTelegramChatId])
@@ -863,13 +878,11 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 </button>
               )}
               
-              {/* Ссылка "Открыть Telegram" */}
-              {botStartUrl && (
-                <div style={{ marginBottom: '0.5rem' }}>
+              {/* Кнопки для открытия Telegram */}
+              {botStartUrl && connectToken && (
+                <div style={{ marginBottom: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <a
-                    href={botStartUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={getBotStartAppUrl()}
                     style={{
                       display: 'inline-block',
                       padding: '0.5rem 1rem',
@@ -879,9 +892,29 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                       borderRadius: '4px',
                       fontSize: '0.875rem',
                       fontWeight: 500,
+                      textAlign: 'center',
                     }}
                   >
                     Открыть Telegram
+                  </a>
+                  <a
+                    href={botStartUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.5rem 1rem',
+                      background: 'white',
+                      color: '#2563eb',
+                      textDecoration: 'none',
+                      borderRadius: '4px',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      border: '1px solid #2563eb',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Открыть в браузере
                   </a>
                 </div>
               )}
