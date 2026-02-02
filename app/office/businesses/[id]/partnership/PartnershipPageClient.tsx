@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
 import PriceUploadModal from './PriceUploadModal'
@@ -36,6 +37,7 @@ interface Price {
 
 interface PartnershipPageClientProps {
   businessId: string
+  telegramChatId: string | null
 }
 
 interface AssignedPrice {
@@ -73,7 +75,8 @@ interface IncomingRequest {
   createdAt: string
 }
 
-export default function PartnershipPageClient({ businessId }: PartnershipPageClientProps) {
+export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId }: PartnershipPageClientProps) {
+  const router = useRouter()
   const [prices, setPrices] = useState<Price[]>([])
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,6 +93,12 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
   const [activeCounterpartiesExpanded, setActiveCounterpartiesExpanded] = useState(false)
   const [incomingRequestsExpanded, setIncomingRequestsExpanded] = useState(false)
   const [loadingPartnership, setLoadingPartnership] = useState(false)
+  
+  // Telegram integration states
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(initialTelegramChatId)
+  const [telegramLoading, setTelegramLoading] = useState(false)
+  const [botStartUrl, setBotStartUrl] = useState<string>('')
+  const [telegramError, setTelegramError] = useState<string>('')
 
   // Скачать прайс в Excel (.xlsx): № п/п, ширина Наименование 28, Цена 22, только сохранённые колонки
   const downloadPriceAsExcel = (rows: Row[], columns: Column[], filename: string) => {
@@ -264,11 +273,46 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
     return 'fromBusinessId' in counterparty ? counterparty.fromBusinessId : counterparty.partnerBusinessId
   }
 
+  // Подключение Telegram
+  const connectTelegram = async () => {
+    setTelegramLoading(true)
+    setTelegramError('')
+    try {
+      const r = await fetch(`/api/office/businesses/${businessId}/integrations/telegram/connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error ?? "connect failed")
+      setBotStartUrl(data.botStartUrl)
+    } catch (err: any) {
+      setTelegramError(err.message || 'Ошибка подключения')
+    } finally {
+      setTelegramLoading(false)
+    }
+  }
+
+  // Обновление статуса подключения
+  const refreshTelegramStatus = async () => {
+    router.refresh()
+  }
+
   useEffect(() => {
     loadPrices()
     loadAssignedPrices()
     loadPartnershipData()
   }, [businessId])
+
+  // Обновляем telegramChatId при изменении пропса
+  useEffect(() => {
+    setTelegramChatId(initialTelegramChatId)
+    // Если подключение успешно, очищаем botStartUrl
+    if (initialTelegramChatId) {
+      setBotStartUrl('')
+      setTelegramError('')
+    }
+  }, [initialTelegramChatId])
 
   // Загрузка данных конкретного прайса (для редактирования)
   const loadPriceData = async (priceId: string) => {
@@ -782,13 +826,92 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             >
               Запросы на подключение контрагентов
             </button>
-            <div style={{ marginTop: '0.3rem' }}>
-              <button
-                type="button"
-                style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 500, color: '#111827', textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
-              >
+            {/* Telegram интеграция */}
+            <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+              <div style={{ marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: 500 }}>
                 Telegram
-              </button>
+              </div>
+              
+              {/* Статус подключения */}
+              <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem' }}>
+                {telegramChatId ? (
+                  <span style={{ color: '#059669' }}>✅ Telegram подключен</span>
+                ) : (
+                  <span style={{ color: '#6b7280' }}>⚪ Telegram не подключен</span>
+                )}
+              </div>
+              
+              {/* Кнопка "Подключить Telegram" */}
+              {!telegramChatId && (
+                <button
+                  type="button"
+                  onClick={connectTelegram}
+                  disabled={telegramLoading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: telegramLoading ? '#d1d5db' : '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: telegramLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    marginBottom: botStartUrl ? '0.5rem' : '0',
+                  }}
+                >
+                  {telegramLoading ? 'Подключение...' : 'Подключить Telegram'}
+                </button>
+              )}
+              
+              {/* Ссылка "Открыть Telegram" */}
+              {botStartUrl && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <a
+                    href={botStartUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.5rem 1rem',
+                      background: '#2563eb',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: '4px',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Открыть Telegram
+                  </a>
+                </div>
+              )}
+              
+              {/* Кнопка "Проверить статус" */}
+              {botStartUrl && !telegramChatId && (
+                <button
+                  type="button"
+                  onClick={refreshTelegramStatus}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: 'white',
+                    color: '#111827',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                  }}
+                >
+                  Проверить статус
+                </button>
+              )}
+              
+              {/* Ошибка */}
+              {telegramError && (
+                <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>
+                  {telegramError}
+                </div>
+              )}
             </div>
             {incomingRequestsExpanded && (
               <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>

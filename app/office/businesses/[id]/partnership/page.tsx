@@ -14,6 +14,7 @@ export default async function PartnershipPage({ params }: PageProps) {
     select: {
       id: true,
       slug: true,
+      telegramChatId: true,
     },
   })
 
@@ -21,5 +22,5 @@ export default async function PartnershipPage({ params }: PageProps) {
     notFound()
   }
 
-  return <PartnershipPageClient businessId={business.id} />
+  return <PartnershipPageClient businessId={business.id} telegramChatId={business.telegramChatId} />
 }
