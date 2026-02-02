@@ -782,6 +782,14 @@ export default function PartnershipPageClient({ businessId }: PartnershipPageCli
             >
               Запросы на подключение контрагентов
             </button>
+            <div style={{ marginTop: '0.3rem' }}>
+              <button
+                type="button"
+                style={{ padding: '0.25rem 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 500, color: '#111827', textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
+              >
+                Telegram
+              </button>
+            </div>
             {incomingRequestsExpanded && (
               <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.25rem' }}>
