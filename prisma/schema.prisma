@@ -54,6 +54,25 @@ model Business {
   assignedPrices  PriceAssignment[] @relation("AssignedPrices")
   incomingRequestsReceived IncomingRequest[] @relation("IncomingRequestRecipient")
   incomingRequestsSent     IncomingRequest[] @relation("IncomingRequestSender")
+  telegramConnectTokens    TelegramConnectToken[]
+
+  telegramChatId       String?   @db.VarChar(32)
+  telegramConnectedAt DateTime?
+}
+
+// Одноразовый токен для привязки Telegram-чата к бизнесу (/start <token>)
+model TelegramConnectToken {
+  id         String    @id @default(cuid())
+  businessId String
+  token      String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 // Справочник категорий: источник списков для прайсов, витрины и т.д.
