@@ -115,6 +115,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [addRecipientBotUrl, setAddRecipientBotUrl] = useState('')
   const [addRecipientToken, setAddRecipientToken] = useState('')
   const [addRecipientLoading, setAddRecipientLoading] = useState(false)
+  const [telegramPanelOpen, setTelegramPanelOpen] = useState(false)
 
   // Скачать прайс в Excel (.xlsx): № п/п, ширина Наименование 28, Цена 22, только сохранённые колонки
   const downloadPriceAsExcel = (rows: Row[], columns: Column[], filename: string) => {
@@ -914,236 +915,26 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
             >
               Запросы на подключение контрагентов
             </button>
-            {/* Telegram интеграция */}
-            <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
-              <div style={{ marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: 500 }}>
+            {/* Кнопка Telegram — по клику открывается панель справа */}
+            <div style={{ marginTop: '0.3rem' }}>
+              <button
+                type="button"
+                onClick={() => setTelegramPanelOpen((v) => !v)}
+                style={{
+                  padding: '0.25rem 0',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  color: '#111827',
+                  textAlign: 'left',
+                  display: 'inline-block',
+                  width: 'fit-content',
+                }}
+              >
                 Telegram
-              </div>
-              
-              {/* Статус подключения */}
-              <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem' }}>
-                {telegramChatId ? (
-                  <span style={{ color: '#059669' }}>✅ Telegram подключен</span>
-                ) : (
-                  <span style={{ color: '#6b7280' }}>⚪ Telegram не подключен</span>
-                )}
-              </div>
-
-              {/* Получатели заявок */}
-              <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.35rem', color: '#374151' }}>
-                  Получатели заявок
-                </div>
-                {telegramRecipients.length === 0 ? (
-                  <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>Нет получателей. Добавьте через кнопку ниже.</div>
-                ) : (
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                    {telegramRecipients.map((r) => (
-                      <li
-                        key={r.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.35rem 0',
-                          fontSize: '0.8125rem',
-                          borderBottom: '1px solid #e5e7eb',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={r.isActive}
-                          onChange={(e) => toggleRecipientActive(r.id, e.target.checked)}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        <span style={{ flex: 1 }}>
-                          {r.label?.trim() || r.chatIdMasked}
-                          {r.label?.trim() && <span style={{ color: '#6b7280', marginLeft: '0.25rem' }}>({r.chatIdMasked})</span>}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Добавить получателя */}
-              <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.35rem', color: '#374151' }}>
-                  Добавить получателя
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    placeholder="Метка (необязательно), напр. Мария (склад)"
-                    value={addRecipientLabel}
-                    onChange={(e) => setAddRecipientLabel(e.target.value)}
-                    style={{
-                      padding: '0.4rem 0.5rem',
-                      fontSize: '0.8125rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      maxWidth: '280px',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={connectAddRecipient}
-                    disabled={addRecipientLoading}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: addRecipientLoading ? '#d1d5db' : '#2563eb',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: addRecipientLoading ? 'not-allowed' : 'pointer',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      alignSelf: 'flex-start',
-                    }}
-                  >
-                    {addRecipientLoading ? 'Генерация...' : 'Сгенерировать ссылку'}
-                  </button>
-                  {addRecipientBotUrl && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      <button
-                        type="button"
-                        onClick={copyAddRecipientLink}
-                        style={{
-                          padding: '0.4rem 0.75rem',
-                          background: 'white',
-                          color: '#2563eb',
-                          border: '1px solid #2563eb',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                          alignSelf: 'flex-start',
-                        }}
-                      >
-                        Скопировать ссылку
-                      </button>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <a
-                          href={addRecipientBotUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: '0.8125rem', color: '#2563eb' }}
-                        >
-                          Открыть Telegram
-                        </a>
-                        <a href={getAddRecipientAppUrl()} style={{ fontSize: '0.8125rem', color: '#2563eb' }}>
-                          В приложении
-                        </a>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { router.refresh(); setAddRecipientBotUrl(''); setAddRecipientToken('') }}
-                        style={{
-                          padding: '0.4rem 0.75rem',
-                          background: '#f3f4f6',
-                          color: '#111827',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                          alignSelf: 'flex-start',
-                        }}
-                      >
-                        Обновить список
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Кнопка "Подключить Telegram" */}
-              {!telegramChatId && (
-                <button
-                  type="button"
-                  onClick={connectTelegram}
-                  disabled={telegramLoading}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: telegramLoading ? '#d1d5db' : '#059669',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: telegramLoading ? 'not-allowed' : 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    marginBottom: botStartUrl ? '0.5rem' : '0',
-                  }}
-                >
-                  {telegramLoading ? 'Подключение...' : 'Подключить Telegram'}
-                </button>
-              )}
-              
-              {/* Кнопки для открытия Telegram */}
-              {botStartUrl && connectToken && (
-                <div style={{ marginBottom: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <a
-                    href={botStartUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block',
-                      padding: '0.5rem 1rem',
-                      background: '#2563eb',
-                      color: 'white',
-                      textDecoration: 'none',
-                      borderRadius: '4px',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Открыть Telegram
-                  </a>
-                  <a
-                    href={getBotStartAppUrl()}
-                    style={{
-                      display: 'inline-block',
-                      padding: '0.5rem 1rem',
-                      background: 'white',
-                      color: '#2563eb',
-                      textDecoration: 'none',
-                      borderRadius: '4px',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      border: '1px solid #2563eb',
-                      textAlign: 'center',
-                    }}
-                  >
-                    Открыть в приложении
-                  </a>
-                </div>
-              )}
-              
-              {/* Кнопка "Проверить статус" */}
-              {botStartUrl && !telegramChatId && (
-                <button
-                  type="button"
-                  onClick={refreshTelegramStatus}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: 'white',
-                    color: '#111827',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                  }}
-                >
-                  Проверить статус
-                </button>
-              )}
-              
-              {/* Ошибка */}
-              {telegramError && (
-                <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>
-                  {telegramError}
-                </div>
-              )}
+              </button>
             </div>
             {incomingRequestsExpanded && (
               <div style={{ marginTop: '0.5rem', overflow: 'hidden' }}>
@@ -1233,8 +1024,10 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           </div>
         </div>
 
-        {/* Правая колонка: карточки назначенных прайсов и свои прайсы */}
-        <div style={{ flex: '1', minWidth: '280px', display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }}>
+        {/* Центр + правая панель Telegram */}
+        <div style={{ flex: 1, minWidth: '280px', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+          {/* Карточки назначенных прайсов и свои прайсы */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }}>
           {assignedPrices.length > 0 && (
             <>
             {assignedPrices.map((assigned) => (
@@ -1555,6 +1348,155 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           </div>
         ))}
       </div>
+          </div>
+
+          {/* Панель Telegram справа */}
+          {telegramPanelOpen && (
+            <div
+              style={{
+                width: '320px',
+                flexShrink: 0,
+                padding: '1rem',
+                background: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 600, color: '#111827' }}>Telegram</span>
+                <button
+                  type="button"
+                  onClick={() => setTelegramPanelOpen(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', lineHeight: 1, color: '#6b7280', padding: '0.25rem' }}
+                  title="Закрыть"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={{ marginBottom: '0.75rem', fontSize: '0.875rem' }}>
+                {telegramChatId ? (
+                  <span style={{ color: '#374151' }}>✅ Telegram подключен</span>
+                ) : (
+                  <span style={{ color: '#6b7280' }}>⚪ Telegram не подключен</span>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.35rem', color: '#374151' }}>Получатели заявок</div>
+                {telegramRecipients.length === 0 ? (
+                  <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>Нет получателей. Добавьте через кнопку ниже.</div>
+                ) : (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {telegramRecipients.map((r) => (
+                      <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0', fontSize: '0.8125rem', borderBottom: '1px solid #e5e7eb' }}>
+                        <input type="checkbox" checked={r.isActive} onChange={(e) => toggleRecipientActive(r.id, e.target.checked)} style={{ cursor: 'pointer' }} />
+                        <span style={{ flex: 1 }}>
+                          {r.label?.trim() || r.chatIdMasked}
+                          {r.label?.trim() && <span style={{ color: '#6b7280', marginLeft: '0.25rem' }}>({r.chatIdMasked})</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.35rem', color: '#374151' }}>Добавить получателя</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Метка (необязательно), напр. Мария (склад)"
+                    value={addRecipientLabel}
+                    onChange={(e) => setAddRecipientLabel(e.target.value)}
+                    style={{ padding: '0.4rem 0.5rem', fontSize: '0.8125rem', border: '1px solid #d1d5db', borderRadius: '4px', maxWidth: '100%' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={connectAddRecipient}
+                    disabled={addRecipientLoading}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'white',
+                      color: '#111827',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      cursor: addRecipientLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    {addRecipientLoading ? 'Генерация...' : 'Сгенерировать ссылку'}
+                  </button>
+                  {addRecipientBotUrl && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <button type="button" onClick={copyAddRecipientLink} style={{ padding: '0.4rem 0.75rem', background: 'white', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem', alignSelf: 'flex-start' }}>
+                        Скопировать ссылку
+                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <a href={addRecipientBotUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.8125rem', color: '#111827', textDecoration: 'underline' }}>
+                          Открыть Telegram
+                        </a>
+                        <a href={getAddRecipientAppUrl()} style={{ fontSize: '0.8125rem', color: '#111827', textDecoration: 'underline' }}>
+                          В приложении
+                        </a>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { router.refresh(); setAddRecipientBotUrl(''); setAddRecipientToken('') }}
+                        style={{ padding: '0.4rem 0.75rem', background: 'white', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem', alignSelf: 'flex-start' }}
+                      >
+                        Обновить список
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {!telegramChatId && (
+                <button
+                  type="button"
+                  onClick={connectTelegram}
+                  disabled={telegramLoading}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: 'white',
+                    color: '#111827',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: telegramLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    marginBottom: botStartUrl ? '0.5rem' : '0',
+                  }}
+                >
+                  {telegramLoading ? 'Подключение...' : 'Подключить Telegram'}
+                </button>
+              )}
+
+              {botStartUrl && connectToken && (
+                <div style={{ marginBottom: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <a href={botStartUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', padding: '0.5rem 1rem', background: 'white', color: '#111827', textDecoration: 'none', borderRadius: '4px', fontSize: '0.875rem', fontWeight: 500, border: '1px solid #d1d5db', textAlign: 'center' }}>
+                    Открыть Telegram
+                  </a>
+                  <a href={getBotStartAppUrl()} style={{ display: 'inline-block', padding: '0.5rem 1rem', background: 'white', color: '#111827', textDecoration: 'none', borderRadius: '4px', fontSize: '0.875rem', fontWeight: 500, border: '1px solid #d1d5db', textAlign: 'center' }}>
+                    Открыть в приложении
+                  </a>
+                </div>
+              )}
+
+              {botStartUrl && !telegramChatId && (
+                <button type="button" onClick={refreshTelegramStatus} style={{ padding: '0.5rem 1rem', background: 'white', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>
+                  Проверить статус
+                </button>
+              )}
+
+              {telegramError && (
+                <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>{telegramError}</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
