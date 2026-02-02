@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/middleware'
-import { sendTelegramMessage } from '@/lib/telegram'
+import { sendTelegramDocument } from '@/lib/telegram'
+import { buildRequestXlsx } from '@/lib/requestExcel'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
@@ -27,7 +28,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true, legalName: true, name: true },
+      select: { id: true, ownerId: true, legalName: true, name: true, slug: true },
     })
 
     if (!business) {
@@ -48,11 +49,11 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'recipientBusinessId is required' }, { status: 400 })
     }
 
-    const recipient = await prisma.business.findUnique({
+    const recipientBusiness = await prisma.business.findUnique({
       where: { id: recipientBusinessId },
-      select: { id: true },
+      select: { id: true, legalName: true, name: true, slug: true },
     })
-    if (!recipient) {
+    if (!recipientBusiness) {
       return NextResponse.json({ error: 'Recipient business not found' }, { status: 404 })
     }
 
@@ -89,27 +90,50 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       },
     })
 
-    // Notify recipient business Telegram: active recipients or fallback to telegramChatId
+    // Notify recipient business Telegram: send Excel to active recipients or fallback to telegramChatId
     const recipientRecipients = await prisma.businessTelegramRecipient.findMany({
       where: { businessId: recipientBusinessId, isActive: true },
       select: { chatId: true },
     })
-    const recipientBusiness = await prisma.business.findUnique({
+    const recipientBiz = await prisma.business.findUnique({
       where: { id: recipientBusinessId },
       select: { telegramChatId: true },
     })
-    const senderName = business.legalName?.trim() || business.name
-    const categoryLine = category ? `\nКатегория: ${category}` : ''
-    const totalLine = total != null && Number.isFinite(total) ? `\nСумма: ${total}` : ''
-    const text = `Новая заявка от ${senderName}${categoryLine}${totalLine}\n\nПерейдите в офис для просмотра.`
     const chatIdsToNotify: string[] =
       recipientRecipients.length > 0
         ? recipientRecipients.map((r) => r.chatId)
-        : recipientBusiness?.telegramChatId
-          ? [recipientBusiness.telegramChatId]
+        : recipientBiz?.telegramChatId
+          ? [recipientBiz.telegramChatId]
           : []
-    for (const cid of chatIdsToNotify) {
-      void sendTelegramMessage(cid, text)
+
+    if (chatIdsToNotify.length > 0) {
+      try {
+        const senderName = business.legalName?.trim() || business.name
+        const recipientName = recipientBusiness.legalName?.trim() || recipientBusiness.name || recipientBusiness.slug
+        const { filename, buffer } = await buildRequestXlsx({
+          senderName,
+          senderSlug: business.slug ?? '',
+          recipientName: recipientName || null,
+          category,
+          total: total != null && Number.isFinite(total) ? total : null,
+          items: requestItems.map((it) => ({
+            name: it.name,
+            quantity: it.quantity,
+            unit: it.unit,
+            price: it.price,
+            sum: it.sum,
+          })),
+          createdAt: incomingRequest.createdAt,
+        })
+        const caption = `🧾 Новая заявка от ${senderName}`
+        for (const cid of chatIdsToNotify) {
+          sendTelegramDocument(cid, filename, buffer, caption).catch((e) => {
+            console.warn('Telegram sendDocument failed for chat', cid, e)
+          })
+        }
+      } catch (e) {
+        console.warn('Build/send request xlsx failed:', e)
+      }
     }
 
     return NextResponse.json({
