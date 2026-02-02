@@ -32,6 +32,16 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; 
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    let mode: 'set_primary' | 'add_recipient' = 'set_primary'
+    let label: string | null = null
+    try {
+      const body = await req.json().catch(() => ({}))
+      if (body?.mode === 'add_recipient') mode = 'add_recipient'
+      if (typeof body?.label === 'string' && body.label.trim()) label = body.label.trim()
+    } catch {
+      // empty body → set_primary
+    }
+
     const connectToken = randomBytes(TOKEN_BYTES).toString('hex')
     const expiresAt = new Date(Date.now() + EXPIRES_MINUTES * 60 * 1000)
 
@@ -40,6 +50,8 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; 
         businessId,
         token: connectToken,
         expiresAt,
+        mode,
+        label,
       },
     })
 

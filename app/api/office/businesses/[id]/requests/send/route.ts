@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/middleware'
+import { sendTelegramMessage } from '@/lib/telegram'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
@@ -87,6 +88,29 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
         items: true,
       },
     })
+
+    // Notify recipient business Telegram: active recipients or fallback to telegramChatId
+    const recipientRecipients = await prisma.businessTelegramRecipient.findMany({
+      where: { businessId: recipientBusinessId, isActive: true },
+      select: { chatId: true },
+    })
+    const recipientBusiness = await prisma.business.findUnique({
+      where: { id: recipientBusinessId },
+      select: { telegramChatId: true },
+    })
+    const senderName = business.legalName?.trim() || business.name
+    const categoryLine = category ? `\nКатегория: ${category}` : ''
+    const totalLine = total != null && Number.isFinite(total) ? `\nСумма: ${total}` : ''
+    const text = `Новая заявка от ${senderName}${categoryLine}${totalLine}\n\nПерейдите в офис для просмотра.`
+    const chatIdsToNotify: string[] =
+      recipientRecipients.length > 0
+        ? recipientRecipients.map((r) => r.chatId)
+        : recipientBusiness?.telegramChatId
+          ? [recipientBusiness.telegramChatId]
+          : []
+    for (const cid of chatIdsToNotify) {
+      void sendTelegramMessage(cid, text)
+    }
 
     return NextResponse.json({
       id: incomingRequest.id,

@@ -55,6 +55,7 @@ model Business {
   incomingRequestsReceived IncomingRequest[] @relation("IncomingRequestRecipient")
   incomingRequestsSent     IncomingRequest[] @relation("IncomingRequestSender")
   telegramConnectTokens    TelegramConnectToken[]
+  telegramRecipients       BusinessTelegramRecipient[]
 
   telegramChatId       String?   @db.VarChar(32)
   telegramConnectedAt DateTime?
@@ -67,12 +68,29 @@ model TelegramConnectToken {
   token      String    @unique
   expiresAt  DateTime
   usedAt     DateTime?
+  mode       String    @default("set_primary") // set_primary | add_recipient
+  label      String?
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
   @@index([token])
   @@index([expiresAt])
+}
+
+// Получатели уведомлений о заявках в Telegram (несколько на бизнес)
+model BusinessTelegramRecipient {
+  id         String   @id @default(cuid())
+  businessId String
+  chatId     String   @db.VarChar(32)
+  label      String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, chatId])
+  @@index([businessId])
 }
 
 // Справочник категорий: источник списков для прайсов, витрины и т.д.

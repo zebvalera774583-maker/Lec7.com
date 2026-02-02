@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     const row = await prisma.telegramConnectToken.findUnique({
       where: { token },
-      select: { id: true, businessId: true, expiresAt: true, usedAt: true },
+      select: { id: true, businessId: true, expiresAt: true, usedAt: true, mode: true, label: true },
     })
 
     if (!row || row.usedAt || new Date() > row.expiresAt) {
@@ -44,21 +44,46 @@ export async function POST(req: NextRequest) {
 
     const chatIdStr = String(chatId)
     const now = new Date()
+    const mode = (row.mode ?? 'set_primary') as string
 
-    await prisma.$transaction([
-      prisma.business.updateMany({
-        where: { telegramChatId: chatIdStr, id: { not: row.businessId } },
-        data: { telegramChatId: null, telegramConnectedAt: null },
-      }),
-      prisma.business.update({
-        where: { id: row.businessId },
-        data: { telegramChatId: chatIdStr, telegramConnectedAt: now },
-      }),
-      prisma.telegramConnectToken.update({
-        where: { id: row.id },
-        data: { usedAt: now },
-      }),
-    ])
+    if (mode === 'add_recipient') {
+      await prisma.$transaction([
+        prisma.businessTelegramRecipient.upsert({
+          where: {
+            businessId_chatId: { businessId: row.businessId, chatId: chatIdStr },
+          },
+          create: {
+            businessId: row.businessId,
+            chatId: chatIdStr,
+            label: row.label ?? null,
+            isActive: true,
+          },
+          update: {
+            label: row.label ?? undefined,
+            isActive: true,
+          },
+        }),
+        prisma.telegramConnectToken.update({
+          where: { id: row.id },
+          data: { usedAt: now },
+        }),
+      ])
+    } else {
+      await prisma.$transaction([
+        prisma.business.updateMany({
+          where: { telegramChatId: chatIdStr, id: { not: row.businessId } },
+          data: { telegramChatId: null, telegramConnectedAt: null },
+        }),
+        prisma.business.update({
+          where: { id: row.businessId },
+          data: { telegramChatId: chatIdStr, telegramConnectedAt: now },
+        }),
+        prisma.telegramConnectToken.update({
+          where: { id: row.id },
+          data: { usedAt: now },
+        }),
+      ])
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

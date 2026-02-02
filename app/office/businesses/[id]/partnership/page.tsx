@@ -8,6 +8,11 @@ interface PageProps {
   }
 }
 
+function maskChatId(chatId: string): string {
+  if (chatId.length <= 6) return '***'
+  return chatId.slice(0, 3) + '***' + chatId.slice(-3)
+}
+
 export default async function PartnershipPage({ params }: PageProps) {
   const business = await prisma.business.findUnique({
     where: { id: params.id },
@@ -15,6 +20,10 @@ export default async function PartnershipPage({ params }: PageProps) {
       id: true,
       slug: true,
       telegramChatId: true,
+      telegramRecipients: {
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, chatId: true, label: true, isActive: true, createdAt: true },
+      },
     },
   })
 
@@ -22,5 +31,19 @@ export default async function PartnershipPage({ params }: PageProps) {
     notFound()
   }
 
-  return <PartnershipPageClient businessId={business.id} telegramChatId={business.telegramChatId} />
+  const recipients = business.telegramRecipients.map((r) => ({
+    id: r.id,
+    chatIdMasked: maskChatId(r.chatId),
+    label: r.label,
+    isActive: r.isActive,
+    createdAt: r.createdAt.toISOString(),
+  }))
+
+  return (
+    <PartnershipPageClient
+      businessId={business.id}
+      telegramChatId={business.telegramChatId}
+      telegramRecipients={recipients}
+    />
+  )
 }

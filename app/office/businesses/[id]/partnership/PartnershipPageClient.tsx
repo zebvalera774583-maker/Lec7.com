@@ -35,9 +35,18 @@ interface Price {
   }
 }
 
+interface TelegramRecipientItem {
+  id: string
+  chatIdMasked: string
+  label: string | null
+  isActive: boolean
+  createdAt: string
+}
+
 interface PartnershipPageClientProps {
   businessId: string
   telegramChatId: string | null
+  telegramRecipients: TelegramRecipientItem[]
 }
 
 interface AssignedPrice {
@@ -75,7 +84,7 @@ interface IncomingRequest {
   createdAt: string
 }
 
-export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId }: PartnershipPageClientProps) {
+export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients }: PartnershipPageClientProps) {
   const router = useRouter()
   const [prices, setPrices] = useState<Price[]>([])
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
@@ -96,10 +105,16 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   
   // Telegram integration states
   const [telegramChatId, setTelegramChatId] = useState<string | null>(initialTelegramChatId)
+  const [telegramRecipients, setTelegramRecipients] = useState<TelegramRecipientItem[]>(initialRecipients)
   const [telegramLoading, setTelegramLoading] = useState(false)
   const [botStartUrl, setBotStartUrl] = useState<string>('')
   const [connectToken, setConnectToken] = useState<string>('')
   const [telegramError, setTelegramError] = useState<string>('')
+  // Add recipient flow
+  const [addRecipientLabel, setAddRecipientLabel] = useState('')
+  const [addRecipientBotUrl, setAddRecipientBotUrl] = useState('')
+  const [addRecipientToken, setAddRecipientToken] = useState('')
+  const [addRecipientLoading, setAddRecipientLoading] = useState(false)
 
   // Скачать прайс в Excel (.xlsx): № п/п, ширина Наименование 28, Цена 22, только сохранённые колонки
   const downloadPriceAsExcel = (rows: Row[], columns: Column[], filename: string) => {
@@ -328,6 +343,64 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       setTelegramError('')
     }
   }, [initialTelegramChatId])
+
+  useEffect(() => {
+    setTelegramRecipients(initialRecipients)
+  }, [initialRecipients])
+
+  // Добавить получателя: connect с mode add_recipient
+  const connectAddRecipient = async () => {
+    setAddRecipientLoading(true)
+    setTelegramError('')
+    try {
+      const r = await fetch(`/api/office/businesses/${businessId}/integrations/telegram/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          mode: 'add_recipient',
+          label: addRecipientLabel.trim() || undefined,
+        }),
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error ?? 'connect failed')
+      setAddRecipientBotUrl(data.botStartUrl)
+      setAddRecipientToken(data.connectToken || '')
+    } catch (err: any) {
+      setTelegramError(err.message || 'Ошибка генерации ссылки')
+    } finally {
+      setAddRecipientLoading(false)
+    }
+  }
+
+  const toggleRecipientActive = async (recipientId: string, isActive: boolean) => {
+    try {
+      const r = await fetch(`/api/office/businesses/${businessId}/integrations/telegram/recipients/${recipientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ isActive }),
+      })
+      if (!r.ok) throw new Error('Failed to update')
+      router.refresh()
+    } catch (e) {
+      console.error('Toggle recipient error:', e)
+    }
+  }
+
+  const getAddRecipientAppUrl = (): string => {
+    if (!addRecipientToken || !addRecipientBotUrl) return ''
+    const match = addRecipientBotUrl.match(/https:\/\/t\.me\/([^?]+)/)
+    if (match?.[1]) return `tg://resolve?domain=${match[1]}&start=${addRecipientToken}`
+    return ''
+  }
+
+  const copyAddRecipientLink = () => {
+    if (addRecipientBotUrl) {
+      void navigator.clipboard.writeText(addRecipientBotUrl)
+      // можно показать toast
+    }
+  }
 
   // Загрузка данных конкретного прайса (для редактирования)
   const loadPriceData = async (priceId: string) => {
@@ -854,6 +927,132 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 ) : (
                   <span style={{ color: '#6b7280' }}>⚪ Telegram не подключен</span>
                 )}
+              </div>
+
+              {/* Получатели заявок */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.35rem', color: '#374151' }}>
+                  Получатели заявок
+                </div>
+                {telegramRecipients.length === 0 ? (
+                  <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>Нет получателей. Добавьте через кнопку ниже.</div>
+                ) : (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {telegramRecipients.map((r) => (
+                      <li
+                        key={r.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          padding: '0.35rem 0',
+                          fontSize: '0.8125rem',
+                          borderBottom: '1px solid #e5e7eb',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={r.isActive}
+                          onChange={(e) => toggleRecipientActive(r.id, e.target.checked)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <span style={{ flex: 1 }}>
+                          {r.label?.trim() || r.chatIdMasked}
+                          {r.label?.trim() && <span style={{ color: '#6b7280', marginLeft: '0.25rem' }}>({r.chatIdMasked})</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Добавить получателя */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.35rem', color: '#374151' }}>
+                  Добавить получателя
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Метка (необязательно), напр. Мария (склад)"
+                    value={addRecipientLabel}
+                    onChange={(e) => setAddRecipientLabel(e.target.value)}
+                    style={{
+                      padding: '0.4rem 0.5rem',
+                      fontSize: '0.8125rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      maxWidth: '280px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={connectAddRecipient}
+                    disabled={addRecipientLoading}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: addRecipientLoading ? '#d1d5db' : '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: addRecipientLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    {addRecipientLoading ? 'Генерация...' : 'Сгенерировать ссылку'}
+                  </button>
+                  {addRecipientBotUrl && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        onClick={copyAddRecipientLink}
+                        style={{
+                          padding: '0.4rem 0.75rem',
+                          background: 'white',
+                          color: '#2563eb',
+                          border: '1px solid #2563eb',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                          alignSelf: 'flex-start',
+                        }}
+                      >
+                        Скопировать ссылку
+                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <a
+                          href={addRecipientBotUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '0.8125rem', color: '#2563eb' }}
+                        >
+                          Открыть Telegram
+                        </a>
+                        <a href={getAddRecipientAppUrl()} style={{ fontSize: '0.8125rem', color: '#2563eb' }}>
+                          В приложении
+                        </a>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { router.refresh(); setAddRecipientBotUrl(''); setAddRecipientToken('') }}
+                        style={{
+                          padding: '0.4rem 0.75rem',
+                          background: '#f3f4f6',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                          alignSelf: 'flex-start',
+                        }}
+                      >
+                        Обновить список
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               
               {/* Кнопка "Подключить Telegram" */}
