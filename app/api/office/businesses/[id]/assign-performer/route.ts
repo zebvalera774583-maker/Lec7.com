@@ -2,12 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/middleware'
-import { getAppOrigin } from '@/lib/getAppOrigin'
 
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
+const withOfficeAuth = (handler: (req: NextRequest, user: { id: string; role: string }) => Promise<NextResponse>) =>
+  requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
 
-const TOKEN_BYTES = 16
+const TOKEN_BYTES = 24
 const PICKER_LABEL = 'Сборщик 1'
+
+function getAppOrigin(req: NextRequest): string {
+  const base = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL
+  if (base) return base.replace(/\/$/, '')
+  const host = req.headers.get('host')
+  const proto =
+    req.headers.get('x-forwarded-proto') ||
+    req.headers.get('x-forwarded-protocol') ||
+    (req.url.startsWith('https') ? 'https' : 'http')
+  return host ? `${proto}://${host}` : 'http://localhost:3000'
+}
 
 function getBusinessIdFromPath(pathname: string): string | null {
   // /api/office/businesses/[id]/assign-performer
