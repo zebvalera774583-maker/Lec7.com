@@ -83,10 +83,16 @@ export default async function BusinessDetailPage({ params }: PageProps) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {business.requests.map((request) => (
-                  <div key={request.id} style={{ padding: '0.75rem', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
-                    <h4 style={{ marginBottom: '0.25rem' }}>{request.title}</h4>
-                    <p style={{ fontSize: '0.85rem', color: '#666' }}>{request.status}</p>
-                  </div>
+                  <Link
+                    key={request.id}
+                    href={`/office/businesses/${business.id}/request/${request.id}`}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    <div style={{ padding: '0.75rem', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
+                      <h4 style={{ marginBottom: '0.25rem' }}>{request.title}</h4>
+                      <p style={{ fontSize: '0.85rem', color: '#666' }}>{request.status}</p>
+                    </div>
+                  </Link>
                 ))}
               </div>
             )}

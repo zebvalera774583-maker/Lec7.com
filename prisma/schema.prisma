@@ -17,11 +17,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  businesses         Business[]          @relation("BusinessOwner")
-  ownerConversations OwnerConversation[]
-  auditLogs          AuditLog[]
-  conversations      Conversation[]
-  agentConversations AgentConversation[] @relation("AgentConversations")
+  businesses              Business[]           @relation("BusinessOwner")
+  ownerConversations      OwnerConversation[]
+  auditLogs               AuditLog[]
+  conversations           Conversation[]
+  agentConversations      AgentConversation[]  @relation("AgentConversations")
+  createdRequestAssignments RequestAssignment[]
+  createdPickerInvites    PickerInvite[]
 }
 
 model Business {
@@ -199,10 +201,51 @@ model Request {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  business Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  invoices Invoice[]
+  business     Business?            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+  assignments  RequestAssignment[]
+  pickerInvites PickerInvite[]
 
   @@index([businessId])
+}
+
+enum PerformerRole {
+  PICKER
+}
+
+model RequestAssignment {
+  id               String        @id @default(cuid())
+  requestId        String
+  role             PerformerRole
+  createdAt        DateTime      @default(now())
+  createdByUserId  String
+  inviteId         String?       // для PICKER — ссылка на PickerInvite
+
+  request Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  invite  PickerInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+  createdBy User   @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, role])
+  @@index([requestId])
+  @@index([createdByUserId])
+}
+
+model PickerInvite {
+  id               String    @id @default(cuid())
+  token            String    @unique
+  label            String    // напр. "Сборщик 1"
+  requestId        String
+  createdAt        DateTime  @default(now())
+  createdByUserId  String
+  revokedAt        DateTime?
+  usedAt           DateTime?
+
+  request    Request             @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  createdBy  User                @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignment RequestAssignment?
+
+  @@index([requestId])
+  @@index([token])
 }
 
 // Входящая заявка от контрагента (отправитель → получатель)
