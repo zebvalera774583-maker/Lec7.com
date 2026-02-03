@@ -372,7 +372,8 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, { credentials: 'include' })
       const data = await r.json()
       if (!r.ok) throw new Error(data?.error || 'Failed to load')
-      if (data.invite) setAssignInvite(data.invite)
+      const first = (data.pickers || [])[0]
+      if (first) setAssignInvite({ label: first.label, url: first.url })
       else setAssignInvite(null)
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Ошибка загрузки')
@@ -404,7 +405,8 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       })
       const data = await r.json()
       if (!r.ok) throw new Error(data?.error || 'Ошибка')
-      setAssignInvite(data.invite)
+      const p = data.picker
+      if (p) setAssignInvite({ label: p.label, url: p.url })
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Ошибка')
     } finally {
@@ -414,6 +416,21 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
 
   const copyAssignLink = () => {
     if (assignInvite?.url) navigator.clipboard.writeText(assignInvite.url)
+  }
+
+  const handleAssignDelete = async () => {
+    setAssignError(null)
+    try {
+      const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data?.error || 'Ошибка удаления')
+      setAssignInvite(null)
+    } catch (e: unknown) {
+      setAssignError(e instanceof Error ? e.message : 'Ошибка удаления')
+    }
   }
 
   // Добавить получателя: connect с mode add_recipient
@@ -896,7 +913,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
             }}
             style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textAlign: 'left', cursor: 'pointer', display: 'inline-block', width: 'fit-content' }}
           >
-            Назначить исполнителя
+            Исполнители
           </button>
 
           {prices.length === 0 ? (
@@ -1663,6 +1680,22 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                         }}
                       >
                         Копировать
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAssignDelete}
+                        style={{
+                          marginLeft: '0.5rem',
+                          padding: '0.5rem 1rem',
+                          background: 'white',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        Удалить
                       </button>
                       <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#6b7280' }}>
                         Ссылка даёт доступ к активации страницы сборщика по этой заявке.

@@ -53,27 +53,31 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: { id: string; r
     const access = await ensureBusinessAccessible(businessId, user)
     if ('error' in access && access.error) return access.error
 
-    const assignment = await prisma.requestAssignment.findFirst({
+    const assignments = await prisma.requestAssignment.findMany({
       where: {
         role: 'PICKER',
         request: { businessId },
+        invite: { revokedAt: null },
       },
       include: { invite: true, request: { select: { id: true } } },
       orderBy: { createdAt: 'desc' },
     })
 
-    if (!assignment?.invite) {
-      return NextResponse.json({ assignment: null, invite: null })
-    }
-
     const origin = getAppOrigin(req)
-    return NextResponse.json({
-      assignment: { id: assignment.id, requestId: assignment.request.id, role: assignment.role },
-      invite: {
-        label: assignment.invite.label,
-        url: `${origin}/pick/invite/${assignment.invite.token}`,
-      },
-    })
+    const pickers = assignments
+      .filter((a) => a.invite)
+      .map((a) => ({
+        assignmentId: a.id,
+        requestId: a.request.id,
+        inviteId: a.invite!.id,
+        label: a.invite!.label,
+        createdAt: a.invite!.createdAt,
+        usedAt: a.invite!.usedAt,
+        revokedAt: a.invite!.revokedAt,
+        url: `${origin}/pick/invite/${a.invite!.token}`,
+      }))
+
+    return NextResponse.json({ pickers })
   } catch (error) {
     console.error('Get business assign performer error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
@@ -96,27 +100,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; 
       return NextResponse.json({ error: 'role PICKER is required' }, { status: 400 })
     }
 
-    // Ищем уже существующее назначение сборщика по заявке этого бизнеса
-    const existing = await prisma.requestAssignment.findFirst({
-      where: {
-        role: 'PICKER',
-        request: { businessId },
-      },
-      include: { invite: true, request: { select: { id: true } } },
-      orderBy: { createdAt: 'desc' },
-    })
-
     const origin = getAppOrigin(req)
-
-    if (existing?.invite) {
-      return NextResponse.json({
-        assignment: { id: existing.id, requestId: existing.request.id, role: existing.role },
-        invite: {
-          label: existing.invite.label,
-          url: `${origin}/pick/invite/${existing.invite.token}`,
-        },
-      })
-    }
 
     // Берём последнюю заявку бизнеса или создаём новую «техническую» заявку
     let request = await prisma.request.findFirst({
@@ -157,9 +141,14 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; 
     })
 
     return NextResponse.json({
-      assignment: { id: assignment.id, requestId: assignment.requestId, role: assignment.role },
-      invite: {
+      picker: {
+        assignmentId: assignment.id,
+        requestId: assignment.requestId,
+        inviteId: pickerInvite.id,
         label: PICKER_LABEL,
+        createdAt: pickerInvite.createdAt,
+        usedAt: pickerInvite.usedAt,
+        revokedAt: pickerInvite.revokedAt,
         url: `${origin}/pick/invite/${pickerInvite.token}`,
       },
     })
@@ -168,4 +157,41 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; 
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 })
+
+export const DELETE = withOfficeAuth(async (req: NextRequest, user: { id: string; role: string }) => {
+  try {
+    const businessId = getBusinessIdFromPath(new URL(req.url).pathname)
+    if (!businessId) {
+      return NextResponse.json({ error: 'business id is required' }, { status: 400 })
+    }
+
+    const access = await ensureBusinessAccessible(businessId, user)
+    if ('error' in access && access.error) return access.error
+
+    const assignment = await prisma.requestAssignment.findFirst({
+      where: {
+        role: 'PICKER',
+        request: { businessId },
+        invite: { revokedAt: null },
+      },
+      include: { invite: true },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (!assignment?.invite) {
+      return NextResponse.json({ ok: true })
+    }
+
+    await prisma.pickerInvite.update({
+      where: { id: assignment.invite.id },
+      data: { revokedAt: new Date() },
+    })
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('Business delete assign performer error:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+})
+
 
