@@ -219,7 +219,7 @@ model RequestAssignment {
   role             PerformerRole
   createdAt        DateTime      @default(now())
   createdByUserId  String
-  inviteId         String?       // для PICKER — ссылка на PickerInvite
+  inviteId         String?   @unique // для PICKER — ссылка на PickerInvite (one-to-one)
 
   request Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
   invite  PickerInvite? @relation(fields: [inviteId], references: [id], onDelete: SetNull)
