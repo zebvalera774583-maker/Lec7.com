@@ -125,9 +125,8 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [addRecipientLoading, setAddRecipientLoading] = useState(false)
   const [telegramPanelOpen, setTelegramPanelOpen] = useState(false)
 
-  // Назначить исполнителя: панель справа + выбранная заявка
+  // Назначить исполнителя: панель справа
   const [assignPerformerOpen, setAssignPerformerOpen] = useState(false)
-  const [assignPerformerRequestId, setAssignPerformerRequestId] = useState<string | null>(null)
   const [assignInvite, setAssignInvite] = useState<{ label: string; url: string } | null>(null)
   const [assignLoading, setAssignLoading] = useState(false)
   const [assignGenerateLoading, setAssignGenerateLoading] = useState(false)
@@ -366,11 +365,11 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   }, [initialRecipients])
 
   // Загрузка существующего инвайта при открытии drawer «Назначить исполнителя»
-  const loadAssignExisting = async (requestId: string) => {
+  const loadAssignExisting = async () => {
     setAssignLoading(true)
     setAssignError(null)
     try {
-      const r = await fetch(`/api/office/requests/${requestId}/assign-performer`, { credentials: 'include' })
+      const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, { credentials: 'include' })
       const data = await r.json()
       if (!r.ok) throw new Error(data?.error || 'Failed to load')
       if (data.invite) setAssignInvite(data.invite)
@@ -383,22 +382,21 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   }
 
   useEffect(() => {
-    if (assignPerformerOpen && assignPerformerRequestId) {
+    if (assignPerformerOpen) {
       setAssignInvite(null)
       setAssignError(null)
-      loadAssignExisting(assignPerformerRequestId)
+      loadAssignExisting()
     } else if (!assignPerformerOpen) {
       setAssignInvite(null)
       setAssignError(null)
     }
-  }, [assignPerformerOpen, assignPerformerRequestId])
+  }, [assignPerformerOpen])
 
   const handleAssignGenerate = async () => {
-    if (!assignPerformerRequestId) return
     setAssignGenerateLoading(true)
     setAssignError(null)
     try {
-      const r = await fetch(`/api/office/requests/${assignPerformerRequestId}/assign-performer`, {
+      const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -895,7 +893,6 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
             type="button"
             onClick={() => {
               setAssignPerformerOpen(true)
-              setAssignPerformerRequestId(requests[0]?.id ?? null)
             }}
             style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', fontSize: '1rem', fontWeight: 500, textAlign: 'left', cursor: 'pointer', display: 'inline-block', width: 'fit-content' }}
           >
@@ -1594,7 +1591,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>Назначить исполнителя</h2>
                 <button
                   type="button"
-                  onClick={() => { setAssignPerformerOpen(false); setAssignPerformerRequestId(null); setAssignInvite(null); setAssignError(null) }}
+                  onClick={() => { setAssignPerformerOpen(false); setAssignInvite(null); setAssignError(null) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#6b7280' }}
                 >
                   ×
