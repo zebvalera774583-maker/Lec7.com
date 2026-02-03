@@ -24,6 +24,11 @@ export default async function PartnershipPage({ params }: PageProps) {
         orderBy: { createdAt: 'asc' },
         select: { id: true, chatId: true, label: true, isActive: true, createdAt: true },
       },
+      requests: {
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, title: true, status: true, createdAt: true },
+      },
     },
   })
 
@@ -39,11 +44,19 @@ export default async function PartnershipPage({ params }: PageProps) {
     createdAt: r.createdAt.toISOString(),
   }))
 
+  const requests = business.requests.map((r) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    createdAt: r.createdAt.toISOString(),
+  }))
+
   return (
     <PartnershipPageClient
       businessId={business.id}
       telegramChatId={business.telegramChatId}
       telegramRecipients={recipients}
+      requests={requests}
     />
   )
 }

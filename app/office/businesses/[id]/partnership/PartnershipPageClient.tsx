@@ -43,10 +43,18 @@ interface TelegramRecipientItem {
   createdAt: string
 }
 
+interface RequestItem {
+  id: string
+  title: string
+  status: string
+  createdAt: string
+}
+
 interface PartnershipPageClientProps {
   businessId: string
   telegramChatId: string | null
   telegramRecipients: TelegramRecipientItem[]
+  requests: RequestItem[]
 }
 
 interface AssignedPrice {
@@ -84,7 +92,7 @@ interface IncomingRequest {
   createdAt: string
 }
 
-export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients }: PartnershipPageClientProps) {
+export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients, requests }: PartnershipPageClientProps) {
   const router = useRouter()
   const [prices, setPrices] = useState<Price[]>([])
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
@@ -116,6 +124,13 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [addRecipientToken, setAddRecipientToken] = useState('')
   const [addRecipientLoading, setAddRecipientLoading] = useState(false)
   const [telegramPanelOpen, setTelegramPanelOpen] = useState(false)
+
+  // Назначить исполнителя (drawer по заявке Request)
+  const [assignPerformerRequestId, setAssignPerformerRequestId] = useState<string | null>(null)
+  const [assignInvite, setAssignInvite] = useState<{ label: string; url: string } | null>(null)
+  const [assignLoading, setAssignLoading] = useState(false)
+  const [assignGenerateLoading, setAssignGenerateLoading] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
 
   // Скачать прайс в Excel (.xlsx): № п/п, ширина Наименование 28, Цена 22, только сохранённые колонки
   const downloadPriceAsExcel = (rows: Row[], columns: Column[], filename: string) => {
@@ -348,6 +363,59 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   useEffect(() => {
     setTelegramRecipients(initialRecipients)
   }, [initialRecipients])
+
+  // Загрузка существующего инвайта при открытии drawer «Назначить исполнителя»
+  const loadAssignExisting = async (requestId: string) => {
+    setAssignLoading(true)
+    setAssignError(null)
+    try {
+      const r = await fetch(`/api/office/requests/${requestId}/assign-performer`, { credentials: 'include' })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error || 'Failed to load')
+      if (data.invite) setAssignInvite(data.invite)
+      else setAssignInvite(null)
+    } catch (e: unknown) {
+      setAssignError(e instanceof Error ? e.message : 'Ошибка загрузки')
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (assignPerformerRequestId) {
+      setAssignInvite(null)
+      setAssignError(null)
+      loadAssignExisting(assignPerformerRequestId)
+    } else {
+      setAssignInvite(null)
+      setAssignError(null)
+    }
+  }, [assignPerformerRequestId])
+
+  const handleAssignGenerate = async () => {
+    if (!assignPerformerRequestId) return
+    setAssignGenerateLoading(true)
+    setAssignError(null)
+    try {
+      const r = await fetch(`/api/office/requests/${assignPerformerRequestId}/assign-performer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ role: 'PICKER' }),
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data?.error || 'Ошибка')
+      setAssignInvite(data.invite)
+    } catch (e: unknown) {
+      setAssignError(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setAssignGenerateLoading(false)
+    }
+  }
+
+  const copyAssignLink = () => {
+    if (assignInvite?.url) navigator.clipboard.writeText(assignInvite.url)
+  }
 
   // Добавить получателя: connect с mode add_recipient
   const connectAddRecipient = async () => {
@@ -822,6 +890,54 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           >
             Сводная таблица прайсов
           </Link>
+
+          {/* Заявки: список с кнопкой «Назначить исполнителя» */}
+          {requests.length > 0 && (
+            <div style={{ width: '100%' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 500, color: '#111827', marginBottom: '0.5rem' }}>Заявки</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {requests.map((req) => (
+                  <div
+                    key={req.id}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: '0.9375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{req.title}</div>
+                      <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{req.status}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAssignPerformerRequestId(req.id)}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        background: 'white',
+                        color: '#111827',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.8125rem',
+                        fontWeight: 500,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Назначить исполнителя
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {prices.length === 0 ? (
             <button
               type="button"
@@ -1494,6 +1610,114 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
 
               {telegramError && (
                 <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>{telegramError}</div>
+              )}
+            </div>
+          )}
+
+          {/* Drawer «Назначить исполнителя» — тот же UI, что на странице заявки */}
+          {assignPerformerRequestId && (
+            <div
+              style={{
+                width: '320px',
+                flexShrink: 0,
+                padding: '1.25rem',
+                background: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#111827' }}>Назначить исполнителя</h2>
+                <button
+                  type="button"
+                  onClick={() => { setAssignPerformerRequestId(null); setAssignInvite(null); setAssignError(null) }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#6b7280' }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {assignLoading ? (
+                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Загрузка...</p>
+              ) : (
+                <>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#374151', marginBottom: '0.35rem' }}>Должность</label>
+                    <select
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        fontSize: '0.875rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        background: 'white',
+                      }}
+                      defaultValue="PICKER"
+                    >
+                      <option value="PICKER">Сборщик</option>
+                    </select>
+                  </div>
+
+                  {!assignInvite ? (
+                    <button
+                      type="button"
+                      onClick={handleAssignGenerate}
+                      disabled={assignGenerateLoading}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'white',
+                        color: '#111827',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: assignGenerateLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {assignGenerateLoading ? 'Генерация...' : 'Сгенерировать ссылку'}
+                    </button>
+                  ) : (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <p style={{ fontSize: '0.875rem', marginBottom: '0.35rem' }}>
+                        <strong>Исполнитель:</strong> {assignInvite.label}
+                      </p>
+                      <input
+                        type="text"
+                        readOnly
+                        value={assignInvite.url}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          fontSize: '0.8125rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          background: '#fff',
+                          marginBottom: '0.5rem',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={copyAssignLink}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: 'white',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                        }}
+                      >
+                        Копировать
+                      </button>
+                    </div>
+                  )}
+
+                  <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                    Ссылка даёт доступ к активации страницы сборщика по этой заявке.
+                  </p>
+                  {assignError && <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#dc2626' }}>{assignError}</p>}
+                </>
               )}
             </div>
           )}
