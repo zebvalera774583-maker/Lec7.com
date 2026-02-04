@@ -7,11 +7,12 @@ const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_AD
 function parseIds(pathname: string): { businessId: string | null; partnerBusinessId: string | null } {
   const parts = pathname.split('/')
   const idx = parts.indexOf('businesses')
-  if (idx === -1 || idx + 2 >= parts.length) {
+  if (idx === -1 || idx + 1 >= parts.length) {
     return { businessId: null, partnerBusinessId: null }
   }
   const businessId = parts[idx + 1] || null
-  const partnerBusinessId = parts[idx + 3] || null // .../businesses/[id]/partnership/counterparties/[partnerId]
+  // Последний сегмент пути — это partnerId: /api/office/businesses/[id]/partnership/counterparties/[partnerId]
+  const partnerBusinessId = parts[parts.length - 1] || null
   return { businessId, partnerBusinessId }
 }
 
