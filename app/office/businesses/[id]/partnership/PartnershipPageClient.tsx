@@ -124,6 +124,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [addRecipientToken, setAddRecipientToken] = useState('')
   const [addRecipientLoading, setAddRecipientLoading] = useState(false)
   const [telegramPanelOpen, setTelegramPanelOpen] = useState(false)
+  const [removingCounterpartyId, setRemovingCounterpartyId] = useState<string | null>(null)
 
   // Назначить исполнителя: панель справа
   const [assignPerformerOpen, setAssignPerformerOpen] = useState(false)
@@ -303,6 +304,30 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
     if (slug) return slug
     if (residentNumber) return residentNumber
     return 'fromBusinessId' in counterparty ? counterparty.fromBusinessId : counterparty.partnerBusinessId
+  }
+
+  const handleRemoveCounterparty = async (partnerBusinessId: string) => {
+    if (removingCounterpartyId) return
+    const confirmed = window.confirm('Удалить контрагента из списка действующих?')
+    if (!confirmed) return
+    try {
+      setRemovingCounterpartyId(partnerBusinessId)
+      const r = await fetch(
+        `/api/office/businesses/${businessId}/partnership/counterparties/${partnerBusinessId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        },
+      )
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data?.error || 'Ошибка удаления контрагента')
+      await loadPartnershipData()
+    } catch (e) {
+      console.error('Remove counterparty error:', e)
+      alert(e instanceof Error ? e.message : 'Ошибка удаления контрагента')
+    } finally {
+      setRemovingCounterpartyId(null)
+    }
   }
 
   // Подключение Telegram
@@ -979,6 +1004,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                       <tr style={{ background: '#f9fafb' }}>
                         <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
                         <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -986,6 +1012,24 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                         <tr key={counterparty.partnerBusinessId}>
                           <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
                           <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCounterparty(counterparty.partnerBusinessId)}
+                              disabled={removingCounterpartyId === counterparty.partnerBusinessId}
+                              style={{
+                                padding: '0.35rem 0.75rem',
+                                background: '#f9fafb',
+                                color: '#111827',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                cursor: removingCounterpartyId ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8125rem',
+                              }}
+                            >
+                              {removingCounterpartyId === counterparty.partnerBusinessId ? 'Удаление...' : 'Удалить'}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
