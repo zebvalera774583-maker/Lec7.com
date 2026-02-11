@@ -8,28 +8,40 @@ import Papa from 'papaparse'
 export type ImportItem = {
   title: string
   price: number | null
+  priceWithVat?: number | null
+  priceWithoutVat?: number | null
   unit?: string | null
   sku?: string | null
 }
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20MB
 
-// Column header patterns (case-insensitive)
+// Title column patterns (для поиска header)
 const TITLE_PATTERNS = /^(наименование|товар|позиция|name|title|название)$/i
-const PRICE_PATTERNS = /^(цена|price|стоимость|сумма)$/i
-const UNIT_PATTERNS = /^(ед|ед\.|единица|unit|ед\.?\s*изм)$/i
+
+// Заголовки, которые НЕ должны импортироваться как позиции
+const TITLE_ROW_SKIP = /^(наименование\s+товара|наименование|товар|номенклатура|позиция|наименование\s+продукции)$/i
+
+// Колонки, которые выглядят как заголовки
+const COLUMN_HEADER_LIKE = /^(ед\.?\s*изм|единица|цена|цена\s*с\s*ндс|цена\s*без\s*ндс|с\s*ндс|без\s*ндс|сумма)$/i
+
+// Price column patterns
+const PRICE_VAT_PATTERNS = /(с\s*ндс|вкл\.?\s*ндс|включая\s*ндс)/i
+const PRICE_NO_VAT_PATTERNS = /(без\s*ндс|без\s*учёта\s*ндс)/i
+const PRICE_GENERIC = /^(цена|price|стоимость|сумма)$/i
+
+// Unit patterns (расширенные)
+const UNIT_PATTERNS =
+  /^(ед|ед\.|ед\.?\s*изм|единица|единицы|уп|упак|упаковка|фас|кг|г|л|мл|шт|штук|пуч|пучок|ящ|ящик|кор|короб|крт|коробка)$/i
+
 const SKU_PATTERNS = /^(артикул|sku|код)$/i
 
-// Service columns to skip (first column)
 const INDEX_PATTERNS = /^(№|№\s*п\/п|n|index|номер)$/i
 
 function matchHeader(h: string, patterns: RegExp): boolean {
   return patterns.test(String(h || '').trim())
 }
 
-/**
- * Parse price string: "1 200,50" or "1200.50" -> number
- */
 function parsePrice(val: unknown): number | null {
   if (val == null || val === '') return null
   const s = String(val).trim()
@@ -39,9 +51,6 @@ function parsePrice(val: unknown): number | null {
   return Number.isNaN(num) ? null : num
 }
 
-/**
- * Check if value looks like a number (for detecting numeric columns)
- */
 function looksNumeric(val: unknown): boolean {
   if (val == null || val === '') return false
   const s = String(val).trim()
@@ -51,22 +60,15 @@ function looksNumeric(val: unknown): boolean {
   return !Number.isNaN(num)
 }
 
-/**
- * Check if cell is pure number (for header vs text detection)
- */
 function isPureNumber(val: string): boolean {
   const s = val.trim()
   if (!s) return false
   const norm = s.replace(/\s/g, '').replace(',', '.')
   const num = parseFloat(norm)
   if (Number.isNaN(num)) return false
-  // Allow integer or decimal
   return /^[\d\s.,\-]+$/.test(s)
 }
 
-/**
- * Check if title is junk: pure number or too short
- */
 function isJunkTitle(title: string): boolean {
   const t = title.trim()
   if (t.length < 3) return true
@@ -74,8 +76,15 @@ function isJunkTitle(title: string): boolean {
 }
 
 /**
- * Extract businessId from path like /api/office/businesses/[id]/price-lists/import/parse
+ * Строка похожа на заголовок (не импортировать как позицию)
  */
+function isHeaderLikeRow(row: string[], titleCol: number): boolean {
+  const title = String(row[titleCol] ?? '').trim()
+  if (matchHeader(title, TITLE_ROW_SKIP)) return true
+  if (row.some((c) => matchHeader(String(c ?? ''), COLUMN_HEADER_LIKE))) return true
+  return false
+}
+
 export function getBusinessIdFromPath(pathname: string): string | null {
   const parts = pathname.split('/')
   const idx = parts.indexOf('businesses')
@@ -89,11 +98,6 @@ export function assertFileSize(size: number): void {
   }
 }
 
-/**
- * Find real table header inside Excel: scan first maxScan rows.
- * Header row: ≥3 non-empty cells, ≥2 text cells, contains text, not only numbers,
- * not single "№ п/п". Prefer row with TITLE_PATTERNS (наименование etc).
- */
 function findHeaderRow(rows: string[][], maxScan: number): number {
   const scan = Math.min(maxScan, rows.length)
   const candidates: number[] = []
@@ -126,6 +130,15 @@ function findHeaderRow(rows: string[][], maxScan: number): number {
   return 0
 }
 
+/**
+ * Проверить, содержит ли ячейка допустимую единицу измерения
+ */
+function isValidUnit(val: string): boolean {
+  const s = val.trim()
+  if (!s || s.length > 20) return false
+  return UNIT_PATTERNS.test(s) || /^[а-яёa-z]{1,10}$/i.test(s)
+}
+
 export function parseFileToItems(
   buffer: Buffer,
   filename: string,
@@ -151,9 +164,7 @@ export function parseFileToItems(
   } else if (['xlsx', 'xls'].includes(ext) || mime.includes('spreadsheet') || mime.includes('excel')) {
     const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false })
     const firstSheet = wb.SheetNames[0]
-    if (!firstSheet) {
-      throw new Error('В файле нет листов')
-    }
+    if (!firstSheet) throw new Error('В файле нет листов')
     const ws = wb.Sheets[firstSheet]
     const aoa = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
     rows = aoa as string[][]
@@ -168,33 +179,90 @@ export function parseFileToItems(
   const headerRowIdx = findHeaderRow(rows, 30)
   const headerRow = rows[headerRowIdx].map((c) => String(c || '').trim())
 
-  // 1. Skip index column if first column matches
   let colOffset = 0
   if (matchHeader(headerRow[0], INDEX_PATTERNS)) {
     colOffset = 1
   }
 
   let titleCol = colOffset
-  let priceCol = colOffset + 1
+  let priceWithVatCol: number | null = null
+  let priceWithoutVatCol: number | null = null
   let unitCol: number | null = null
   let skuCol: number | null = null
 
   const hasLikelyHeaders = headerRow.some(
-    (h) => matchHeader(h, TITLE_PATTERNS) || matchHeader(h, PRICE_PATTERNS)
+    (h) => matchHeader(h, TITLE_PATTERNS) || PRICE_GENERIC.test(h) || UNIT_PATTERNS.test(h)
   )
 
   if (hasLikelyHeaders) {
     headerRow.forEach((h, i) => {
       if (i < colOffset) return
       const idx = i
-      if (matchHeader(h, TITLE_PATTERNS)) titleCol = idx
-      if (matchHeader(h, PRICE_PATTERNS)) priceCol = idx
-      if (matchHeader(h, UNIT_PATTERNS)) unitCol = idx
-      if (matchHeader(h, SKU_PATTERNS)) skuCol = idx
+      const cell = String(h || '').trim()
+      if (matchHeader(cell, TITLE_PATTERNS)) titleCol = idx
+      if (UNIT_PATTERNS.test(cell)) unitCol = idx
+      if (matchHeader(cell, SKU_PATTERNS)) skuCol = idx
+
+      if (PRICE_NO_VAT_PATTERNS.test(cell)) {
+        priceWithoutVatCol = idx
+      } else if (PRICE_VAT_PATTERNS.test(cell) || PRICE_GENERIC.test(cell)) {
+        priceWithVatCol = idx
+      }
     })
   }
 
+  if (priceWithVatCol == null && priceWithoutVatCol == null && hasLikelyHeaders) {
+    const genericPrice = headerRow.findIndex((h, i) => i >= colOffset && PRICE_GENERIC.test(h))
+    if (genericPrice >= 0) priceWithVatCol = genericPrice
+  }
+
   const dataStart = hasLikelyHeaders ? headerRowIdx + 1 : 0
+
+  let defaultUnit: string | null = null
+  if (unitCol != null) {
+    for (let r = dataStart; r < Math.min(dataStart + 20, rows.length); r++) {
+      const val = String(rows[r]?.[unitCol] ?? '').trim()
+      if (isValidUnit(val)) {
+        defaultUnit = val
+        break
+      }
+    }
+    if (!defaultUnit && headerRowIdx > 0) {
+      const aboveRow = rows[headerRowIdx - 1] || []
+      for (let c = 0; c < aboveRow.length; c++) {
+        const val = String(aboveRow[c] ?? '').trim()
+        if (isValidUnit(val)) {
+          defaultUnit = val
+          break
+        }
+        const afterColon = val.split(/:\s*/).pop()?.trim()
+        if (afterColon && isValidUnit(afterColon)) {
+          defaultUnit = afterColon
+          break
+        }
+      }
+    }
+    if (!defaultUnit) {
+      const adj = [unitCol - 1, unitCol + 1].filter((c) => c >= 0 && c < headerRow.length)
+      for (const c of adj) {
+        const val = String(headerRow[c] ?? '').trim()
+        if (isValidUnit(val)) {
+          defaultUnit = val
+          break
+        }
+      }
+    }
+  }
+
+  console.log('Columns:', {
+    titleCol,
+    priceWithVatCol,
+    priceWithoutVatCol,
+    unitCol,
+    skuCol,
+    defaultUnit,
+  })
+
   const items: ImportItem[] = []
   let noPriceCount = 0
 
@@ -207,34 +275,51 @@ export function parseFileToItems(
     if (!title) continue
 
     if (isJunkTitle(title)) continue
+    if (isHeaderLikeRow(row, titleCol)) continue
 
-    let price = parsePrice(row[priceCol])
+    let priceWithVat: number | null = null
+    let priceWithoutVat: number | null = null
 
-    // 3. If price not found — try adjacent numeric columns (right of title)
-    if (price == null) {
+    if (priceWithVatCol != null) {
+      priceWithVat = parsePrice(row[priceWithVatCol])
+    }
+    if (priceWithoutVatCol != null) {
+      priceWithoutVat = parsePrice(row[priceWithoutVatCol])
+    }
+
+    if (priceWithVat == null && priceWithoutVat == null) {
       const colsToTry = [
-        priceCol,
+        priceWithVatCol,
+        priceWithoutVatCol,
         titleCol + 1,
         titleCol + 2,
         titleCol + 3,
-      ].filter((c) => c !== titleCol && c >= 0 && c < row.length)
+      ].filter((c): c is number => c != null && c !== titleCol && c >= 0 && c < row.length)
       for (const c of colsToTry) {
         const val = row[c]
         if (looksNumeric(val)) {
-          price = parsePrice(val)
-          if (price != null) break
+          const p = parsePrice(val)
+          if (p != null) {
+            priceWithVat = p
+            break
+          }
         }
       }
     }
 
-    if (price == null) noPriceCount++
+    if (priceWithVat == null && priceWithoutVat == null) noPriceCount++
 
-    const unit = unitCol != null ? String(row[unitCol] ?? '').trim() || null : null
+    let unit = unitCol != null ? String(row[unitCol] ?? '').trim() || null : null
+    if (!unit && defaultUnit) unit = defaultUnit
     const sku = skuCol != null ? String(row[skuCol] ?? '').trim() || null : null
+
+    const price = priceWithVat ?? priceWithoutVat
 
     items.push({
       title,
       price,
+      priceWithVat: priceWithVat ?? undefined,
+      priceWithoutVat: priceWithoutVat ?? undefined,
       unit: unit || undefined,
       sku: sku || undefined,
     })
@@ -244,7 +329,6 @@ export function parseFileToItems(
     warnings.push(`Не удалось распознать цену в ${noPriceCount} строках`)
   }
 
-  // 5. UX: if 70%+ rows without price — add structural warning
   if (items.length > 0 && noPriceCount / items.length >= 0.7) {
     warnings.push('⚠ Возможно, файл имеет сложную структуру. Проверьте, что в таблице есть колонки «Наименование» и «Цена».')
   }

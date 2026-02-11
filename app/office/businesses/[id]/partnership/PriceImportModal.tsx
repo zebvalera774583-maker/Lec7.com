@@ -5,6 +5,8 @@ import { useState, useRef } from 'react'
 export type ImportItem = {
   title: string
   price: number | null
+  priceWithVat?: number | null
+  priceWithoutVat?: number | null
   unit?: string | null
   sku?: string | null
 }

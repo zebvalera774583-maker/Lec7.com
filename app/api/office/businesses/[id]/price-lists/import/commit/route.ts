@@ -55,20 +55,43 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
         },
       })
 
-      const rowsToCreate = validItems.map((it: { title: string; price?: number | null; unit?: string | null; sku?: string | null }, index: number) => {
-        const priceNum =
-          it.price != null && typeof it.price === 'number' && !Number.isNaN(it.price) ? it.price : null
-        const extra = it.sku && String(it.sku).trim() ? { sku: String(it.sku).trim() } : undefined
-        return {
-          priceListId: priceList.id,
-          order: index + 1,
-          name: String(it.title).trim(),
-          unit: it.unit && String(it.unit).trim() ? String(it.unit).trim() : null,
-          priceWithVat: priceNum,
-          priceWithoutVat: priceNum,
-          extra,
+      const rowsToCreate = validItems.map(
+        (
+          it: {
+            title: string
+            price?: number | null
+            priceWithVat?: number | null
+            priceWithoutVat?: number | null
+            unit?: string | null
+            sku?: string | null
+          },
+          index: number
+        ) => {
+          const priceWithVat =
+            it.priceWithVat != null && typeof it.priceWithVat === 'number' && !Number.isNaN(it.priceWithVat)
+              ? it.priceWithVat
+              : null
+          const priceWithoutVat =
+            it.priceWithoutVat != null &&
+            typeof it.priceWithoutVat === 'number' &&
+            !Number.isNaN(it.priceWithoutVat)
+              ? it.priceWithoutVat
+              : null
+          const fallbackPrice = it.price != null && typeof it.price === 'number' && !Number.isNaN(it.price) ? it.price : null
+          const finalPriceWithVat = priceWithVat ?? (priceWithoutVat == null ? fallbackPrice : null)
+          const finalPriceWithoutVat = priceWithoutVat ?? (priceWithVat == null ? fallbackPrice : null)
+          const extra = it.sku && String(it.sku).trim() ? { sku: String(it.sku).trim() } : undefined
+          return {
+            priceListId: priceList.id,
+            order: index + 1,
+            name: String(it.title).trim(),
+            unit: it.unit && String(it.unit).trim() ? String(it.unit).trim() : null,
+            priceWithVat: finalPriceWithVat,
+            priceWithoutVat: finalPriceWithoutVat,
+            extra,
+          }
         }
-      })
+      )
 
       await tx.priceListRow.createMany({
         data: rowsToCreate,
