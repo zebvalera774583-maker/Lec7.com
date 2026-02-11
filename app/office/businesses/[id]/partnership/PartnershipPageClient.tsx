@@ -544,7 +544,6 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         return result
       })
 
-      // Восстанавливаем структуру колонок: сохраняем полный список (в т.ч. удалённые «с НДС»/«без НДС»)
       const BASE_COLUMN_DEFS: Column[] = [
         { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
         { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
@@ -559,11 +558,11 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           kind: col.kind === 'number' ? 'number' : 'text',
           isBase: ['name', 'unit', 'priceWithVat', 'priceWithoutVat'].includes(col.id),
         }))
-        // Гарантируем наличие обязательных колонок (их нельзя удалить)
         if (!columns.some((c) => c.id === 'name')) columns.unshift(BASE_COLUMN_DEFS[0])
         if (!columns.some((c) => c.id === 'unit')) columns.splice(1, 0, BASE_COLUMN_DEFS[1])
       } else {
-        columns = [...BASE_COLUMN_DEFS]
+        const hasAnyPriceWithoutVat = data.rows?.some((r: any) => r.priceWithoutVat != null)
+        columns = hasAnyPriceWithoutVat ? [...BASE_COLUMN_DEFS] : BASE_COLUMN_DEFS.filter((c) => c.id !== 'priceWithoutVat')
       }
 
       setEditingPriceData({ rows, columns, category: data.category })
@@ -1212,7 +1211,6 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                       return result
                     })
 
-                    // Восстанавливаем колонки (полный список из БД)
                     const baseDefs: Column[] = [
                       { id: 'name', title: 'Наименование', kind: 'text', isBase: true },
                       { id: 'unit', title: 'Ед. изм', kind: 'text', isBase: true },
@@ -1230,7 +1228,8 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                       if (!columns.some((c) => c.id === 'name')) columns.unshift(baseDefs[0])
                       if (!columns.some((c) => c.id === 'unit')) columns.splice(1, 0, baseDefs[1])
                     } else {
-                      columns = [...baseDefs]
+                      const hasAnyPriceWithoutVat = data.rows?.some((r: any) => r.priceWithoutVat != null)
+                      columns = hasAnyPriceWithoutVat ? [...baseDefs] : baseDefs.filter((c) => c.id !== 'priceWithoutVat')
                     }
 
                     setEditingPriceData({ rows, columns, category: data.category })
@@ -1488,6 +1487,42 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                     }}
                   >
                     Скачать прайс
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setMenuOpenPriceId(null)
+                      if (!confirm('Удалить прайс «' + price.name + '»?')) return
+                      try {
+                        const res = await fetch(`/api/office/businesses/${businessId}/prices/${price.id}`, {
+                          method: 'DELETE',
+                          credentials: 'include',
+                        })
+                        if (!res.ok) throw new Error('Не удалось удалить')
+                        await loadPrices()
+                      } catch (e) {
+                        alert('Ошибка удаления прайса')
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderTop: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#dc2626',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fef2f2'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    Удалить прайс
                   </button>
                 </div>
               </>

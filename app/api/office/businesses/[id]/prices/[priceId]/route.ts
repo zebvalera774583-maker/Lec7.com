@@ -219,3 +219,44 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 })
+
+export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
+  try {
+    const url = new URL(req.url)
+    const pathParts = url.pathname.split('/')
+    const businessId = pathParts[pathParts.indexOf('businesses') + 1]
+    const priceId = pathParts[pathParts.indexOf('prices') + 1]
+
+    if (!businessId || !priceId) {
+      return NextResponse.json({ error: 'business id and price id are required' }, { status: 400 })
+    }
+
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true, ownerId: true },
+    })
+
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+
+    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const priceList = await prisma.priceList.findFirst({
+      where: { id: priceId, businessId },
+    })
+
+    if (!priceList) {
+      return NextResponse.json({ error: 'Price list not found' }, { status: 404 })
+    }
+
+    await prisma.priceList.delete({ where: { id: priceId } })
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('Delete price list error:', error)
+    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 })
+  }
+})

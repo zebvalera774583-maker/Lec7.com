@@ -46,16 +46,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
         : `Импорт прайса (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`
 
     const result = await prisma.$transaction(async (tx) => {
-      const priceList = await tx.priceList.create({
-        data: {
-          businessId,
-          name: priceListName,
-          kind: 'BASE',
-          category: null,
-        },
-      })
-
-      const rowsToCreate = validItems.map(
+      const mappedRows = validItems.map(
         (
           it: {
             title: string
@@ -82,7 +73,6 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
           const finalPriceWithoutVat = priceWithoutVat ?? (priceWithVat == null ? fallbackPrice : null)
           const extra = it.sku && String(it.sku).trim() ? { sku: String(it.sku).trim() } : undefined
           return {
-            priceListId: priceList.id,
             order: index + 1,
             name: String(it.title).trim(),
             unit: it.unit && String(it.unit).trim() ? String(it.unit).trim() : null,
@@ -93,11 +83,39 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
         }
       )
 
-      await tx.priceListRow.createMany({
-        data: rowsToCreate,
+      const hasAnyPriceWithoutVat = mappedRows.some((r) => r.priceWithoutVat != null)
+      const columns = hasAnyPriceWithoutVat
+        ? [
+            { id: 'name', title: 'Наименование', kind: 'text' },
+            { id: 'unit', title: 'Ед. изм', kind: 'text' },
+            { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number' },
+            { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number' },
+          ]
+        : [
+            { id: 'name', title: 'Наименование', kind: 'text' },
+            { id: 'unit', title: 'Ед. изм', kind: 'text' },
+            { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number' },
+          ]
+
+      const priceList = await tx.priceList.create({
+        data: {
+          businessId,
+          name: priceListName,
+          kind: 'BASE',
+          category: null,
+          columns,
+        },
       })
 
-      return { priceListId: priceList.id, count: rowsToCreate.length }
+      await tx.priceListRow.createMany({
+        data: mappedRows.map((r) => ({
+          priceListId: priceList.id,
+          ...r,
+          priceWithoutVat: hasAnyPriceWithoutVat ? r.priceWithoutVat : null,
+        })),
+      })
+
+      return { priceListId: priceList.id, count: mappedRows.length }
     })
 
     return NextResponse.json(result)
