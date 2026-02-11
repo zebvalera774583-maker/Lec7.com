@@ -16,7 +16,7 @@ WITH accepted_prices AS (
   JOIN "Business" s ON s.id = pl."businessId"
   WHERE pa."counterpartyBusinessId" = $1
     AND pa.status = 'ACTIVE'::"PartnerLinkStatus"
-    AND (pl.category = $2 OR (pl.category IS NULL AND $2 = 'Свежая плодоовощная продукция'))
+    AND (pl.category = $2 OR pl.category IS NULL)
   UNION
   SELECT
     pl.id AS "priceListId",
@@ -26,7 +26,7 @@ WITH accepted_prices AS (
   FROM "PriceList" pl
   JOIN "Business" s ON s.id = pl."businessId"
   WHERE pl."businessId" = $1
-    AND (pl.category = $2 OR (pl.category IS NULL AND $2 = 'Свежая плодоовощная продукция'))
+    AND (pl.category = $2 OR pl.category IS NULL)
 ),
 items AS (
   SELECT
@@ -113,10 +113,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const categoryFilter =
-      categoryParam === 'Свежая плодоовощная продукция'
-        ? { OR: [{ category: categoryParam }, { category: null }] }
-        : { category: categoryParam }
+    const categoryFilter = { OR: [{ category: categoryParam }, { category: null }] }
 
     const [assignments, ownPriceLists] = await Promise.all([
       prisma.priceAssignment.findMany({
