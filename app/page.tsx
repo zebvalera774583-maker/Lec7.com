@@ -64,7 +64,7 @@ export default function HomePage() {
               color: '#0f172a',
             }}
           >
-            Lec7
+            Lek7
           </span>
         </div>
       </div>
@@ -130,7 +130,7 @@ export default function HomePage() {
                   color: '#111827',
                 }}
               >
-                Lec7
+                Lek7
               </span>{' '}
               — AI-платформа для ведения сделок
               <br />
@@ -147,11 +147,10 @@ export default function HomePage() {
               }}
             >
               <Link
-                href="/resident/welcome"
+                href="/resident/signup"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
                   color: '#111827',
                   textDecoration: 'none',
                   padding: '0.35rem 0.1rem',
@@ -165,11 +164,24 @@ export default function HomePage() {
                 >
                   Создать свой бизнес
                 </span>
+              </Link>
+              <Link
+                href="/login"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  color: '#111827',
+                  textDecoration: 'none',
+                  padding: '0.35rem 0.1rem',
+                }}
+              >
                 <span
-                  aria-hidden="true"
-                  style={{ fontSize: '1.1rem', transform: 'translateY(-1px)' }}
+                  style={{
+                    borderBottom: '1px solid rgba(15, 23, 42, 0.2)',
+                    paddingBottom: '0.1rem',
+                  }}
                 >
-                  →
+                  Войти
                 </span>
               </Link>
             </div>
@@ -267,7 +279,7 @@ export default function HomePage() {
               color: '#111827',
             }}
           >
-            Lec7
+            Lek7
           </span>{' '}
           — рабочая AI-инфраструктура для реальных сделок.
         </div>

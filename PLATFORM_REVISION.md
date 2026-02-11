@@ -10,7 +10,7 @@
 | Зона | Маршруты | Назначение |
 |------|----------|------------|
 | **Публика** | `/`, `/biz/[slug]`, `/u/[slug]` | Витрина, карточка бизнеса |
-| **Вход** | `/login`, `/resident/login`, `/resident/signup`, `/resident/welcome`, `/admin/login` | Авторизация и онбординг |
+| **Вход** | `/login`, `/resident/login`, `/resident/signup`, `/admin/login` | Авторизация и онбординг |
 | **Офис** | `/office`, `/office/businesses/[id]/*` | Личный кабинет: бизнес, профиль, прайсы, партнёрство, заявки, Telegram |
 | **Админка** | `/admin`, `/admin/businesses`, `/admin/owner-agent` | Статистика, активация бизнесов, Owner Agent |
 | **API** | `/api/*` | Auth, businesses, office/*, ai, agent, integrations/telegram, requests, invoices и др. |
