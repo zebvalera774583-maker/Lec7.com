@@ -17,6 +17,16 @@ WITH accepted_prices AS (
   WHERE pa."counterpartyBusinessId" = $1
     AND pa.status = 'ACTIVE'::"PartnerLinkStatus"
     AND (pl.category = $2 OR (pl.category IS NULL AND $2 = 'Свежая плодоовощная продукция'))
+  UNION
+  SELECT
+    pl.id AS "priceListId",
+    pl."businessId" AS "supplierBusinessId",
+    COALESCE(NULLIF(s."legalName", ''), s.name) AS "supplierLegalName",
+    pl."updatedAt" AS "priceListUpdatedAt"
+  FROM "PriceList" pl
+  JOIN "Business" s ON s.id = pl."businessId"
+  WHERE pl."businessId" = $1
+    AND (pl.category = $2 OR (pl.category IS NULL AND $2 = 'Свежая плодоовощная продукция'))
 ),
 items AS (
   SELECT
@@ -103,32 +113,41 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Suppliers: active assignments for this counterparty and category, dedupe by supplierBusinessId
-    const assignments = await prisma.priceAssignment.findMany({
-      where: {
-        counterpartyBusinessId: businessId,
-        status: 'ACTIVE',
-        priceList:
-          categoryParam === 'Свежая плодоовощная продукция'
-            ? { OR: [{ category: categoryParam }, { category: null }] }
-            : { category: categoryParam },
-      },
-      include: {
-        priceList: {
-          select: {
-            id: true,
-            updatedAt: true,
-            business: {
-              select: {
-                id: true,
-                name: true,
-                legalName: true,
+    const categoryFilter =
+      categoryParam === 'Свежая плодоовощная продукция'
+        ? { OR: [{ category: categoryParam }, { category: null }] }
+        : { category: categoryParam }
+
+    const [assignments, ownPriceLists] = await Promise.all([
+      prisma.priceAssignment.findMany({
+        where: {
+          counterpartyBusinessId: businessId,
+          status: 'ACTIVE',
+          priceList: categoryFilter,
+        },
+        include: {
+          priceList: {
+            select: {
+              id: true,
+              updatedAt: true,
+              business: {
+                select: { id: true, name: true, legalName: true },
               },
             },
           },
         },
-      },
-    })
+      }),
+      prisma.priceList.findMany({
+        where: { businessId, ...categoryFilter },
+        select: {
+          id: true,
+          updatedAt: true,
+          business: {
+            select: { id: true, name: true, legalName: true },
+          },
+        },
+      }),
+    ])
 
     const supplierMap = new Map<string, { supplierBusinessId: string; supplierLegalName: string; priceListId: string; priceListUpdatedAt: Date }>()
     for (const a of assignments) {
@@ -140,6 +159,17 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
         supplierLegalName: legalName,
         priceListId: a.priceList.id,
         priceListUpdatedAt: a.priceList.updatedAt,
+      })
+    }
+    for (const pl of ownPriceLists) {
+      const bid = pl.business.id
+      if (supplierMap.has(bid)) continue
+      const legalName = (pl.business.legalName || '').trim() || pl.business.name
+      supplierMap.set(bid, {
+        supplierBusinessId: bid,
+        supplierLegalName: legalName,
+        priceListId: pl.id,
+        priceListUpdatedAt: pl.updatedAt,
       })
     }
     const suppliers = Array.from(supplierMap.values()).sort((a, b) =>
