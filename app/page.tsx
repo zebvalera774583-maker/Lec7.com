@@ -147,33 +147,6 @@ export default function HomePage() {
               }}
             >
               <Link
-                href="/visitor"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  color: '#111827',
-                  textDecoration: 'none',
-                  padding: '0.35rem 0.1rem',
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{ fontSize: '1.1rem', transform: 'translateY(-1px)' }}
-                >
-                  ←
-                </span>
-                <span
-                  style={{
-                    borderBottom: '1px solid rgba(15, 23, 42, 0.2)',
-                    paddingBottom: '0.1rem',
-                  }}
-                >
-                  Посмотреть предложения бизнесов
-                </span>
-              </Link>
-
-              <Link
                 href="/resident/welcome"
                 style={{
                   display: 'inline-flex',
