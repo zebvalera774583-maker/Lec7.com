@@ -49,23 +49,46 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Укажите хотя бы одну позицию с наименованием' }, { status: 400 })
     }
 
-    // Активные назначения: контрагенты, которые нам назначили прайс (мы получатель)
-    const assignments = await prisma.priceAssignment.findMany({
-      where: {
-        counterpartyBusinessId: businessId,
-        status: 'ACTIVE',
-      },
-      include: {
-        priceList: {
-          include: {
-            business: {
-              select: { id: true, legalName: true, name: true },
+    const [assignments, ownPriceLists] = await Promise.all([
+      prisma.priceAssignment.findMany({
+        where: {
+          counterpartyBusinessId: businessId,
+          status: 'ACTIVE',
+        },
+        include: {
+          priceList: {
+            include: {
+              business: {
+                select: { id: true, legalName: true, name: true },
+              },
+              rows: true,
             },
-            rows: true,
           },
         },
-      },
-    })
+      }),
+      prisma.priceList.findMany({
+        where: { businessId, kind: 'BASE' },
+        include: { rows: true },
+      }),
+    ])
+
+    // Собственный прайс: norm -> min price (из всех строк)
+    const ownPriceMap = new Map<string, number>()
+    for (const pl of ownPriceLists) {
+      for (const row of pl.rows) {
+        const norm = normalizeName(row.name)
+        if (!norm) continue
+        const price = row.priceWithVat != null
+          ? Number(row.priceWithVat)
+          : row.priceWithoutVat != null
+            ? Number(row.priceWithoutVat)
+            : null
+        if (price == null || Number.isNaN(price)) continue
+        const existing = ownPriceMap.get(norm)
+        if (existing == null || price < existing) ownPriceMap.set(norm, price)
+      }
+    }
+    const hasOwnPrice = ownPriceMap.size > 0
 
     // Точные совпадения: norm -> список { supplierId, price }
     const normToOffers = new Map<string, { supplierBusinessId: string; supplierLegalName: string; price: number }[]>()
@@ -98,9 +121,12 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       supplierRows.set(supplierId, rows)
     }
 
-    const counterparties = Array.from(counterpartySet.entries())
+    const partnerCounterparties = Array.from(counterpartySet.entries())
       .map(([id, legalName]) => ({ id, legalName }))
       .sort((a, b) => a.legalName.localeCompare(b.legalName, 'ru'))
+    const counterparties = hasOwnPrice
+      ? [{ id: '__OWN_PRICE__', legalName: 'Мой прайс' }, ...partnerCounterparties]
+      : partnerCounterparties
 
     const resultItems: {
       name: string
@@ -117,9 +143,13 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
       for (const o of offersList) {
         offers[o.supplierBusinessId] = o.price
       }
+      if (hasOwnPrice && norm) {
+        const ownPrice = ownPriceMap.get(norm)
+        if (ownPrice != null) offers['__OWN_PRICE__'] = ownPrice
+      }
       const analogues: Record<string, { name: string; price: number }[]> = {}
       if (norm) {
-        for (const c of counterparties) {
+        for (const c of partnerCounterparties) {
           if (offers[c.id] != null) continue
           const rows = supplierRows.get(c.id) || emptyRowList
           const list = rows.filter(
