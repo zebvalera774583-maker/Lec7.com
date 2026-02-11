@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
 import PriceUploadModal from './PriceUploadModal'
+import PriceImportModal from './PriceImportModal'
 import CreateDerivedPriceModal from './CreateDerivedPriceModal'
 import AssignCounterpartyModal from './AssignCounterpartyModal'
 
@@ -98,6 +99,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isCreateDerivedModalOpen, setIsCreateDerivedModalOpen] = useState(false)
   const [isAssignCounterpartyModalOpen, setIsAssignCounterpartyModalOpen] = useState(false)
   const [assigningPriceId, setAssigningPriceId] = useState<string | null>(null)
@@ -967,6 +969,13 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
               Добавить прайс
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
+          >
+            Импорт прайса
+          </button>
 
           {/* Действующие контрагенты */}
           <div style={{ width: '100%' }}>
@@ -1767,6 +1776,13 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         initialColumns={editingPriceData?.columns}
         initialCategory={editingPriceData?.category}
         readOnly={isViewOnlyMode}
+      />
+
+      <PriceImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={loadPrices}
+        businessId={businessId}
       />
 
       <CreateDerivedPriceModal
