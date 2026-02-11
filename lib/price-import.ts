@@ -205,7 +205,9 @@ export function parseFileToItems(
 
       if (PRICE_NO_VAT_PATTERNS.test(cell)) {
         priceWithoutVatCol = idx
-      } else if (PRICE_VAT_PATTERNS.test(cell) || PRICE_GENERIC.test(cell)) {
+      } else if (PRICE_VAT_PATTERNS.test(cell)) {
+        priceWithVatCol = idx
+      } else if (PRICE_GENERIC.test(cell) && priceWithVatCol == null) {
         priceWithVatCol = idx
       }
     })
