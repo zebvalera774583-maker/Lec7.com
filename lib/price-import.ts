@@ -52,16 +52,25 @@ function looksNumeric(val: unknown): boolean {
 }
 
 /**
+ * Check if cell is pure number (for header vs text detection)
+ */
+function isPureNumber(val: string): boolean {
+  const s = val.trim()
+  if (!s) return false
+  const norm = s.replace(/\s/g, '').replace(',', '.')
+  const num = parseFloat(norm)
+  if (Number.isNaN(num)) return false
+  // Allow integer or decimal
+  return /^[\d\s.,\-]+$/.test(s)
+}
+
+/**
  * Check if title is junk: pure number or too short
  */
 function isJunkTitle(title: string): boolean {
   const t = title.trim()
   if (t.length < 3) return true
-  // Title is a number
-  const norm = t.replace(/\s/g, '').replace(',', '.')
-  const num = parseFloat(norm)
-  if (!Number.isNaN(num) && String(num) === norm) return true
-  return false
+  return isPureNumber(t)
 }
 
 /**
@@ -81,14 +90,39 @@ export function assertFileSize(size: number): void {
 }
 
 /**
- * Find header row by scanning first maxScan rows for TITLE_PATTERNS
+ * Find real table header inside Excel: scan first maxScan rows.
+ * Header row: ≥3 non-empty cells, ≥2 text cells, contains text, not only numbers,
+ * not single "№ п/п". Prefer row with TITLE_PATTERNS (наименование etc).
  */
 function findHeaderRow(rows: string[][], maxScan: number): number {
-  for (let r = 0; r < Math.min(maxScan, rows.length); r++) {
+  const scan = Math.min(maxScan, rows.length)
+  const candidates: number[] = []
+
+  for (let r = 0; r < scan; r++) {
     const row = rows[r] || []
-    const hasTitle = row.some((c) => matchHeader(c, TITLE_PATTERNS))
-    if (hasTitle) return r
+    const cells = row.map((c) => String(c ?? '').trim())
+    const nonEmpty = cells.filter((c) => c.length > 0)
+
+    if (nonEmpty.length < 3) continue
+
+    const textCells = nonEmpty.filter((c) => !isPureNumber(c))
+    if (textCells.length < 2) continue
+
+    if (nonEmpty.length === 1 && matchHeader(nonEmpty[0], INDEX_PATTERNS)) continue
+
+    if (row.some((c) => matchHeader(c, TITLE_PATTERNS))) {
+      console.log('Detected header row index:', r)
+      return r
+    }
+    candidates.push(r)
   }
+
+  if (candidates.length > 0) {
+    const index = candidates[0]
+    console.log('Detected header row index:', index)
+    return index
+  }
+
   return 0
 }
 
@@ -131,8 +165,7 @@ export function parseFileToItems(
     throw new Error('Файл пуст или не содержит данных')
   }
 
-  // 2. Auto-detect header row (scan first 10 rows)
-  const headerRowIdx = findHeaderRow(rows, 10)
+  const headerRowIdx = findHeaderRow(rows, 30)
   const headerRow = rows[headerRowIdx].map((c) => String(c || '').trim())
 
   // 1. Skip index column if first column matches
@@ -167,10 +200,12 @@ export function parseFileToItems(
 
   for (let i = dataStart; i < rows.length; i++) {
     const row = rows[i] || []
+    const nonEmptyCount = row.filter((c) => String(c ?? '').trim().length > 0).length
+    if (nonEmptyCount < 2) continue
+
     const title = String(row[titleCol] ?? '').trim()
     if (!title) continue
 
-    // 4. Filter junk
     if (isJunkTitle(title)) continue
 
     let price = parsePrice(row[priceCol])
