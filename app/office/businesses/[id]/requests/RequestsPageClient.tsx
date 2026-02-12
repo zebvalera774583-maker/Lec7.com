@@ -76,7 +76,7 @@ function formatRequestDate(d: Date): string {
 }
 
 export default function RequestsPageClient({ businessId }: RequestsPageClientProps) {
-  const [showCreateBlock, setShowCreateBlock] = useState(false)
+  const [showCreateBlock, setShowCreateBlock] = useState(true)
   const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>('form')
   const [selectedCounterpartyId, setSelectedCounterpartyId] = useState<string | null>(null)
   const [createdRequest, setCreatedRequest] = useState<{
