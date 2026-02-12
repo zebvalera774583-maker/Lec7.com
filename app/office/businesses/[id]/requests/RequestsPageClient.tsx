@@ -543,55 +543,59 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <header style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem 2rem' }}>
-        <h1 style={{ margin: 0, fontSize: '2rem', marginRight: '1rem' }}>Заявки</h1>
-        <Link
-          href={`/office/businesses/${businessId}`}
-          style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
-        >
-          Назад
-        </Link>
-        <button
-          type="button"
-          onClick={() => {
-            setViewSection('create')
-            setViewMode('form')
-          }}
-          style={{
-            padding: '0.5rem 1rem',
-            background: '#2563eb',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            fontWeight: 500,
-          }}
-        >
-          Создать заявку
-        </button>
-        <button
-          type="button"
-          onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
-          style={{
-            padding: '0.25rem 0',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: '1rem',
-            fontWeight: 500,
-            color: '#111827',
-            textAlign: 'left',
-          }}
-        >
-          Поступившие заявки
-        </button>
-        <span style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500 }}>
-          Архив заявок
-        </span>
-      </header>
+      <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Заявки</h1>
 
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <Link
+            href={`/office/businesses/${businessId}`}
+            style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
+          >
+            Назад
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              if (viewMode === 'summary') {
+                handleCreateRequest()
+              } else {
+                setViewSection('create')
+                setViewMode('form')
+              }
+            }}
+            style={{
+              padding: '0.25rem 0',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 500,
+              color: '#111827',
+              textAlign: 'left',
+            }}
+          >
+            Создать заявку
+          </button>
+          <button
+            type="button"
+            onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
+            style={{
+              padding: '0.25rem 0',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 500,
+              color: '#111827',
+              textAlign: 'left',
+            }}
+          >
+            Поступившие заявки
+          </button>
+          <span style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500 }}>
+            Архив заявок
+          </span>
+        </div>
         {sendStatus && (
           <div style={{ marginBottom: '0.75rem', padding: '0.5rem 1rem', borderRadius: '6px', background: sendStatus.ok ? '#dcfce7' : '#fee2e2', color: sendStatus.ok ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
             {sendStatus.message}
@@ -768,44 +772,8 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               </>
             ) : (
               <>
-                <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {createdRequest && (
-                      <button
-                        type="button"
-                        onClick={() => { setViewMode('created'); setSelectedCounterpartyId(null) }}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          background: 'none',
-                          color: '#111827',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                        }}
-                      >
-                        Назад к заявкам
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleCreateRequest}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: 'none',
-                        color: '#111827',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Создать заявку
-                    </button>
-                  </div>
+                <div style={{ marginBottom: '0.75rem', fontSize: '1rem', fontWeight: 500, color: '#111827' }}>
+                  Сводная таблица
                 </div>
                 {viewMode === 'requestDetail' && selectedCounterpartyId && summaryData ? (() => {
                   const c = summaryData.counterparties.find((x) => x.id === selectedCounterpartyId)
