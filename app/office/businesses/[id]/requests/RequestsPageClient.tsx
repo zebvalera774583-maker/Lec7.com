@@ -772,8 +772,24 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               </>
             ) : (
               <>
-                <div style={{ marginBottom: '0.75rem', fontSize: '1rem', fontWeight: 500, color: '#111827' }}>
-                  Сводная таблица
+                <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
+                  <button
+                    type="button"
+                    onClick={() => { setViewMode('form'); setSelectedCounterpartyId(null) }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: 'none',
+                      color: '#111827',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Редактировать заявку
+                  </button>
                 </div>
                 {viewMode === 'requestDetail' && selectedCounterpartyId && summaryData ? (() => {
                   const c = summaryData.counterparties.find((x) => x.id === selectedCounterpartyId)
