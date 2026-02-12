@@ -555,18 +555,17 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           type="button"
           onClick={() => {
             setViewSection('create')
-            setShowCreateBlock(true)
-            if (!showCreateBlock) setViewMode('form')
+            setViewMode('form')
           }}
           style={{
-            padding: '0.25rem 0',
-            background: 'none',
+            padding: '0.5rem 1rem',
+            background: '#2563eb',
+            color: 'white',
             border: 'none',
+            borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '1rem',
             fontWeight: 500,
-            color: '#111827',
-            textAlign: 'left',
           }}
         >
           Создать заявку
