@@ -543,72 +543,56 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Заявки</h1>
-
-      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div
+      <header style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem 2rem' }}>
+        <h1 style={{ margin: 0, fontSize: '2rem', marginRight: '1rem' }}>Заявки</h1>
+        <Link
+          href={`/office/businesses/${businessId}`}
+          style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
+        >
+          Назад
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            setViewSection('create')
+            setShowCreateBlock(true)
+            if (!showCreateBlock) setViewMode('form')
+          }}
           style={{
-            flex: '0 0 auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.25rem',
-            position: 'relative',
-            zIndex: 1,
+            padding: '0.25rem 0',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: 500,
+            color: '#111827',
+            textAlign: 'left',
           }}
         >
-          <Link
-            href={`/office/businesses/${businessId}`}
-            style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}
-          >
-            Назад
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              console.log('[DEBUG] Создать заявку: клик получен')
-              setViewSection('create')
-              setShowCreateBlock(true)
-              if (!showCreateBlock) setViewMode('form')
-            }}
-            style={{
-              padding: '0.25rem 0',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              fontWeight: 500,
-              color: '#111827',
-              textAlign: 'left',
-              display: 'inline-block',
-              width: 'fit-content',
-              pointerEvents: 'auto',
-            }}
-          >
-            Создать заявку
-          </button>
-          <button
-            type="button"
-            onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
-            style={{
-              padding: '0.25rem 0',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              fontWeight: 500,
-              color: '#111827',
-              textAlign: 'left',
-              display: 'inline-block',
-              width: 'fit-content',
-            }}
-          >
-            Поступившие заявки
-          </button>
-          <p style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, margin: 0 }}>
-            Архив заявок
-          </p>
-        </div>
+          Создать заявку
+        </button>
+        <button
+          type="button"
+          onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
+          style={{
+            padding: '0.25rem 0',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: 500,
+            color: '#111827',
+            textAlign: 'left',
+          }}
+        >
+          Поступившие заявки
+        </button>
+        <span style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500 }}>
+          Архив заявок
+        </span>
+      </header>
 
+      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {sendStatus && (
           <div style={{ marginBottom: '0.75rem', padding: '0.5rem 1rem', borderRadius: '6px', background: sendStatus.ok ? '#dcfce7' : '#fee2e2', color: sendStatus.ok ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
             {sendStatus.message}
