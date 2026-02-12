@@ -546,7 +546,16 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
       <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Заявки</h1>
 
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div
+          style={{
+            flex: '0 0 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.25rem',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
           <Link
             href={`/office/businesses/${businessId}`}
             style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}
@@ -556,6 +565,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           <button
             type="button"
             onClick={() => {
+              console.log('[DEBUG] Создать заявку: клик получен')
               setViewSection('create')
               setShowCreateBlock(true)
               if (!showCreateBlock) setViewMode('form')
@@ -571,6 +581,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               textAlign: 'left',
               display: 'inline-block',
               width: 'fit-content',
+              pointerEvents: 'auto',
             }}
           >
             Создать заявку
@@ -687,7 +698,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
             )}
           </div>
         ) : (
-          <div style={{ flex: '1', minWidth: '320px', maxWidth: '900px' }}>
+          <div style={{ flex: '1', minWidth: '320px', maxWidth: '900px', minHeight: '200px' }}>
             {viewMode === 'form' ? (
               <>
                 <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
