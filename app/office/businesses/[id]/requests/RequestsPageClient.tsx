@@ -775,9 +775,8 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                 {viewMode === 'summary' && (
                   <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
-                    <button
-                      type="button"
-                      onClick={() => { setViewMode('form'); setSelectedCounterpartyId(null) }}
+                    <Link
+                      href={`/office/businesses/${businessId}/requests`}
                       style={{
                         padding: '0.5rem 1rem',
                         background: 'none',
@@ -787,10 +786,11 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
                         cursor: 'pointer',
                         fontSize: '0.875rem',
                         fontWeight: 500,
+                        textDecoration: 'none',
                       }}
                     >
                       Назад
-                    </button>
+                    </Link>
                   </div>
                 )}
                 {viewMode === 'requestDetail' && selectedCounterpartyId && summaryData ? (() => {
