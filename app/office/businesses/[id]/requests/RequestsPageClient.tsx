@@ -686,7 +686,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               </div>
             )}
           </div>
-        ) : showCreateBlock && (
+        ) : (
           <div style={{ flex: '1', minWidth: '320px', maxWidth: '900px' }}>
             {viewMode === 'form' ? (
               <>
