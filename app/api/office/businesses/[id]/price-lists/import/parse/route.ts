@@ -92,6 +92,20 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
       return NextResponse.json({ error: message }, { status: 400 })
     }
     console.error('Parse price import error:', err)
-    return NextResponse.json({ error: 'Ошибка при разборе файла' }, { status: 500 })
+    // Пробрасываем понятные ошибки для PDF/DOCX (AI gateway, mammoth, fetch)
+    const isKnown =
+      message.includes('AI gateway') ||
+      message.includes('AI returned') ||
+      message.includes('Empty AI') ||
+      message.includes('Не удалось извлечь') ||
+      message.includes('Could not find') ||
+      message.includes('valid .docx') ||
+      message.includes('fetch failed') ||
+      message.includes('ECONNREFUSED') ||
+      message.includes('ENOTFOUND')
+    return NextResponse.json(
+      { error: isKnown ? message : 'Ошибка при разборе файла' },
+      { status: isKnown ? 502 : 500 }
+    )
   }
 })

@@ -357,6 +357,9 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
  * Извлечь текст из DOCX
  */
 export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
+  if (!buffer || buffer.length === 0) {
+    throw new Error('Файл пуст')
+  }
   const result = await mammoth.extractRawText({ buffer })
   return (result?.value || '').trim()
 }
