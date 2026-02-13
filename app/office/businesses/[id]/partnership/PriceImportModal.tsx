@@ -194,7 +194,7 @@ export default function PriceImportModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls,.csv,.pdf,.docx"
               onChange={handleFileChange}
               style={{ marginBottom: '1rem' }}
             />

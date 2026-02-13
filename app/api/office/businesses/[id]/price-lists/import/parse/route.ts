@@ -5,12 +5,15 @@ import {
   getBusinessIdFromPath,
   assertFileSize,
   parseFileToItems,
+  extractTextFromPdf,
+  extractTextFromDocx,
+  parsePricelistWithAI,
 } from '@/lib/price-import'
 
 const withOfficeAuth = (handler: (req: NextRequest, user: { id: string; role: string }) => Promise<NextResponse>) =>
   requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
 
-const ALLOWED_EXT = ['.xlsx', '.xls', '.csv']
+const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.pdf', '.docx']
 
 export const POST = withOfficeAuth(async (req: NextRequest, user) => {
   try {
@@ -43,7 +46,7 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
     const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '')
     if (!ALLOWED_EXT.includes(ext)) {
       return NextResponse.json(
-        { error: 'Неподдерживаемый формат. Используйте .xlsx, .xls или .csv' },
+        { error: 'Неподдерживаемый формат. Используйте .xlsx, .xls, .csv, .pdf или .docx' },
         { status: 400 }
       )
     }
@@ -51,7 +54,36 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
     assertFileSize(file.size)
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const { items, warnings } = parseFileToItems(buffer, file.name, file.type)
+    const mimetype = (file.type || '').toLowerCase()
+
+    let items: Awaited<ReturnType<typeof parseFileToItems>>['items']
+    let warnings: string[] = []
+
+    if (ext === '.pdf' || mimetype === 'application/pdf') {
+      const text = await extractTextFromPdf(buffer)
+      if (!text) {
+        return NextResponse.json(
+          { error: 'Не удалось извлечь текст из PDF' },
+          { status: 400 }
+        )
+      }
+      items = await parsePricelistWithAI(text)
+      warnings = []
+    } else if (ext === '.docx' || mimetype.includes('wordprocessingml') || mimetype.includes('docx')) {
+      const text = await extractTextFromDocx(buffer)
+      if (!text) {
+        return NextResponse.json(
+          { error: 'Не удалось извлечь текст из DOCX' },
+          { status: 400 }
+        )
+      }
+      items = await parsePricelistWithAI(text)
+      warnings = []
+    } else {
+      const result = parseFileToItems(buffer, file.name, file.type)
+      items = result.items
+      warnings = result.warnings
+    }
 
     return NextResponse.json({ items, warnings })
   } catch (err: unknown) {

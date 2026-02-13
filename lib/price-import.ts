@@ -1,9 +1,11 @@
 /**
- * Price list import: parse xlsx/xls/csv into normalized items
+ * Price list import: parse xlsx/xls/csv/pdf/docx into normalized items
  */
 
 import * as XLSX from 'xlsx'
 import Papa from 'papaparse'
+import { PDFParse } from 'pdf-parse'
+import mammoth from 'mammoth'
 
 export type ImportItem = {
   title: string
@@ -336,4 +338,107 @@ export function parseFileToItems(
   }
 
   return { items, warnings }
+}
+
+/**
+ * Извлечь текст из PDF
+ */
+export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  const parser = new PDFParse({ data: new Uint8Array(buffer) })
+  try {
+    const result = await parser.getText()
+    return (result?.text || '').trim()
+  } finally {
+    await parser.destroy()
+  }
+}
+
+/**
+ * Извлечь текст из DOCX
+ */
+export async function extractTextFromDocx(buffer: Buffer): Promise<string> {
+  const result = await mammoth.extractRawText({ buffer })
+  return (result?.value || '').trim()
+}
+
+const PRICELIST_AI_PROMPT = `Ты получаешь текст прайс-листа. Верни JSON массив объектов:
+{ "title": string, "price": number, "unit": string, "category": string }
+
+Только валидный JSON массив, без markdown и пояснений.`
+
+type AIPriceItem = { title?: string; price?: number; unit?: string; category?: string }
+
+/**
+ * Распознать позиции прайса через AI-gateway
+ */
+export async function parsePricelistWithAI(text: string): Promise<ImportItem[]> {
+  const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
+  const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
+
+  if (!gatewayUrl || !gatewaySecret) {
+    throw new Error('AI gateway configuration is missing')
+  }
+
+  const response = await fetch(`${gatewayUrl}/v1/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-LEC7-GATEWAY-SECRET': gatewaySecret,
+    },
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: PRICELIST_AI_PROMPT },
+        { role: 'user', content: text },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`AI gateway error: ${response.status}`)
+  }
+
+  const data = (await response.json()) as { reply?: string }
+  const reply = (data.reply || '').trim()
+  if (!reply) {
+    throw new Error('Empty AI reply')
+  }
+
+  // Убрать markdown code block если есть
+  let jsonStr = reply
+  const codeMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeMatch) {
+    jsonStr = codeMatch[1].trim()
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonStr)
+  } catch {
+    throw new Error('AI returned invalid JSON')
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('AI response is not an array')
+  }
+
+  const items: ImportItem[] = []
+  for (const row of parsed as AIPriceItem[]) {
+    const title = row?.title && String(row.title).trim()
+    if (!title) continue
+
+    const price =
+      row?.price != null && typeof row.price === 'number' && !Number.isNaN(row.price)
+        ? row.price
+        : null
+
+    items.push({
+      title,
+      price,
+      priceWithVat: price,
+      unit: row?.unit && String(row.unit).trim() ? String(row.unit).trim() : undefined,
+      sku: undefined,
+    })
+  }
+
+  return items
 }
