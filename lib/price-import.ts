@@ -397,7 +397,17 @@ export async function parsePricelistWithAI(text: string): Promise<ImportItem[]> 
   })
 
   if (!response.ok) {
-    throw new Error(`AI gateway error: ${response.status}`)
+    const bodyText = await response.text()
+    try {
+      const errBody = JSON.parse(bodyText) as { error?: string; message?: string }
+      const detail = errBody.error || errBody.message || bodyText.slice(0, 500)
+      console.error('[parsePricelistWithAI] Gateway error:', response.status, detail)
+      throw new Error(`AI gateway error: ${response.status} — ${detail}`)
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('AI gateway error:')) throw e
+      console.error('[parsePricelistWithAI] Gateway error:', response.status, bodyText.slice(0, 500))
+      throw new Error(`AI gateway error: ${response.status} — ${bodyText.slice(0, 200)}`)
+    }
   }
 
   const data = (await response.json()) as { reply?: string }
