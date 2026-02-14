@@ -97,15 +97,16 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
       message.includes('AI gateway') ||
       message.includes('AI returned') ||
       message.includes('Empty AI') ||
-      message.includes('Не удалось извлечь') ||
+      message.includes('Не удалось') ||
       message.includes('Could not find') ||
       message.includes('valid .docx') ||
       message.includes('fetch failed') ||
       message.includes('ECONNREFUSED') ||
       message.includes('ENOTFOUND')
+    const status = message.includes('Не удалось распознать') ? 400 : isKnown ? 502 : 500
     return NextResponse.json(
-      { error: isKnown ? message : 'Ошибка при разборе файла' },
-      { status: isKnown ? 502 : 500 }
+      { error: isKnown || message.includes('Не удалось распознать') ? message : 'Ошибка при разборе файла' },
+      { status }
     )
   }
 })

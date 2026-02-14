@@ -423,15 +423,23 @@ export async function parsePricelistWithAI(text: string): Promise<ImportItem[]> 
     jsonStr = codeMatch[1].trim()
   }
 
+  // Извлечь JSON-массив из текста (AI может вернуть текст + JSON)
+  const start = jsonStr.indexOf('[')
+  const end = jsonStr.lastIndexOf(']')
+  if (start !== -1 && end !== -1 && end >= start) {
+    jsonStr = jsonStr.slice(start, end + 1)
+  }
+
   let parsed: unknown
   try {
     parsed = JSON.parse(jsonStr)
   } catch {
-    throw new Error('AI returned invalid JSON')
+    console.error('[parsePricelistWithAI] JSON parse failed, raw:', jsonStr)
+    throw new Error('Не удалось распознать прайс. Файл не имеет табличной структуры.')
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error('AI response is not an array')
+    throw new Error('Не удалось распознать прайс. Файл не имеет табличной структуры.')
   }
 
   const items: ImportItem[] = []
@@ -557,16 +565,24 @@ export async function parsePricelistToStructuredJSON(text: string): Promise<Pric
     jsonStr = codeMatch[1].trim()
   }
 
+  // Извлечь JSON-объект из текста (AI может вернуть текст + JSON)
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start !== -1 && end !== -1 && end >= start) {
+    jsonStr = jsonStr.slice(start, end + 1)
+  }
+
   let parsed: unknown
   try {
     parsed = JSON.parse(jsonStr)
   } catch {
-    throw new Error('AI returned invalid JSON')
+    console.error('[parsePricelistToStructuredJSON] JSON parse failed, raw:', jsonStr)
+    throw new Error('Не удалось распознать прайс. Файл не имеет табличной структуры.')
   }
 
   const obj = parsed as Record<string, unknown>
   if (!obj || typeof obj !== 'object') {
-    throw new Error('AI response is not an object')
+    throw new Error('Не удалось распознать прайс. Файл не имеет табличной структуры.')
   }
 
   const currency = typeof obj.currency === 'string' ? obj.currency : 'RUB'
