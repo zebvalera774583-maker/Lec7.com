@@ -6,11 +6,28 @@ app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.LEC7_GATEWAY_SECRET || "";
+const LLM_PROVIDER = (process.env.LLM_PROVIDER || "openai").toLowerCase();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const YANDEX_API_KEY = process.env.YANDEX_API_KEY || "";
+const YANDEX_FOLDER_ID = process.env.YANDEX_FOLDER_ID || "";
+const YANDEX_MODEL =
+  process.env.YANDEX_MODEL ||
+  (YANDEX_FOLDER_ID ? `gpt://${YANDEX_FOLDER_ID}/yandexgpt-lite/latest` : "");
 
-const openai = OPENAI_API_KEY
-  ? new OpenAI({ apiKey: OPENAI_API_KEY })
-  : null;
+const openai =
+  LLM_PROVIDER === "yandex"
+    ? YANDEX_API_KEY && YANDEX_FOLDER_ID && YANDEX_MODEL
+      ? new OpenAI({
+          apiKey: YANDEX_API_KEY,
+          baseURL: "https://ai.api.cloud.yandex.net/v1",
+          defaultHeaders: {
+            Authorization: `Api-Key ${YANDEX_API_KEY}`,
+          },
+        })
+      : null
+    : OPENAI_API_KEY
+      ? new OpenAI({ apiKey: OPENAI_API_KEY })
+      : null;
 
 function checkAuth(req, res) {
   const token = req.header("X-LEC7-GATEWAY-SECRET") || "";
@@ -28,6 +45,15 @@ app.get("/health", (_req, res) => {
 app.post("/v1/owner-agent", async (req, res) => {
   if (!checkAuth(req, res)) return;
   if (!openai) {
+    if (LLM_PROVIDER === "yandex") {
+      return res.status(500).json({
+        error: !YANDEX_API_KEY
+          ? "YANDEX_API_KEY missing"
+          : !YANDEX_FOLDER_ID
+            ? "YANDEX_FOLDER_ID missing"
+            : "YANDEX_MODEL missing",
+      });
+    }
     return res.status(500).json({ error: "OPENAI_API_KEY missing" });
   }
 
@@ -38,7 +64,7 @@ app.post("/v1/owner-agent", async (req, res) => {
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: LLM_PROVIDER === "yandex" ? YANDEX_MODEL : "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -63,6 +89,15 @@ app.post("/v1/owner-agent", async (req, res) => {
 app.post("/v1/chat", async (req, res) => {
   if (!checkAuth(req, res)) return;
   if (!openai) {
+    if (LLM_PROVIDER === "yandex") {
+      return res.status(500).json({
+        error: !YANDEX_API_KEY
+          ? "YANDEX_API_KEY missing"
+          : !YANDEX_FOLDER_ID
+            ? "YANDEX_FOLDER_ID missing"
+            : "YANDEX_MODEL missing",
+      });
+    }
     return res.status(500).json({ error: "OPENAI_API_KEY missing" });
   }
 
@@ -74,7 +109,7 @@ app.post("/v1/chat", async (req, res) => {
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: LLM_PROVIDER === "yandex" ? YANDEX_MODEL : "gpt-4o-mini",
       messages,
       temperature: 0,
     });
