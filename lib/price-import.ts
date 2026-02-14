@@ -455,3 +455,141 @@ export async function parsePricelistWithAI(text: string): Promise<ImportItem[]> 
 
   return items
 }
+
+// --- Pricelists parse API (structured JSON) ---
+
+const MAX_TEXT_CHARS = 30_000
+const TRUNCATE_FIRST = 15_000
+const TRUNCATE_LAST = 5_000
+
+/**
+ * Обрезать текст для AI: первые X + последние Y символов
+ */
+export function truncateTextForAI(text: string, maxChars = MAX_TEXT_CHARS): string {
+  if (text.length <= maxChars) return text
+  const first = text.slice(0, TRUNCATE_FIRST)
+  const last = text.slice(-TRUNCATE_LAST)
+  return first + '\n\n... [текст обрезан для экономии токенов] ...\n\n' + last
+}
+
+const PRICELIST_STRUCTURED_PROMPT = `Ты получаешь текст прайс-листа. Верни строго JSON объект:
+{
+  "currency": "RUB",
+  "items": [
+    {"name": "название позиции", "unit": "шт", "price": 123.45, "vendorCode": "артикул или пустая строка", "category": "категория или пустая строка"}
+  ]
+}
+
+Правила:
+- currency: RUB, USD, EUR или другая валюта из текста
+- items: массив позиций
+- name: наименование товара (обязательно)
+- unit: ед. изм. (шт, кг, л, упак и т.д.)
+- price: число (обязательно для каждой позиции)
+- vendorCode: артикул/код, если нет — ""
+- category: категория, если нет — ""
+
+Только валидный JSON, без markdown и пояснений.`
+
+export type PricelistParseItem = {
+  name: string
+  unit: string
+  price: number
+  vendorCode: string
+  category: string
+}
+
+export type PricelistParseResult = {
+  currency: string
+  items: PricelistParseItem[]
+}
+
+/**
+ * Распознать прайс через AI в структурированный JSON
+ */
+export async function parsePricelistToStructuredJSON(text: string): Promise<PricelistParseResult> {
+  const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
+  const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
+
+  if (!gatewayUrl || !gatewaySecret) {
+    throw new Error('AI gateway configuration is missing')
+  }
+
+  const truncated = truncateTextForAI(text)
+
+  const response = await fetch(`${gatewayUrl}/v1/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-LEC7-GATEWAY-SECRET': gatewaySecret,
+    },
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: PRICELIST_STRUCTURED_PROMPT },
+        { role: 'user', content: truncated },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const bodyText = await response.text()
+    try {
+      const errBody = JSON.parse(bodyText) as { error?: string; message?: string }
+      const detail = errBody.error || errBody.message || bodyText.slice(0, 500)
+      console.error('[parsePricelistToStructuredJSON] Gateway error:', response.status, detail)
+      throw new Error(`AI gateway error: ${response.status} — ${detail}`)
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('AI gateway error:')) throw e
+      console.error('[parsePricelistToStructuredJSON] Gateway error:', response.status, bodyText.slice(0, 500))
+      throw new Error(`AI gateway error: ${response.status} — ${bodyText.slice(0, 200)}`)
+    }
+  }
+
+  const data = (await response.json()) as { reply?: string }
+  const reply = (data.reply || '').trim()
+  if (!reply) {
+    throw new Error('Empty AI reply')
+  }
+
+  let jsonStr = reply
+  const codeMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeMatch) {
+    jsonStr = codeMatch[1].trim()
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonStr)
+  } catch {
+    throw new Error('AI returned invalid JSON')
+  }
+
+  const obj = parsed as Record<string, unknown>
+  if (!obj || typeof obj !== 'object') {
+    throw new Error('AI response is not an object')
+  }
+
+  const currency = typeof obj.currency === 'string' ? obj.currency : 'RUB'
+  const rawItems = Array.isArray(obj.items) ? obj.items : []
+
+  const items: PricelistParseItem[] = []
+  for (const row of rawItems as Record<string, unknown>[]) {
+    const name = row?.name != null ? String(row.name).trim() : ''
+    if (!name) continue
+
+    const price =
+      row?.price != null && typeof row.price === 'number' && !Number.isNaN(row.price)
+        ? row.price
+        : 0
+
+    items.push({
+      name,
+      unit: row?.unit != null ? String(row.unit).trim() : 'шт',
+      price,
+      vendorCode: row?.vendorCode != null ? String(row.vendorCode).trim() : '',
+      category: row?.category != null ? String(row.category).trim() : '',
+    })
+  }
+
+  return { currency, items }
+}
