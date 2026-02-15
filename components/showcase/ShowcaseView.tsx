@@ -57,7 +57,12 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const [selectedCaseIndex, setSelectedCaseIndex] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const shareUrl =
+    typeof window !== 'undefined'
+      ? mode === 'resident'
+        ? `${window.location.origin}/biz/${business.slug}`
+        : window.location.href
+      : ''
 
   // Определяем мобильный режим
   useEffect(() => {
