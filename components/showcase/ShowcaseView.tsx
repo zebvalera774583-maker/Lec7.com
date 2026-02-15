@@ -375,7 +375,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           <button
             type="button"
             onClick={async () => {
-              const url = window.location.href
+              const url = shareUrl
               const title = business.name
 
               // Пробуем использовать Web Share API если доступен
