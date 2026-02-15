@@ -22,37 +22,24 @@ export default function ShowcaseShell({ children, backLink }: ShowcaseShellProps
         flexDirection: 'column',
       }}
     >
-      {/* Верхняя полоса с логотипом и служебной ссылкой (для превью) */}
-      <div
-        style={{
-          borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
-          padding: '1.25rem 1.5rem',
-        }}
-      >
+      {/* Верхняя полоса: только для превью резидента (с backLink). Публичная витрина — без шапки. */}
+      {backLink && (
         <div
           style={{
-            maxWidth: '1120px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
+            borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+            padding: '1.25rem 1.5rem',
           }}
         >
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: '1.15rem',
-                letterSpacing: '0.02em',
-                color: '#0f172a',
-              }}
-            >
-              Lec7
-            </span>
-          </Link>
-
-          {backLink && (
+          <div
+            style={{
+              maxWidth: '1120px',
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '1rem',
+            }}
+          >
             <Link
               href={backLink.href}
               style={{
@@ -64,9 +51,9 @@ export default function ShowcaseShell({ children, backLink }: ShowcaseShellProps
             >
               {backLink.label ?? '← Вернуться в кабинет'}
             </Link>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Контент витрины */}
       <div
