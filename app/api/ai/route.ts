@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Business not found' }, { status: 404 })
       }
 
-      const landingUrl = business.slug ? `https://lec7.com/biz/${business.slug}` : 'страница бизнеса в Lec7'
+      const landingUrl = business.slug ? `https://lec7.com/~${business.slug}` : 'страница бизнеса в Lec7'
 
       const servicesText =
         business.profile?.services && business.profile.services.length > 0

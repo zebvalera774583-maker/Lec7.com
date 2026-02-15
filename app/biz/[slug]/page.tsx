@@ -85,7 +85,7 @@ export default async function BizPage({ params }: PageProps) {
   // 4) Если нормализованное значение не совпадает с каноническим slug в БД,
   // делаем redirect на канонический URL (всегда нижний регистр)
   if (normalized !== business.slug) {
-    redirect(`/biz/${business.slug}`)
+    redirect(`/~${business.slug}`)
   }
 
   const viewBusiness = {

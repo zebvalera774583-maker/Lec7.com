@@ -1,12 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  async redirects() {
+    return [
+      { source: '/biz/:slug', destination: '/~:slug', permanent: true },
+    ]
+  },
   async rewrites() {
     return [
-      {
-        source: '/~:slug',
-        destination: '/u/:slug',
-      },
+      { source: '/~:slug', destination: '/biz/:slug' },
     ]
   },
 }

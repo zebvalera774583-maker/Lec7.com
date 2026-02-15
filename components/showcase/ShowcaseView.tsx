@@ -60,7 +60,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const shareUrl =
     typeof window !== 'undefined'
       ? mode === 'resident'
-        ? `${window.location.origin}/biz/${business.slug}`
+        ? `${window.location.origin}/~${business.slug}`
         : window.location.href
       : ''
 
