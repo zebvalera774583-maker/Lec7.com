@@ -100,6 +100,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [updatePriceId, setUpdatePriceId] = useState<string | null>(null)
   const [isCreateDerivedModalOpen, setIsCreateDerivedModalOpen] = useState(false)
   const [isAssignCounterpartyModalOpen, setIsAssignCounterpartyModalOpen] = useState(false)
   const [assigningPriceId, setAssigningPriceId] = useState<string | null>(null)
@@ -970,7 +971,10 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           )}
           <button
             type="button"
-            onClick={() => setIsImportModalOpen(true)}
+            onClick={() => {
+              setUpdatePriceId(null)
+              setIsImportModalOpen(true)
+            }}
             style={{ padding: '0.25rem 0', background: 'none', color: '#111827', border: 'none', borderRadius: 0, cursor: 'pointer', fontSize: '1rem', fontWeight: 500, textAlign: 'left', display: 'inline-block', width: 'fit-content' }}
           >
             Импорт прайса
@@ -1420,6 +1424,33 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                     </button>
                   )}
                   <button
+                    onClick={() => {
+                      setUpdatePriceId(price.id)
+                      setIsImportModalOpen(true)
+                      setMenuOpenPriceId(null)
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderTop: '1px solid #e5e7eb',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#111827',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f9fafb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }}
+                  >
+                    Обновить из Excel
+                  </button>
+                  <button
                     onClick={() => handleEdit(price.id)}
                     style={{
                       width: '100%',
@@ -1815,9 +1846,13 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
 
       <PriceImportModal
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={() => {
+          setIsImportModalOpen(false)
+          setUpdatePriceId(null)
+        }}
         onSuccess={loadPrices}
         businessId={businessId}
+        updatePriceId={updatePriceId}
       />
 
       <CreateDerivedPriceModal

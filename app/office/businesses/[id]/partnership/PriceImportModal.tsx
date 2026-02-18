@@ -16,6 +16,8 @@ interface PriceImportModalProps {
   onClose: () => void
   onSuccess: () => void
   businessId: string
+  /** При указании — обновить существующий прайс вместо создания нового */
+  updatePriceId?: string | null
 }
 
 const PREVIEW_ROWS = 100
@@ -25,6 +27,7 @@ export default function PriceImportModal({
   onClose,
   onSuccess,
   businessId,
+  updatePriceId = null,
 }: PriceImportModalProps) {
   const [step, setStep] = useState<'select' | 'preview'>('select')
   const [file, setFile] = useState<File | null>(null)
@@ -118,25 +121,72 @@ export default function PriceImportModal({
         .sort((a, b) => a - b)
         .map((i) => items[i])
 
-      const res = await fetch(
-        `/api/office/businesses/${businessId}/price-lists/import/commit`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            name: `Импорт прайса (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
-            items: toImport,
-          }),
+      if (updatePriceId) {
+        const hasPriceWithoutVat = toImport.some(
+          (it) => it.priceWithoutVat != null && typeof it.priceWithoutVat === 'number'
+        )
+        const columns = hasPriceWithoutVat
+          ? [
+              { id: 'name', title: 'Наименование', kind: 'text' },
+              { id: 'unit', title: 'Ед. изм', kind: 'text' },
+              { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number' },
+              { id: 'priceWithoutVat', title: 'Цена за ед. изм. без НДС', kind: 'number' },
+            ]
+          : [
+              { id: 'name', title: 'Наименование', kind: 'text' },
+              { id: 'unit', title: 'Ед. изм', kind: 'text' },
+              { id: 'priceWithVat', title: 'Цена за ед. изм. С НДС', kind: 'number' },
+            ]
+        const rows = toImport.map((it) => ({
+          name: String(it.title || '').trim(),
+          unit: it.unit && String(it.unit).trim() ? String(it.unit).trim() : null,
+          priceWithVat:
+            it.priceWithVat != null && typeof it.priceWithVat === 'number'
+              ? it.priceWithVat
+              : it.price != null && typeof it.price === 'number'
+                ? it.price
+                : null,
+          priceWithoutVat:
+            it.priceWithoutVat != null && typeof it.priceWithoutVat === 'number' ? it.priceWithoutVat : null,
+          extra: it.sku && String(it.sku).trim() ? { sku: String(it.sku).trim() } : null,
+        }))
+
+        const res = await fetch(
+          `/api/office/businesses/${businessId}/prices/${updatePriceId}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ columns, rows }),
+          }
+        )
+
+        const data = await res.json()
+        if (!res.ok) {
+          setError(data.error || 'Ошибка при обновлении')
+          setImporting(false)
+          return
         }
-      )
+      } else {
+        const res = await fetch(
+          `/api/office/businesses/${businessId}/price-lists/import/commit`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              name: `Импорт прайса (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+              items: toImport,
+            }),
+          }
+        )
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || 'Ошибка при импорте')
-        setImporting(false)
-        return
+        const data = await res.json()
+        if (!res.ok) {
+          setError(data.error || 'Ошибка при импорте')
+          setImporting(false)
+          return
+        }
       }
 
       handleClose()
@@ -179,7 +229,7 @@ export default function PriceImportModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Импорт прайса</h2>
+          <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{updatePriceId ? 'Обновить прайс' : 'Импорт прайса'}</h2>
           <button
             type="button"
             onClick={handleClose}
@@ -289,7 +339,7 @@ export default function PriceImportModal({
                   cursor: selectedCount === 0 ? 'not-allowed' : 'pointer',
                 }}
               >
-                {importing ? 'Импорт...' : `Импортировать (${selectedCount})`}
+                {importing ? (updatePriceId ? 'Обновление...' : 'Импорт...') : (updatePriceId ? `Обновить (${selectedCount})` : `Импортировать (${selectedCount})`)}
               </button>
             </div>
           </div>
