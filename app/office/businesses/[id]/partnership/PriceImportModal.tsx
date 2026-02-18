@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export type ImportItem = {
   title: string
@@ -48,6 +48,10 @@ export default function PriceImportModal({
     setError('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
+
+  useEffect(() => {
+    if (isOpen) reset()
+  }, [isOpen])
 
   const handleClose = () => {
     reset()
