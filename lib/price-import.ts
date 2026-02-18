@@ -19,26 +19,26 @@ export type ImportItem = {
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 // 20MB
 
 // Title column patterns (для поиска header)
-const TITLE_PATTERNS = /^(наименование|товар|позиция|name|title|название)$/i
+const TITLE_PATTERNS = /^(наименование|наименование\s+товаров|наименование\s+продукции|товар|позиция|name|title|название)$/i
 
 // Заголовки, которые НЕ должны импортироваться как позиции
 const TITLE_ROW_SKIP = /^(наименование\s+товара|наименование|товар|номенклатура|позиция|наименование\s+продукции)$/i
 
 // Колонки, которые выглядят как заголовки
-const COLUMN_HEADER_LIKE = /^(ед\.?\s*изм|единица|цена|цена\s*с\s*ндс|цена\s*без\s*ндс|с\s*ндс|без\s*ндс|сумма)$/i
+const COLUMN_HEADER_LIKE = /^(ед\.?\s*изм\.?|единица|цена|цена\s*с\s*ндс|цена\s*без\s*ндс|с\s*ндс|без\s*ндс|сумма)$/i
 
 // Price column patterns
 const PRICE_VAT_PATTERNS = /(с\s*ндс|вкл\.?\s*ндс|включая\s*ндс)/i
 const PRICE_NO_VAT_PATTERNS = /(без\s*ндс|без\s*учёта\s*ндс)/i
 const PRICE_GENERIC = /^(цена|price|стоимость|сумма)$/i
 
-// Unit patterns (расширенные)
+// Unit patterns (расширенные) — для заголовков и значений
 const UNIT_PATTERNS =
-  /^(ед|ед\.|ед\.?\s*изм|единица|единицы|уп|упак|упаковка|фас|кг|г|л|мл|шт|штук|пуч|пучок|ящ|ящик|кор|короб|крт|коробка)$/i
+  /^(ед|ед\.|ед\.?\s*изм\.?|единица|единицы|уп|упак|упаковка|фас|кг|г|л|мл|шт|штук|пуч|пучок|ящ|ящик|кор|короб|крт|коробка)$/i
 
 const SKU_PATTERNS = /^(артикул|sku|код)$/i
 
-const INDEX_PATTERNS = /^(№|№\s*п\/п|n|index|номер)$/i
+const INDEX_PATTERNS = /^(№|№\s*п\/п|п\/н|n|index|номер)$/i
 
 function matchHeader(h: string, patterns: RegExp): boolean {
   return patterns.test(String(h || '').trim())
