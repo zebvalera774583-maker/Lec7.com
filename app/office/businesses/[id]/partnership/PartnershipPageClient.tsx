@@ -1176,7 +1176,8 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
 
         {/* Центр + правая панель Telegram */}
         <div style={{ flex: 1, minWidth: '280px', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-          {/* Карточки назначенных прайсов и свои прайсы */}
+          {/* Карточки назначенных прайсов и свои прайсы — скрыты при открытом «Исполнители» */}
+          {!assignPerformerOpen && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }}>
           {assignedPrices.length > 0 && (
             <>
@@ -1562,6 +1563,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         ))}
       </div>
           </div>
+          )}
 
           {/* Панель Telegram справа */}
           {telegramPanelOpen && (
