@@ -35,6 +35,16 @@ model Business {
   category        String?
   logoUrl         String?
   legalName       String?  // Юридическое название (партнёрства, не витрина)
+  address         String?  // Адрес
+  ogrn            String?
+  inn             String?
+  bankAccount     String?  // р/сч
+  bank            String?
+  bankCorrAccount String?  // к/сч
+  bik             String?
+  requisitesPhone String?  // телефон
+  requisitesEmail String?  // электронный адрес
+  director        String?  // директор или ИП
   coverUrl        String?
   ownerId         String
   lifecycleStatus String   @default("DRAFT") // DRAFT | ACTIVE | SUSPENDED | ARCHIVED
