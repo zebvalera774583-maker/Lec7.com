@@ -19,7 +19,8 @@ export default function RequestDetailClient({
   requestCreatedAt,
 }: RequestDetailClientProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [invite, setInvite] = useState<{ label: string; url: string } | null>(null)
+  const [role, setRole] = useState<'PICKER' | 'RECEIVER'>('PICKER')
+  const [invite, setInvite] = useState<{ label: string; url: string; role: 'PICKER' | 'RECEIVER' } | null>(null)
   const [loading, setLoading] = useState(false)
   const [generateLoading, setGenerateLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,11 +29,22 @@ export default function RequestDetailClient({
     setLoading(true)
     setError(null)
     try {
-      const r = await fetch(`/api/office/requests/${requestId}/assign-performer`, { credentials: 'include' })
-      const data = await r.json()
-      if (!r.ok) throw new Error(data?.error || 'Failed to load')
-      if (data.invite) setInvite(data.invite)
-      else setInvite(null)
+      const [reqRes, bizRes] = await Promise.all([
+        fetch(`/api/office/requests/${requestId}/assign-performer`, { credentials: 'include' }),
+        fetch(`/api/office/businesses/${businessId}/assign-performer`, { credentials: 'include' }),
+      ])
+      const reqData = await reqRes.json()
+      const bizData = await bizRes.json()
+      if (reqRes.ok && reqData.invite) {
+        setRole('PICKER')
+        setInvite({ label: reqData.invite.label, url: reqData.invite.url, role: 'PICKER' })
+      } else if (bizRes.ok && (bizData.receivers || [])[0]) {
+        const rec = bizData.receivers[0]
+        setRole('RECEIVER')
+        setInvite({ label: rec.label, url: rec.url, role: 'RECEIVER' })
+      } else {
+        setInvite(null)
+      }
     } catch (e: any) {
       setError(e.message || 'Ошибка загрузки')
     } finally {
@@ -42,21 +54,38 @@ export default function RequestDetailClient({
 
   useEffect(() => {
     if (sidebarOpen) loadExisting()
-  }, [sidebarOpen, requestId])
+  }, [sidebarOpen, requestId, businessId])
+
+  const handleRoleChange = (newRole: 'PICKER' | 'RECEIVER') => {
+    setRole(newRole)
+    setInvite(null)
+  }
 
   const handleGenerate = async () => {
     setGenerateLoading(true)
     setError(null)
     try {
-      const r = await fetch(`/api/office/requests/${requestId}/assign-performer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ role: 'PICKER' }),
-      })
-      const data = await r.json()
-      if (!r.ok) throw new Error(data?.error || 'Ошибка')
-      setInvite(data.invite)
+      if (role === 'RECEIVER') {
+        const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ role: 'RECEIVER' }),
+        })
+        const data = await r.json()
+        if (!r.ok) throw new Error(data?.error || 'Ошибка')
+        if (data.receiver) setInvite({ ...data.receiver, role: 'RECEIVER' })
+      } else {
+        const r = await fetch(`/api/office/requests/${requestId}/assign-performer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ role: 'PICKER' }),
+        })
+        const data = await r.json()
+        if (!r.ok) throw new Error(data?.error || 'Ошибка')
+        if (data.invite) setInvite({ ...data.invite, role: 'PICKER' })
+      }
     } catch (e: any) {
       setError(e.message || 'Ошибка')
     } finally {
@@ -135,6 +164,8 @@ export default function RequestDetailClient({
                     Должность
                   </label>
                   <select
+                    value={role}
+                    onChange={(e) => handleRoleChange(e.target.value as 'PICKER' | 'RECEIVER')}
                     style={{
                       width: '100%',
                       padding: '0.5rem 0.5rem',
@@ -143,9 +174,9 @@ export default function RequestDetailClient({
                       borderRadius: '6px',
                       background: 'white',
                     }}
-                    defaultValue="PICKER"
                   >
                     <option value="PICKER">Сборщик</option>
+                    <option value="RECEIVER">Приёмщик</option>
                   </select>
                 </div>
 
@@ -205,7 +236,9 @@ export default function RequestDetailClient({
                 )}
 
                 <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#6b7280' }}>
-                  Ссылка даёт доступ к активации страницы сборщика по этой заявке.
+                  {(invite?.role ?? role) === 'RECEIVER'
+                    ? 'Ссылка даёт доступ к активации страницы приёмщика.'
+                    : 'Ссылка даёт доступ к активации страницы сборщика по этой заявке.'}
                 </p>
                 {error && <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#dc2626' }}>{error}</p>}
               </>
