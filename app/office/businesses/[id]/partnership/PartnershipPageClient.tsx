@@ -131,7 +131,9 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
 
   // Назначить исполнителя: панель справа
   const [assignPerformerOpen, setAssignPerformerOpen] = useState(false)
-  const [assignInvite, setAssignInvite] = useState<{ label: string; url: string } | null>(null)
+  const [assignRole, setAssignRole] = useState<'PICKER' | 'RECEIVER' | ''>('')
+  const [assignData, setAssignData] = useState<{ pickers: { label: string; url: string }[]; receivers: { label: string; url: string }[] }>({ pickers: [], receivers: [] })
+  const [assignInvite, setAssignInvite] = useState<{ label: string; url: string; role: 'PICKER' | 'RECEIVER' } | null>(null)
   const [assignLoading, setAssignLoading] = useState(false)
   const [assignGenerateLoading, setAssignGenerateLoading] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
@@ -392,7 +394,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
     setTelegramRecipients(initialRecipients)
   }, [initialRecipients])
 
-  // Загрузка существующего инвайта при открытии drawer «Назначить исполнителя»
+  // Загрузка существующих инвайтов при открытии drawer «Назначить исполнителя»
   const loadAssignExisting = async () => {
     setAssignLoading(true)
     setAssignError(null)
@@ -400,9 +402,21 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, { credentials: 'include' })
       const data = await r.json()
       if (!r.ok) throw new Error(data?.error || 'Failed to load')
-      const first = (data.pickers || [])[0]
-      if (first) setAssignInvite({ label: first.label, url: first.url })
-      else setAssignInvite(null)
+      const pickers = data.pickers || []
+      const receivers = data.receivers || []
+      setAssignData({ pickers, receivers })
+      const firstPicker = pickers[0]
+      const firstReceiver = receivers[0]
+      if (firstPicker) {
+        setAssignRole('PICKER')
+        setAssignInvite({ label: firstPicker.label, url: firstPicker.url, role: 'PICKER' })
+      } else if (firstReceiver) {
+        setAssignRole('RECEIVER')
+        setAssignInvite({ label: firstReceiver.label, url: firstReceiver.url, role: 'RECEIVER' })
+      } else {
+        setAssignRole('')
+        setAssignInvite(null)
+      }
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Ошибка загрузки')
     } finally {
@@ -413,15 +427,29 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   useEffect(() => {
     if (assignPerformerOpen) {
       setAssignInvite(null)
+      setAssignRole('')
+      setAssignData({ pickers: [], receivers: [] })
       setAssignError(null)
       loadAssignExisting()
     } else if (!assignPerformerOpen) {
       setAssignInvite(null)
+      setAssignRole('')
       setAssignError(null)
     }
   }, [assignPerformerOpen])
 
-  const handleAssignGenerate = async () => {
+  const handleAssignRoleChange = (role: 'PICKER' | 'RECEIVER') => {
+    setAssignRole(role)
+    const existing = role === 'PICKER' ? assignData.pickers[0] : assignData.receivers[0]
+    if (existing) {
+      setAssignInvite({ label: existing.label, url: existing.url, role })
+    } else {
+      setAssignInvite(null)
+      handleAssignGenerate(role)
+    }
+  }
+
+  const handleAssignGenerate = async (role: 'PICKER' | 'RECEIVER') => {
     setAssignGenerateLoading(true)
     setAssignError(null)
     try {
@@ -429,12 +457,19 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ role: 'PICKER' }),
+        body: JSON.stringify({ role }),
       })
       const data = await r.json()
       if (!r.ok) throw new Error(data?.error || 'Ошибка')
       const p = data.picker
-      if (p) setAssignInvite({ label: p.label, url: p.url })
+      const rec = data.receiver
+      if (p) {
+        setAssignInvite({ label: p.label, url: p.url, role: 'PICKER' })
+        setAssignData((prev) => ({ ...prev, pickers: [p, ...prev.pickers] }))
+      } else if (rec) {
+        setAssignInvite({ label: rec.label, url: rec.url, role: 'RECEIVER' })
+        setAssignData((prev) => ({ ...prev, receivers: [rec, ...prev.receivers] }))
+      }
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Ошибка')
     } finally {
@@ -448,14 +483,20 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
 
   const handleAssignDelete = async () => {
     setAssignError(null)
+    const role = assignInvite?.role || assignRole || 'PICKER'
     try {
-      const r = await fetch(`/api/office/businesses/${businessId}/assign-performer`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
+      const r = await fetch(
+        `/api/office/businesses/${businessId}/assign-performer${role === 'RECEIVER' ? '?role=RECEIVER' : ''}`,
+        { method: 'DELETE', credentials: 'include' }
+      )
       const data = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(data?.error || 'Ошибка удаления')
       setAssignInvite(null)
+      setAssignData((prev) =>
+        role === 'RECEIVER'
+          ? { ...prev, receivers: prev.receivers.slice(1) }
+          : { ...prev, pickers: prev.pickers.slice(1) }
+      )
     } catch (e: unknown) {
       setAssignError(e instanceof Error ? e.message : 'Ошибка удаления')
     }
@@ -1743,11 +1784,11 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                   <div style={{ marginBottom: '1rem' }}>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#374151', marginBottom: '0.35rem' }}>Должность</label>
                     <select
-                      defaultValue=""
+                      value={assignRole}
                       onChange={(e) => {
-                        const v = e.target.value
-                        if (v === 'PICKER' && !assignInvite && !assignGenerateLoading) {
-                          handleAssignGenerate()
+                        const v = e.target.value as 'PICKER' | 'RECEIVER' | ''
+                        if (v === 'PICKER' || v === 'RECEIVER') {
+                          handleAssignRoleChange(v)
                         }
                       }}
                       style={{
@@ -1761,6 +1802,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                     >
                       <option value="">Выберите должность</option>
                       <option value="PICKER">Сборщик</option>
+                      <option value="RECEIVER">Приёмщик</option>
                     </select>
                   </div>
 
@@ -1819,7 +1861,9 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                         Удалить
                       </button>
                       <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#6b7280' }}>
-                        Ссылка даёт доступ к активации страницы сборщика по этой заявке.
+                        {assignInvite.role === 'RECEIVER'
+                          ? 'Ссылка даёт доступ к активации страницы приёмщика.'
+                          : 'Ссылка даёт доступ к активации страницы сборщика по этой заявке.'}
                       </p>
                     </div>
                   )}
