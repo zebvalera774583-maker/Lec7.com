@@ -16,7 +16,7 @@ export function normalizeEmail(email: string): string {
  * Guard-функция для проверки валидности роли
  */
 export function isUserRole(value: unknown): value is UserRole {
-  return value === 'BUSINESS_OWNER' || value === 'LEC7_ADMIN'
+  return value === 'BUSINESS_OWNER' || value === 'LEC7_ADMIN' || value === 'RECEIVER'
 }
 
 /**
@@ -76,6 +76,7 @@ export async function getUserByEmail(email: string) {
     },
     include: {
       businesses: true,
+      receiverBusiness: true,
     },
   })
 }

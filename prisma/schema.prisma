@@ -7,23 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  BUSINESS_OWNER
+  LEC7_ADMIN
+  RECEIVER
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  avatarUrl String?
-  role      String   @default("BUSINESS_OWNER") // BUSINESS_OWNER | LEC7_ADMIN | RECEIVER
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  password            String
+  name                String?
+  avatarUrl           String?
+  role                UserRole  @default(BUSINESS_OWNER)
+  receiverBusinessId  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime @updatedAt
 
   businesses              Business[]           @relation("BusinessOwner")
+  receiverBusiness        Business?            @relation("ReceiverUsers", fields: [receiverBusinessId], references: [id], onDelete: SetNull)
   ownerConversations      OwnerConversation[]
   auditLogs               AuditLog[]
   conversations           Conversation[]
   agentConversations      AgentConversation[]  @relation("AgentConversations")
   createdRequestAssignments RequestAssignment[]
   createdPickerInvites    PickerInvite[]
+  createdReceiverInvites  ReceiverInvite[]
+
+  @@index([receiverBusinessId])
 }
 
 model Business {
@@ -68,6 +79,8 @@ model Business {
   incomingRequestsSent     IncomingRequest[] @relation("IncomingRequestSender")
   telegramConnectTokens    TelegramConnectToken[]
   telegramRecipients       BusinessTelegramRecipient[]
+  receiverInvites          ReceiverInvite[]
+  receiverUsers            User[]                 @relation("ReceiverUsers")
 
   telegramChatId       String?   @db.VarChar(32)
   telegramConnectedAt DateTime?
@@ -260,11 +273,17 @@ model PickerInvite {
 
 // Приглашение приёмщика (invite-type: receiver)
 model ReceiverInvite {
-  id        String    @id @default(cuid())
-  token     String    @unique
-  createdAt DateTime @default(now())
-  usedAt    DateTime?
+  id           String    @id @default(cuid())
+  token        String    @unique
+  businessId   String
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  usedAt       DateTime?
 
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy  User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([businessId])
   @@index([token])
 }
 

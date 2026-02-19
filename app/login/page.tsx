@@ -43,7 +43,13 @@ function LoginContent() {
           : null
 
       const role = data?.user?.role
-      const target = safeRedirect ?? (role === 'LEC7_ADMIN' ? '/admin' : '/office')
+      const target =
+        safeRedirect ??
+        (role === 'LEC7_ADMIN'
+          ? '/admin'
+          : role === 'RECEIVER'
+            ? '/receiver/requests'
+            : '/office')
 
       router.push(target)
       router.refresh()

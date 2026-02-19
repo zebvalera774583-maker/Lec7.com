@@ -1,4 +1,4 @@
-export type UserRole = 'BUSINESS_OWNER' | 'LEC7_ADMIN'
+export type UserRole = 'BUSINESS_OWNER' | 'LEC7_ADMIN' | 'RECEIVER'
 export type AuthRole = UserRole | 'visitor'
 export type RequestStatus = 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'CANCELLED'

@@ -39,12 +39,15 @@ export async function POST(request: NextRequest) {
 
     const validatedRole: UserRole = user.role
 
+    const businessId =
+      user.role === 'RECEIVER' ? user.receiverBusinessId : user.businesses[0]?.id
+
     const token = createToken({
       id: user.id,
       email: user.email,
       name: user.name,
       role: validatedRole,
-      businessId: user.businesses[0]?.id,
+      businessId: businessId ?? undefined,
     })
 
     const response = NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: validatedRole } })
