@@ -19,6 +19,7 @@
     "@prisma/engines": "^5.19.0",
     "bcryptjs": "^2.4.3",
     "browser-image-compression": "^2.0.2",
+    "docx": "^9.5.3",
     "exceljs": "^4.4.0",
     "google-auth-library": "^9.0.0",
     "jsonwebtoken": "^9.0.2",

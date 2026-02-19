@@ -29,6 +29,7 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
   const [requisites, setRequisites] = useState<Requisites | null>(null)
   const [requisitesLoading, setRequisitesLoading] = useState(false)
   const [requisitesSaving, setRequisitesSaving] = useState(false)
+  const [requisitesDownloading, setRequisitesDownloading] = useState(false)
   const [requisitesForm, setRequisitesForm] = useState<Requisites>({
     legalName: null,
     address: null,
@@ -69,32 +70,28 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
     }
   }, [requisitesOpen, businessId])
 
-  const handleDownloadRequisites = () => {
-    const labels: Record<keyof Requisites, string> = {
-      legalName: 'Юридическое название',
-      address: 'Адрес',
-      ogrn: 'ОГРН',
-      inn: 'ИНН',
-      bankAccount: 'р/сч',
-      bank: 'Банк',
-      bankCorrAccount: 'к/сч',
-      bik: 'БИК',
-      requisitesPhone: 'Телефон',
-      requisitesEmail: 'Электронный адрес',
-      director: 'Директор или ИП',
+  const handleDownloadRequisites = async () => {
+    setRequisitesDownloading(true)
+    try {
+      const res = await fetch(`/api/office/businesses/${businessId}/requisites/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requisitesForm),
+      })
+      if (!res.ok) throw new Error('Ошибка загрузки')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'реквизиты.docx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Ошибка при скачивании')
+    } finally {
+      setRequisitesDownloading(false)
     }
-    const lines = (Object.keys(labels) as (keyof Requisites)[]).map((key) => {
-      const val = requisitesForm[key]
-      return val ? `${labels[key]}: ${val}` : null
-    }).filter(Boolean)
-    const text = lines.join('\n') || 'Реквизиты не заполнены'
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'реквизиты.txt'
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   const handleSaveRequisites = async () => {
@@ -443,17 +440,17 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
               <button
                 type="button"
                 onClick={handleDownloadRequisites}
-                disabled={requisitesLoading}
+                disabled={requisitesLoading || requisitesDownloading}
                 style={{
                   padding: '0.5rem 1rem',
                   background: '#f3f4f6',
                   border: '1px solid #e5e7eb',
                   borderRadius: '6px',
-                  cursor: requisitesLoading ? 'not-allowed' : 'pointer',
+                  cursor: requisitesLoading || requisitesDownloading ? 'not-allowed' : 'pointer',
                   fontSize: '0.875rem',
                 }}
               >
-                Скачать
+                {requisitesDownloading ? 'Скачивание…' : 'Скачать'}
               </button>
               <button
                 type="button"
