@@ -69,6 +69,34 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
     }
   }, [requisitesOpen, businessId])
 
+  const handleDownloadRequisites = () => {
+    const labels: Record<keyof Requisites, string> = {
+      legalName: 'Юридическое название',
+      address: 'Адрес',
+      ogrn: 'ОГРН',
+      inn: 'ИНН',
+      bankAccount: 'р/сч',
+      bank: 'Банк',
+      bankCorrAccount: 'к/сч',
+      bik: 'БИК',
+      requisitesPhone: 'Телефон',
+      requisitesEmail: 'Электронный адрес',
+      director: 'Директор или ИП',
+    }
+    const lines = (Object.keys(labels) as (keyof Requisites)[]).map((key) => {
+      const val = requisitesForm[key]
+      return val ? `${labels[key]}: ${val}` : null
+    }).filter(Boolean)
+    const text = lines.join('\n') || 'Реквизиты не заполнены'
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'реквизиты.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleSaveRequisites = async () => {
     setRequisitesSaving(true)
     try {
@@ -412,6 +440,21 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={handleDownloadRequisites}
+                disabled={requisitesLoading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#f3f4f6',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  cursor: requisitesLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Скачать
+              </button>
               <button
                 type="button"
                 onClick={() => setRequisitesOpen(false)}
