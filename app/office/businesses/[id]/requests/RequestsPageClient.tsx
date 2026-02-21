@@ -38,6 +38,8 @@ interface IncomingRequestItem {
 
 interface IncomingRequestRow {
   id: string
+  type?: 'incoming' | 'request'
+  requestId?: string | null
   senderBusinessId: string
   senderLegalName: string
   category: string | null
@@ -660,27 +662,54 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
               <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Нет поступивших заявок</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {incomingRequests.map((req) => (
-                  <button
-                    key={req.id}
-                    type="button"
-                    onClick={() => setSelectedIncomingId(req.id)}
-                    style={{
-                      padding: '1rem 1.25rem',
-                      textAlign: 'left',
-                      background: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                      maxWidth: '22em',
-                    }}
-                  >
-                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Заявка от {req.senderLegalName}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{req.category || '—'}</div>
-                    <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}. {req.total != null ? formatPrice(req.total) : ''}</div>
-                  </button>
-                ))}
+                {incomingRequests.map((req) => {
+                  const isRequestLink = req.type === 'request' && req.requestId
+                  const cardContent = (
+                    <>
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Заявка от {req.senderLegalName}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{req.category || '—'}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}. {req.total != null ? formatPrice(req.total) : ''}</div>
+                    </>
+                  )
+                  return isRequestLink ? (
+                    <Link
+                      key={req.id}
+                      href={`/office/businesses/${businessId}/request/${req.requestId}`}
+                      style={{
+                        padding: '1rem 1.25rem',
+                        textAlign: 'left',
+                        background: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        maxWidth: '22em',
+                        textDecoration: 'none',
+                        color: 'inherit',
+                      }}
+                    >
+                      {cardContent}
+                    </Link>
+                  ) : (
+                    <button
+                      key={req.id}
+                      type="button"
+                      onClick={() => setSelectedIncomingId(req.id)}
+                      style={{
+                        padding: '1rem 1.25rem',
+                        textAlign: 'left',
+                        background: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                        maxWidth: '22em',
+                      }}
+                    >
+                      {cardContent}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

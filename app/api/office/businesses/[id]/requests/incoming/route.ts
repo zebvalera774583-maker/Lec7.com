@@ -27,21 +27,27 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const list = await prisma.incomingRequest.findMany({
-      where: { recipientBusinessId: businessId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        sender: {
-          select: { id: true, legalName: true, name: true },
+    const [incomingList, businessRequests] = await Promise.all([
+      prisma.incomingRequest.findMany({
+        where: { recipientBusinessId: businessId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          sender: {
+            select: { id: true, legalName: true, name: true },
+          },
+          items: { orderBy: { sortOrder: 'asc' } },
         },
-        items: {
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-    })
+      }),
+      prisma.request.findMany({
+        where: { businessId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
 
-    const requests = list.map((r) => ({
+    const incomingMapped = incomingList.map((r) => ({
       id: r.id,
+      type: 'incoming' as const,
+      requestId: null as string | null,
       senderBusinessId: r.senderBusinessId,
       senderLegalName: r.sender.legalName || r.sender.name,
       category: r.category,
@@ -57,6 +63,29 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
         sum: Number(i.sum),
       })),
     }))
+
+    const requestMapped = businessRequests.map((r) => ({
+      id: `request_${r.id}`,
+      type: 'request' as const,
+      requestId: r.id,
+      senderBusinessId: '',
+      senderLegalName: 'MAX',
+      category: null,
+      total: null,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+      items: [{
+        id: `${r.id}_item`,
+        name: r.description || r.title,
+        quantity: '1',
+        unit: 'шт',
+        price: 0,
+        sum: 0,
+      }],
+    }))
+
+    const requests = [...incomingMapped, ...requestMapped]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
     return NextResponse.json({ requests })
   } catch (error) {
