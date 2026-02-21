@@ -83,7 +83,7 @@ export default async function BusinessDetailPage({ params }: PageProps) {
             </div>
           ) : (
             <Link
-              href={`/office/businesses/${business.id}/request/${business.requests[0].id}`}
+              href={`/office/businesses/${business.id}/requests`}
               style={{
                 display: 'block',
                 textDecoration: 'none',
