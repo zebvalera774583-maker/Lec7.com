@@ -97,7 +97,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [sendStatus, setSendStatus] = useState<{ ok: boolean; message: string } | null>(null)
   const [sendingCounterpartyId, setSendingCounterpartyId] = useState<string | null>(null)
   const [sendingAll, setSendingAll] = useState(false)
-  const [viewSection, setViewSection] = useState<'create' | 'incoming'>('create')
+  const [viewSection, setViewSection] = useState<'create' | 'incoming'>('incoming')
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
   const menuContainerRef = useRef<HTMLDivElement>(null)
@@ -553,29 +553,6 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           >
             Назад
           </Link>
-          <button
-            type="button"
-            onClick={() => {
-              if (viewMode === 'summary') {
-                handleCreateRequest()
-              } else {
-                setViewSection('create')
-                setViewMode('form')
-              }
-            }}
-            style={{
-              padding: '0.25rem 0',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              fontWeight: 500,
-              color: '#111827',
-              textAlign: 'left',
-            }}
-          >
-            Создать заявку
-          </button>
           <button
             type="button"
             onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
