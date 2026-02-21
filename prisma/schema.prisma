@@ -33,6 +33,8 @@ model User {
   createdRequestAssignments RequestAssignment[]
   createdPickerInvites    PickerInvite[]
   createdReceiverInvites  ReceiverInvite[]
+  receiverMemberships    ReceiverMembership[]
+  receiverMembershipsCreated ReceiverMembership[] @relation("ReceiverMembershipCreatedBy")
 
   @@index([receiverBusinessId])
 }
@@ -81,6 +83,7 @@ model Business {
   telegramRecipients       BusinessTelegramRecipient[]
   receiverInvites          ReceiverInvite[]
   receiverUsers            User[]                 @relation("ReceiverUsers")
+  receiverMemberships      ReceiverMembership[]
   maxChatContexts          MaxChatContext[]
 
   telegramChatId       String?   @db.VarChar(32)
@@ -300,6 +303,23 @@ model ReceiverInvite {
 
   @@index([businessId])
   @@index([token])
+}
+
+// Доступ приёмщика (receiver): независим от User.role. Активация инвайта создаёт membership, не меняет роль.
+model ReceiverMembership {
+  id         String   @id @default(cuid())
+  userId     String
+  businessId String
+  createdById String?
+  createdAt  DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("ReceiverMembershipCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, businessId])
+  @@index([userId])
+  @@index([businessId])
 }
 
 // Входящая заявка от контрагента (отправитель → получатель)

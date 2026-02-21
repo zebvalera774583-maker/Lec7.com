@@ -40,12 +40,16 @@ export default async function ReceiverInvitePage({ params }: PageProps) {
         where: { id: invite.id },
         data: { usedAt: new Date() },
       }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: {
-          role: 'RECEIVER',
-          receiverBusinessId: invite.businessId,
+      prisma.receiverMembership.upsert({
+        where: {
+          userId_businessId: { userId: user.id, businessId: invite.businessId },
         },
+        create: {
+          userId: user.id,
+          businessId: invite.businessId,
+          createdById: invite.createdById ?? undefined,
+        },
+        update: {},
       }),
     ])
   }

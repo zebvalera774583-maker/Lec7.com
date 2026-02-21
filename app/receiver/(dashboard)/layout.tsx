@@ -1,6 +1,7 @@
 import { getAuthUserFromContext } from '@/lib/middleware'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
 
 export default async function ReceiverDashboardLayout({
   children,
@@ -23,8 +24,12 @@ export default async function ReceiverDashboardLayout({
     redirect(`/login?redirect=${encodeURIComponent('/receiver/requests')}`)
   }
 
-  if (user.role !== 'RECEIVER') {
-    redirect('/login')
+  const membership = await prisma.receiverMembership.findFirst({
+    where: { userId: user.id },
+  })
+
+  if (!membership) {
+    redirect('/office?message=receiver_not_connected')
   }
 
   return <>{children}</>

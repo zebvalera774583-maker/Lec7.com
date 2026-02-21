@@ -20,7 +20,7 @@ export default async function OfficeLayout({
     },
   })
 
-  if (!user || !['BUSINESS_OWNER', 'LEC7_ADMIN'].includes(user.role)) {
+  if (!user || !['BUSINESS_OWNER', 'LEC7_ADMIN', 'RECEIVER'].includes(user.role)) {
     // Получаем текущий pathname из заголовков
     // Пробуем x-pathname (если установлен middleware), затем x-invoke-path, затем referer
     let pathname = headersList.get('x-pathname') || headersList.get('x-invoke-path')

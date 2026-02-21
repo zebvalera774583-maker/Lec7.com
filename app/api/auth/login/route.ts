@@ -39,8 +39,7 @@ export async function POST(request: NextRequest) {
 
     const validatedRole: UserRole = user.role
 
-    const businessId =
-      user.role === 'RECEIVER' ? user.receiverBusinessId : user.businesses[0]?.id
+    const businessId = user.businesses[0]?.id
 
     const token = createToken({
       id: user.id,

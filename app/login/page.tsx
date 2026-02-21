@@ -47,9 +47,7 @@ function LoginContent() {
         safeRedirect ??
         (role === 'LEC7_ADMIN'
           ? '/admin'
-          : role === 'RECEIVER'
-            ? '/receiver/requests'
-            : '/office')
+          : '/office')
 
       router.push(target)
       router.refresh()

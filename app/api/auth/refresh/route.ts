@@ -19,10 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
-  const businessId =
-    dbUser.role === 'RECEIVER'
-      ? dbUser.receiverBusinessId
-      : dbUser.businesses[0]?.id
+  const businessId = dbUser.businesses[0]?.id
 
   const token = createToken({
     id: dbUser.id,
