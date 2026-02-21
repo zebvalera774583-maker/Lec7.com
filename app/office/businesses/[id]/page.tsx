@@ -23,7 +23,7 @@ export default async function BusinessDetailPage({ params }: PageProps) {
       },
       requests: {
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: 1,
       },
       invoices: {
         orderBy: { createdAt: 'desc' },
@@ -77,26 +77,27 @@ export default async function BusinessDetailPage({ params }: PageProps) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
         <section>
           <h2 style={{ marginBottom: '1rem' }}>Последние заявки</h2>
-          <div style={{ background: 'white', borderRadius: '8px', padding: '1rem' }}>
-            {business.requests.length === 0 ? (
+          {business.requests.length === 0 ? (
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem' }}>
               <p style={{ color: '#666' }}>Нет заявок</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {business.requests.map((request) => (
-                  <Link
-                    key={request.id}
-                    href={`/office/businesses/${business.id}/request/${request.id}`}
-                    style={{ textDecoration: 'none', color: 'inherit' }}
-                  >
-                    <div style={{ padding: '0.75rem', border: '1px solid #e0e0e0', borderRadius: '4px' }}>
-                      <h4 style={{ marginBottom: '0.25rem' }}>{request.title}</h4>
-                      <p style={{ fontSize: '0.85rem', color: '#666' }}>{request.status}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <Link
+              href={`/office/businesses/${business.id}/request/${business.requests[0].id}`}
+              style={{
+                display: 'block',
+                textDecoration: 'none',
+                color: 'inherit',
+                background: 'white',
+                borderRadius: '8px',
+                padding: '1rem',
+                cursor: 'pointer',
+              }}
+              className="hover:bg-gray-50"
+            >
+              Новая заявка
+            </Link>
+          )}
         </section>
 
         <section>
