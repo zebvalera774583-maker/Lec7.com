@@ -85,6 +85,25 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  max-bot-service:
+    build: ./services/max-bot-service
+    ports:
+      - "127.0.0.1:3005:3005"
+    env_file:
+      - .env
+    environment:
+      MAX_BOT_TOKEN: ${MAX_BOT_TOKEN}
+      LEC7_BASE_URL: ${LEC7_BASE_URL:-http://app:3000}
+      LEC7_MAX_SECRET: ${LEC7_MAX_SECRET}
+    restart: unless-stopped
+    depends_on:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
   caddy:
     image: caddy:latest
     container_name: lec7-caddy
