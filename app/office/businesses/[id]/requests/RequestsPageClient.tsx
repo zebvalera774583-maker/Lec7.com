@@ -555,6 +555,29 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
           </Link>
           <button
             type="button"
+            onClick={() => {
+              if (viewMode === 'summary') {
+                handleCreateRequest()
+              } else {
+                setViewSection('create')
+                setViewMode('form')
+              }
+            }}
+            style={{
+              padding: '0.25rem 0',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 500,
+              color: '#111827',
+              textAlign: 'left',
+            }}
+          >
+            Создать заявку
+          </button>
+          <button
+            type="button"
             onClick={() => { setViewSection('incoming'); setShowCreateBlock(false); setSelectedIncomingId(null) }}
             style={{
               padding: '0.25rem 0',
