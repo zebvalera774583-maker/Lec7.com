@@ -1390,7 +1390,7 @@ export default function BusinessProfileEditor({
               fontSize: '0.875rem',
             }}
           >
-            Открыть витрину →
+            Витрина →
           </Link>
         </div>
       </div>

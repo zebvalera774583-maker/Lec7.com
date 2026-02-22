@@ -328,7 +328,7 @@ export default function BusinessMenu({ businessId, slug }: BusinessMenuProps) {
                 e.currentTarget.style.backgroundColor = 'transparent'
               }}
             >
-              Открыть витрину
+              Витрина
             </button>
             <button
               onClick={handleOpenPartnership}
