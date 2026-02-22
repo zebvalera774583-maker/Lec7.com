@@ -1,10 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
-
-export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -15,19 +13,13 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'business id and price id are required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может видеть только свой бизнес
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Получаем прайс с строками и назначениями
@@ -136,7 +128,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
   }
 })
 
-export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const PUT = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -147,19 +139,13 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'business id and price id are required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может изменять только свой бизнес
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -220,7 +206,7 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
   }
 })
 
-export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const DELETE = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -233,15 +219,11 @@ export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const priceList = await prisma.priceList.findFirst({

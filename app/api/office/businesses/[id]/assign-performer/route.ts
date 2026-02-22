@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
-
-const withOfficeAuth = (handler: (req: NextRequest, user: { id: string; role: string }) => Promise<NextResponse>) =>
-  requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
+import { withBusinessAccess } from '@/lib/access'
 
 const TOKEN_BYTES = 24
 const PICKER_LABEL = 'Сборщик 1'
@@ -29,29 +26,20 @@ function getBusinessIdFromPath(pathname: string): string | null {
   return id && id !== 'assign-performer' ? id : null
 }
 
-async function ensureBusinessAccessible(businessId: string, user: { id: string; role: string }) {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { id: true, ownerId: true },
-  })
-  if (!business) {
-    return { error: NextResponse.json({ error: 'Business not found' }, { status: 404 }) }
-  }
-  if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-  }
-  return { business }
-}
-
-export const GET = withOfficeAuth(async (req: NextRequest, user: { id: string; role: string }) => {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
     const businessId = getBusinessIdFromPath(new URL(req.url).pathname)
     if (!businessId) {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    const access = await ensureBusinessAccessible(businessId, user)
-    if ('error' in access && access.error) return access.error
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true },
+    })
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
 
     const origin = getAppOrigin(req)
 
@@ -99,15 +87,20 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: { id: string; r
   }
 })
 
-export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; role: string }) => {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
     const businessId = getBusinessIdFromPath(new URL(req.url).pathname)
     if (!businessId) {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    const access = await ensureBusinessAccessible(businessId, user)
-    if ('error' in access && access.error) return access.error
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true },
+    })
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
 
     const body = await req.json().catch(() => ({}))
     const role = body?.role === 'PICKER' ? 'PICKER' : body?.role === 'RECEIVER' ? 'RECEIVER' : null
@@ -193,15 +186,20 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: { id: string; 
   }
 })
 
-export const DELETE = withOfficeAuth(async (req: NextRequest, user: { id: string; role: string }) => {
+export const DELETE = withBusinessAccess(async (req, user) => {
   try {
     const businessId = getBusinessIdFromPath(new URL(req.url).pathname)
     if (!businessId) {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    const access = await ensureBusinessAccessible(businessId, user)
-    if ('error' in access && access.error) return access.error
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { id: true },
+    })
+    if (!business) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
 
     const url = new URL(req.url)
     const roleParam = url.searchParams.get('role')

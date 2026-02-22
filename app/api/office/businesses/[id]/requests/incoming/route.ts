@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN', 'RECEIVER'], handler)
-
-export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -16,21 +14,11 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    const isAdmin = user.role === 'LEC7_ADMIN'
-    const isOwner = business.ownerId === user.id
-    const isReceiver = user.role === 'RECEIVER' && (await prisma.receiverMembership.findFirst({
-      where: { userId: user.id, businessId },
-    }))
-
-    if (!isAdmin && !isOwner && !isReceiver) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const [incomingList, businessRequests] = await Promise.all([

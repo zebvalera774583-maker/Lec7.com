@@ -1,41 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 import { uploadPublicFile, deletePublicFileByUrl } from '@/lib/s3'
 
 /**
  * POST /api/office/businesses/[id]/profile/avatar
  * Загрузка аватара бизнеса в S3
  */
-export async function POST(request: NextRequest) {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
-    // Проверка авторизации
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Получаем businessId из URL (как в других office API)
-    const url = new URL(request.url)
-    const businessId = url.pathname.split('/').slice(-3, -2)[0] // /api/office/businesses/[id]/profile/avatar
+    const url = new URL(req.url)
+    const pathParts = url.pathname.split('/')
+    const businessId = pathParts[pathParts.indexOf('businesses') + 1]
 
     if (!businessId) {
       return NextResponse.json({ error: 'Business ID is required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может изменять только свой бизнес (или LEC7_ADMIN)
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Получаем текущий профиль и старый avatarUrl (если есть)
@@ -46,7 +34,7 @@ export async function POST(request: NextRequest) {
     const oldAvatarUrl = existingProfile?.avatarUrl || null
 
     // Получаем multipart/form-data
-    const formData = await request.formData()
+    const formData = await req.formData()
     const file = formData.get('file') as File | null
 
     if (!file) {
@@ -104,4 +92,4 @@ export async function POST(request: NextRequest) {
     console.error('Business avatar upload error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-}
+})

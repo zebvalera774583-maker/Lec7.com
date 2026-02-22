@@ -1,22 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 import { deletePublicFileByUrl } from '@/lib/s3'
 
 /**
  * PATCH /api/office/businesses/[id]/portfolio-items/[itemId]
  * Обновление кейса портфолио
  */
-export async function PATCH(request: NextRequest) {
+export const PATCH = withBusinessAccess(async (req, user) => {
   try {
-    // Проверка авторизации
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Получаем businessId и itemId из URL
-    const url = new URL(request.url)
+    const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
     const businessId = pathParts[pathParts.length - 3] // /api/office/businesses/[id]/portfolio-items/[itemId]
     const itemId = pathParts[pathParts.length - 1]
@@ -25,19 +18,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Business ID and Item ID are required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может изменять только свой бизнес (или LEC7_ADMIN)
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Проверяем, что кейс существует и принадлежит бизнесу
@@ -55,7 +42,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Получаем body
-    const body = await request.json().catch(() => ({}))
+    const body = await req.json().catch(() => ({}))
     const { comment, coverPhotoId } = body
 
     // Если указан coverPhotoId, проверяем что фото существует и принадлежит кейсу
@@ -96,22 +83,15 @@ export async function PATCH(request: NextRequest) {
     console.error('Update portfolio item error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-}
+})
 
 /**
  * DELETE /api/office/businesses/[id]/portfolio-items/[itemId]
  * Удаление кейса портфолио и всех его фото
  */
-export async function DELETE(request: NextRequest) {
+export const DELETE = withBusinessAccess(async (req, user) => {
   try {
-    // Проверка авторизации
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Получаем businessId и itemId из URL
-    const url = new URL(request.url)
+    const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
     const businessId = pathParts[pathParts.length - 3]
     const itemId = pathParts[pathParts.length - 1]
@@ -120,19 +100,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Business ID and Item ID are required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может изменять только свой бизнес (или LEC7_ADMIN)
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Проверяем, что кейс существует и принадлежит бизнесу
@@ -172,4 +146,4 @@ export async function DELETE(request: NextRequest) {
     console.error('Delete portfolio item error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-}
+})

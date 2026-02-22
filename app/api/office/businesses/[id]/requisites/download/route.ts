@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
-
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
 
 const LABELS: Record<string, string> = {
   legalName: 'Юридическое название',
@@ -19,7 +17,7 @@ const LABELS: Record<string, string> = {
   director: 'Директор или ИП',
 }
 
-export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -31,15 +29,11 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()

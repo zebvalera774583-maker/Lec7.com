@@ -1,16 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
-
-const withOfficeAuth = (handler: (req: NextRequest, user: { id: string; role: string }) => Promise<NextResponse>) =>
-  requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
+import { withBusinessAccess } from '@/lib/access'
 
 function maskChatId(chatId: string): string {
   if (chatId.length <= 6) return '***'
   return chatId.slice(0, 3) + '***' + chatId.slice(-3)
 }
 
-export const GET = withOfficeAuth(async (req: NextRequest, user: { id: string; role: string }) => {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -22,15 +19,11 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: { id: string; r
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const recipients = await prisma.businessTelegramRecipient.findMany({

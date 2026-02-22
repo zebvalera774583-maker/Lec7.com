@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
-
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
+import { withBusinessAccess } from '@/lib/access'
 
 function normalizeName(name: string): string {
   return (name || '')
@@ -12,7 +10,7 @@ function normalizeName(name: string): string {
     .trim()
 }
 
-export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -24,15 +22,11 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()

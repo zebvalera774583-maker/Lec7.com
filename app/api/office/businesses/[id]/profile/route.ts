@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 import { isLatinOnly } from '@/lib/slug'
 
-// Доступ для BUSINESS_OWNER и LEC7_ADMIN
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
-
-export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const businessId = url.pathname.split('/').slice(-2, -1)[0] // /api/office/businesses/[id]/profile
@@ -15,19 +12,13 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может видеть только свой бизнес
-    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Получаем или создаём профиль (upsert)
@@ -63,7 +54,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
   }
 })
 
-export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const PUT = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const businessId = url.pathname.split('/').slice(-2, -1)[0]
@@ -72,19 +63,13 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'business id is required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю
     const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может изменять только свой бизнес
-    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireRole } from '@/lib/middleware'
+import { NextResponse } from 'next/server'
+import { withBusinessAccess } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import {
   getBusinessIdFromPath,
@@ -10,12 +10,9 @@ import {
   parsePricelistWithAI,
 } from '@/lib/price-import'
 
-const withOfficeAuth = (handler: (req: NextRequest, user: { id: string; role: string }) => Promise<NextResponse>) =>
-  requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
-
 const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.pdf', '.docx']
 
-export const POST = withOfficeAuth(async (req: NextRequest, user) => {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
     const pathname = new URL(req.url).pathname
     const businessId = getBusinessIdFromPath(pathname)
@@ -25,13 +22,10 @@ export const POST = withOfficeAuth(async (req: NextRequest, user) => {
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const formData = await req.formData()

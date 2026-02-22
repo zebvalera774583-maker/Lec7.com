@@ -133,8 +133,8 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
     return (
       <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
         <p style={{ color: '#b91c1c' }}>{error}</p>
-        <Link href={`/office/businesses/${businessId}/partnership`} style={{ color: '#2563eb', marginTop: '0.5rem', display: 'inline-block' }}>
-          ← Назад к партнёрству
+        <Link href={`/office/businesses/${businessId}`} style={{ color: '#2563eb', marginTop: '0.5rem', display: 'inline-block' }}>
+          ← Назад
         </Link>
       </div>
     )
@@ -171,10 +171,10 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
     <div style={{ padding: '2rem', maxWidth: '100%', margin: '0 auto' }}>
       <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         <Link
-          href={`/office/businesses/${businessId}/partnership`}
+          href={`/office/businesses/${businessId}`}
           style={{ color: '#2563eb', fontSize: '0.875rem' }}
         >
-          ← Назад к партнёрству
+          ← Назад
         </Link>
       </div>
       <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>

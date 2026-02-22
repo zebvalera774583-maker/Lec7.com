@@ -1,41 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAuthUser } from '@/lib/middleware'
-import { uploadPublicFile, deletePublicFileByUrl } from '@/lib/s3'
+import { withBusinessAccess } from '@/lib/access'
+import { uploadPublicFile } from '@/lib/s3'
 
 /**
  * POST /api/office/businesses/[id]/photos
  * Загрузка фото портфолио бизнеса в S3
  */
-export async function POST(request: NextRequest) {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
-    // Проверка авторизации
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Получаем businessId из URL
-    const url = new URL(request.url)
+    const url = new URL(req.url)
     const businessId = url.pathname.split('/').slice(-2, -1)[0] // /api/office/businesses/[id]/photos
 
     if (!businessId) {
       return NextResponse.json({ error: 'Business ID is required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может изменять только свой бизнес (или LEC7_ADMIN)
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Проверяем лимит фото (максимум 12)
@@ -48,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Получаем multipart/form-data
-    const formData = await request.formData()
+    const formData = await req.formData()
     const file = formData.get('file') as File | null
 
     if (!file) {
@@ -107,41 +94,28 @@ export async function POST(request: NextRequest) {
     console.error('Business photo upload error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-}
+})
 
 /**
  * GET /api/office/businesses/[id]/photos
  * Получение списка фото портфолио бизнеса
  */
-export async function GET(request: NextRequest) {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
-    // Проверка авторизации
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Получаем businessId из URL
-    const url = new URL(request.url)
+    const url = new URL(req.url)
     const businessId = url.pathname.split('/').slice(-2, -1)[0]
 
     if (!businessId) {
       return NextResponse.json({ error: 'Business ID is required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    // Резидент может просматривать только свой бизнес (или LEC7_ADMIN)
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Получаем список фото, отсортированный по sortOrder
@@ -161,4 +135,4 @@ export async function GET(request: NextRequest) {
     console.error('Get business photos error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
-}
+})

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
+import { withBusinessAccess } from '@/lib/access'
 import { sendTelegramDocument } from '@/lib/telegram'
 import { buildRequestXlsx } from '@/lib/requestExcel'
 import { Decimal } from '@prisma/client/runtime/library'
-
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
 
 interface SendRequestItem {
   name: string
@@ -16,7 +14,7 @@ interface SendRequestItem {
   sortOrder: number
 }
 
-export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const POST = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
@@ -28,15 +26,11 @@ export const POST = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true, legalName: true, name: true, slug: true },
+      select: { id: true, legalName: true, name: true, slug: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()

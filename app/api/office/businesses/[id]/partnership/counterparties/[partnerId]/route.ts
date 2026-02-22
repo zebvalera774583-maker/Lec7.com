@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
-
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
+import { withBusinessAccess } from '@/lib/access'
 
 function parseIds(pathname: string): { businessId: string | null; partnerBusinessId: string | null } {
   const parts = pathname.split('/')
@@ -11,12 +9,11 @@ function parseIds(pathname: string): { businessId: string | null; partnerBusines
     return { businessId: null, partnerBusinessId: null }
   }
   const businessId = parts[idx + 1] || null
-  // Последний сегмент пути — это partnerId: /api/office/businesses/[id]/partnership/counterparties/[partnerId]
   const partnerBusinessId = parts[parts.length - 1] || null
   return { businessId, partnerBusinessId }
 }
 
-export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const DELETE = withBusinessAccess(async (req, user) => {
   try {
     const { businessId, partnerBusinessId } = parseIds(new URL(req.url).pathname)
 
@@ -24,18 +21,13 @@ export const DELETE = withOfficeAuth(async (req: NextRequest, user: any) => {
       return NextResponse.json({ error: 'businessId and partnerBusinessId are required' }, { status: 400 })
     }
 
-    // Проверяем, что бизнес существует и принадлежит пользователю (или LEC7_ADMIN)
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && business.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Переводим все активные связи между бизнесами в DECLINED (в обе стороны)

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireRole } from '@/lib/middleware'
-
-const withOfficeAuth = (handler: any) => requireRole(['BUSINESS_OWNER', 'LEC7_ADMIN'], handler)
+import { withBusinessAccess } from '@/lib/access'
 
 const REQUISITES_FIELDS = [
   'legalName',
@@ -18,7 +16,7 @@ const REQUISITES_FIELDS = [
   'director',
 ] as const
 
-export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const GET = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const businessId = url.pathname.split('/').slice(-2, -1)[0]
@@ -29,15 +27,11 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true, ...Object.fromEntries(REQUISITES_FIELDS.map((f) => [f, true])) },
+      select: { id: true, ...Object.fromEntries(REQUISITES_FIELDS.map((f) => [f, true])) },
     })
 
     if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const requisites = REQUISITES_FIELDS.reduce(
@@ -54,7 +48,7 @@ export const GET = withOfficeAuth(async (req: NextRequest, user: any) => {
   }
 })
 
-export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
+export const PUT = withBusinessAccess(async (req, user) => {
   try {
     const url = new URL(req.url)
     const businessId = url.pathname.split('/').slice(-2, -1)[0]
@@ -65,15 +59,11 @@ export const PUT = withOfficeAuth(async (req: NextRequest, user: any) => {
 
     const accessBusiness = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     })
 
     if (!accessBusiness) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
-    if (user.role !== 'LEC7_ADMIN' && accessBusiness.ownerId !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()
