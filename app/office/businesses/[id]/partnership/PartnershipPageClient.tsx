@@ -412,15 +412,21 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
     if (initialSection === 'incoming') {
       setIncomingRequestsExpanded(true)
       setActiveCounterpartiesExpanded(false)
+      setAssignPerformerOpen(false)
+      setTelegramPanelOpen(false)
       loadPartnershipData()
     } else if (initialSection === 'counterparties') {
       setActiveCounterpartiesExpanded(true)
       setIncomingRequestsExpanded(false)
+      setAssignPerformerOpen(false)
+      setTelegramPanelOpen(false)
       loadPartnershipData()
     } else if (initialSection === 'performers') {
       setAssignPerformerOpen(true)
+      setTelegramPanelOpen(false)
     } else if (initialSection === 'telegram') {
       setTelegramPanelOpen(true)
+      setAssignPerformerOpen(false)
     }
   }, [initialSection])
 
