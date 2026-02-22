@@ -544,7 +544,7 @@ export default function RequestsPageClient({ businessId, initialSection }: Reque
     }
   }, [menuOpenCardId])
 
-  const showLeftNav = initialSection !== 'create'
+  const showLeftNav = false
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>

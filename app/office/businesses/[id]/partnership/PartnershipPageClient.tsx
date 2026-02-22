@@ -980,7 +980,10 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
     )
   }
 
-  const showLeftColumn = initialSection !== 'telegram'
+  const hideLeftColumn =
+    (initialSection && ['telegram', 'incoming', 'counterparties', 'performers'].includes(initialSection)) ||
+    (initialAction && ['create-price', 'import-price'].includes(initialAction))
+  const showLeftColumn = !hideLeftColumn
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
@@ -1252,7 +1255,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         {/* Центр + правая панель Telegram */}
         <div style={{ flex: 1, minWidth: '280px', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
           {/* Карточки назначенных прайсов и свои прайсы — скрыты при открытом «Исполнители» или section=telegram */}
-          {!assignPerformerOpen && initialSection !== 'telegram' && (
+          {!assignPerformerOpen && !hideLeftColumn && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }}>
           {assignedPrices.length > 0 && (
             <>
