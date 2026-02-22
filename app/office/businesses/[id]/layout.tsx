@@ -1,6 +1,7 @@
-import Link from 'next/link'
+import { Suspense } from 'react'
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
+import BusinessSidebar from './BusinessSidebar'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -38,56 +39,13 @@ export default async function BusinessLayout({ children, params }: LayoutProps) 
 
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: '#f5f5f5' }}>
-      <aside
-        style={{
-          width: '220px',
-          flexShrink: 0,
-          background: 'white',
-          borderRight: '1px solid #e5e7eb',
-          padding: '1.25rem 0',
-        }}
-      >
-        <Link
-          href="/office"
-          style={{
-            display: 'block',
-            padding: '0.5rem 1.25rem',
-            color: '#6b7280',
-            fontSize: '0.875rem',
-            textDecoration: 'none',
-          }}
-        >
-          ← Назад
-        </Link>
-        <div
-          style={{
-            padding: '0.75rem 1.25rem',
-            fontSize: '0.75rem',
-            color: '#9ca3af',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          {business.name}
-        </div>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              style={{
-                padding: '0.5rem 1.25rem',
-                color: '#111827',
-                fontSize: '0.9375rem',
-                textDecoration: 'none',
-              }}
-              className="hover:bg-gray-50"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
+      <Suspense fallback={<div style={{ width: 288, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #e5e7eb', minHeight: 'calc(100vh - 60px)' }} />}>
+        <BusinessSidebar
+          businessId={business.id}
+          businessName={business.name}
+          navItems={navItems}
+        />
+      </Suspense>
       <main style={{ flex: 1, overflow: 'auto' }}>
         {children}
       </main>
