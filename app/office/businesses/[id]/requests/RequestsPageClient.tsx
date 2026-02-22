@@ -544,11 +544,14 @@ export default function RequestsPageClient({ businessId, initialSection }: Reque
     }
   }, [menuOpenCardId])
 
+  const showLeftNav = initialSection !== 'create'
+
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       <h1 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Заявки</h1>
 
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {showLeftNav && (
         <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           <Link
             href={`/office/businesses/${businessId}`}
@@ -599,6 +602,7 @@ export default function RequestsPageClient({ businessId, initialSection }: Reque
             Архив заявок
           </span>
         </div>
+        )}
         {sendStatus && (
           <div style={{ marginBottom: '0.75rem', padding: '0.5rem 1rem', borderRadius: '6px', background: sendStatus.ok ? '#dcfce7' : '#fee2e2', color: sendStatus.ok ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
             {sendStatus.message}
