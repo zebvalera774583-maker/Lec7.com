@@ -3,9 +3,8 @@ import { notFound } from 'next/navigation'
 import PartnershipPageClient from './PartnershipPageClient'
 
 interface PageProps {
-  params: {
-    id: string
-  }
+  params: { id: string }
+  searchParams: { action?: string; section?: string }
 }
 
 function maskChatId(chatId: string): string {
@@ -13,7 +12,7 @@ function maskChatId(chatId: string): string {
   return chatId.slice(0, 3) + '***' + chatId.slice(-3)
 }
 
-export default async function PartnershipPage({ params }: PageProps) {
+export default async function PartnershipPage({ params, searchParams }: PageProps) {
   const business = await prisma.business.findUnique({
     where: { id: params.id },
     select: {
@@ -57,6 +56,8 @@ export default async function PartnershipPage({ params }: PageProps) {
       telegramChatId={business.telegramChatId}
       telegramRecipients={recipients}
       requests={requests}
+      initialAction={searchParams.action}
+      initialSection={searchParams.section}
     />
   )
 }

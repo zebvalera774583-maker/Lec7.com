@@ -56,6 +56,8 @@ interface PartnershipPageClientProps {
   telegramChatId: string | null
   telegramRecipients: TelegramRecipientItem[]
   requests: RequestItem[]
+  initialAction?: string
+  initialSection?: string
 }
 
 interface AssignedPrice {
@@ -93,7 +95,7 @@ interface IncomingRequest {
   createdAt: string
 }
 
-export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients, requests }: PartnershipPageClientProps) {
+export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients, requests, initialAction, initialSection }: PartnershipPageClientProps) {
   const router = useRouter()
   const [prices, setPrices] = useState<Price[]>([])
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
@@ -393,6 +395,34 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   useEffect(() => {
     setTelegramRecipients(initialRecipients)
   }, [initialRecipients])
+
+  useEffect(() => {
+    if (initialAction === 'create-price') {
+      setEditingPriceId(null)
+      setEditingPriceData(null)
+      setIsViewOnlyMode(false)
+      setIsModalOpen(true)
+    } else if (initialAction === 'import-price') {
+      setUpdatePriceId(null)
+      setIsImportModalOpen(true)
+    }
+  }, [initialAction])
+
+  useEffect(() => {
+    if (initialSection === 'incoming') {
+      setIncomingRequestsExpanded(true)
+      setActiveCounterpartiesExpanded(false)
+      loadPartnershipData()
+    } else if (initialSection === 'counterparties') {
+      setActiveCounterpartiesExpanded(true)
+      setIncomingRequestsExpanded(false)
+      loadPartnershipData()
+    } else if (initialSection === 'performers') {
+      setAssignPerformerOpen(true)
+    } else if (initialSection === 'telegram') {
+      setTelegramPanelOpen(true)
+    }
+  }, [initialSection])
 
   // Загрузка существующих инвайтов при открытии drawer «Назначить исполнителя»
   const loadAssignExisting = async () => {

@@ -20,10 +20,19 @@ export default async function BusinessLayout({ children, params }: LayoutProps) 
   const navItems = [
     { href: `/office/businesses/${business.id}`, label: 'Обзор' },
     { href: `/office/businesses/${business.id}/profile`, label: 'Профиль' },
-    { href: `/office/businesses/${business.id}/requests`, label: 'Заявки' },
+    { href: `/office/businesses/${business.id}/requisites`, label: 'Реквизиты предприятия' },
+    { href: `/office/businesses/${business.id}/requests?section=create`, label: 'Создать заявку' },
+    { href: `/office/businesses/${business.id}/requests`, label: 'Поступившие заявки' },
+    { href: `/office/businesses/${business.id}/requests?section=archive`, label: 'Архив заявок' },
+    { href: `/office/businesses/${business.id}/partnership`, label: 'Потребности' },
     { href: `/office/businesses/${business.id}/partnership`, label: 'Партнёрство' },
-    { href: `/office/businesses/${business.id}/prices/compare`, label: 'Сравнение цен' },
-    { href: `/office/ads?businessId=${business.id}`, label: 'Реклама' },
+    { href: `/office/businesses/${business.id}/prices/compare`, label: 'Сводная таблица прайсов' },
+    { href: `/office/businesses/${business.id}/partnership?action=create-price`, label: 'Создать прайс' },
+    { href: `/office/businesses/${business.id}/partnership?action=import-price`, label: 'Импорт прайса' },
+    { href: `/office/businesses/${business.id}/partnership?section=incoming`, label: 'Запросы на подключение контрагентов' },
+    { href: `/office/businesses/${business.id}/partnership?section=counterparties`, label: 'Действующие контрагенты' },
+    { href: `/office/businesses/${business.id}/partnership?section=performers`, label: 'Исполнители' },
+    { href: `/office/businesses/${business.id}/partnership?section=telegram`, label: 'Telegram / MAX' },
   ]
 
   return (

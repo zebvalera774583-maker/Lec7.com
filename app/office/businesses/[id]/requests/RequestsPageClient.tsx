@@ -8,6 +8,7 @@ const STORAGE_KEY_PREFIX = 'lec7_request_created_'
 
 interface RequestsPageClientProps {
   businessId: string
+  initialSection?: string
 }
 
 interface Row {
@@ -77,7 +78,7 @@ function formatRequestDate(d: Date): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export default function RequestsPageClient({ businessId }: RequestsPageClientProps) {
+export default function RequestsPageClient({ businessId, initialSection }: RequestsPageClientProps) {
   const [showCreateBlock, setShowCreateBlock] = useState(true)
   const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>('form')
   const [selectedCounterpartyId, setSelectedCounterpartyId] = useState<string | null>(null)
@@ -99,7 +100,7 @@ export default function RequestsPageClient({ businessId }: RequestsPageClientPro
   const [sendStatus, setSendStatus] = useState<{ ok: boolean; message: string } | null>(null)
   const [sendingCounterpartyId, setSendingCounterpartyId] = useState<string | null>(null)
   const [sendingAll, setSendingAll] = useState(false)
-  const [viewSection, setViewSection] = useState<'create' | 'incoming'>('incoming')
+  const [viewSection, setViewSection] = useState<'create' | 'incoming'>(initialSection === 'create' ? 'create' : 'incoming')
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
   const menuContainerRef = useRef<HTMLDivElement>(null)
