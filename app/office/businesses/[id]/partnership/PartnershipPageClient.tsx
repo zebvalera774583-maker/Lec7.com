@@ -981,7 +981,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   }
 
   const hideLeftColumn =
-    (initialSection && ['telegram', 'incoming', 'counterparties', 'performers'].includes(initialSection)) ||
+    (initialSection && ['telegram', 'performers'].includes(initialSection)) ||
     (initialAction && ['create-price', 'import-price'].includes(initialAction))
   const showLeftColumn = !hideLeftColumn
 
