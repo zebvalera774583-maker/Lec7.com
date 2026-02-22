@@ -28,9 +28,12 @@ const DANGEROUS_PATTERNS = [
   /prisma\.user\.update\s*\(/,
   /prisma\.user\.updateMany\s*\(/,
   /prisma\.user\.upsert\s*\(/,
+  /prisma\.user\.create\s*\(/,
+  /prisma\.user\.createMany\s*\(/,
 ]
 
-const ROLE_IN_DATA = /(?:data|create|update)\s*:\s*\{[\s\S]*?['"]?role['"]?\s*:/
+// role как ключ: role: или role, (shorthand { role })
+const ROLE_IN_DATA = /(?:data|create|update)\s*:\s*\{[\s\S]*?\brole\s*[,:]/
 
 function isWhitelisted(filePath) {
   const rel = path.relative(ROOT, filePath).replace(/\\/g, '/')

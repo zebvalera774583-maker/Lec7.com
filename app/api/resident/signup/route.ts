@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Создаём пользователя-резидента
-    const user = await createUser(email, password, undefined, 'BUSINESS_OWNER')
+    const user = await createUser(email, password, undefined)
 
     if (!isUserRole(user.role)) {
       console.error('Invalid user role after resident signup:', user.role)

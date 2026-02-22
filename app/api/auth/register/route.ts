@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'EMAIL_ALREADY_EXISTS' }, { status: 409 })
     }
 
-    const user = await createUser(email, password, name, 'BUSINESS_OWNER')
+    const user = await createUser(email, password, name)
 
     // Валидация роли после создания
     if (!isUserRole(user.role)) {

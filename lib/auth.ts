@@ -99,18 +99,15 @@ export async function getUserById(id: string) {
 export async function createUser(
   email: string,
   password: string,
-  name?: string,
-  role: UserRole = 'BUSINESS_OWNER'
+  name?: string
 ) {
   const normalizedEmail = normalizeEmail(email)
   const hashedPassword = await hashPassword(password)
-  
   return prisma.user.create({
     data: {
       email: normalizedEmail,
       password: hashedPassword,
       name,
-      role,
     },
   })
 }
