@@ -102,8 +102,8 @@ export default function RequestDetailClient({
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       <div style={{ marginBottom: '1.5rem' }}>
-        <Link href={`/office/businesses/${businessId}`} style={{ color: '#666', textDecoration: 'underline', fontSize: '0.9375rem' }}>
-          ← К заявкам бизнеса
+        <Link href={`/office/businesses/${businessId}/requests`} style={{ color: '#666', textDecoration: 'underline', fontSize: '0.9375rem' }}>
+          ← Назад
         </Link>
       </div>
 
