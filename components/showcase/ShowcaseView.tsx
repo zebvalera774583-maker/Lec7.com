@@ -286,20 +286,20 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
           }}
         />
 
-        {/* Сферы деятельности */}
-        <div>
-          <h2
-            style={{
-              margin: 0,
-              marginBottom: '0.75rem',
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              fontWeight: 600,
-              color: '#111827',
-            }}
-          >
-            Сферы деятельности
-          </h2>
-          {profileServices.length > 0 ? (
+        {/* Сферы деятельности — только если заполнены */}
+        {profileServices.length > 0 && (
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                marginBottom: '0.75rem',
+                fontSize: isMobile ? '0.9rem' : '1rem',
+                fontWeight: 600,
+                color: '#111827',
+              }}
+            >
+              Сферы деятельности
+            </h2>
             <ul
               style={{
                 margin: 0,
@@ -313,18 +313,8 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                 <li key={service}>{service}</li>
               ))}
             </ul>
-          ) : (
-            <p
-              style={{
-                margin: 0,
-                color: '#6b7280',
-                fontSize: '0.9rem',
-              }}
-            >
-              Список сфер деятельности ещё не заполнен.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Города */}
         {profileCities.length > 0 && (
