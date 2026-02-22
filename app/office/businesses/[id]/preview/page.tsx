@@ -79,8 +79,8 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
   return (
     <ShowcaseShell
       backLink={{
-        href: `/office/businesses/${business.id}/profile`,
-        label: '← Вернуться в кабинет',
+        href: '/office/businesses',
+        label: 'Назад',
       }}
     >
       <ShowcaseView business={viewBusiness} mode="resident" />

@@ -49,7 +49,7 @@ export default function ShowcaseShell({ children, backLink }: ShowcaseShellProps
                 whiteSpace: 'nowrap',
               }}
             >
-              {backLink.label ?? '← Вернуться в кабинет'}
+              {backLink.label ?? 'Назад'}
             </Link>
           </div>
         </div>
