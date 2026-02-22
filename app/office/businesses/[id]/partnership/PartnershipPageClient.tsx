@@ -1243,7 +1243,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '0.25rem' }}>
             Здесь настраивается сотрудничество с партнёрами: прайсы, подключения, условия.
           </p>
-          <Link href={`/office/businesses/${businessId}`} style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}>
+          <Link href={`/office/businesses/${businessId}/preview`} style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none', display: 'inline-block', width: 'fit-content' }}>
             Назад
           </Link>
           <Link

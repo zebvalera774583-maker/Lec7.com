@@ -80,7 +80,7 @@ export default async function RequestsPage() {
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       <div style={{ marginBottom: '2rem' }}>
         <Link
-          href={`/office/businesses/${business.id}`}
+          href={`/office/businesses/${business.id}/preview`}
           style={{ color: '#666', textDecoration: 'underline', marginBottom: '1rem', display: 'inline-block' }}
         >
           ← Назад

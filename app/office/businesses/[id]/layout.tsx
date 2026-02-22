@@ -19,7 +19,6 @@ export default async function BusinessLayout({ children, params }: LayoutProps) 
   }
 
   const navItems = [
-    { href: `/office/businesses/${business.id}`, label: 'Обзор' },
     { href: `/office/businesses/${business.id}/preview`, label: 'Витрина' },
     { href: `/office/businesses/${business.id}/profile`, label: 'Профиль' },
     { href: `/office/businesses/${business.id}/requisites`, label: 'Реквизиты предприятия' },

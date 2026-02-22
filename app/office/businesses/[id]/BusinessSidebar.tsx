@@ -23,7 +23,6 @@ export default function BusinessSidebar({ businessId, businessName, navItems }: 
     const pathMatches = pathname === path || pathname.startsWith(path + '/')
     if (!pathMatches) return false
     if (!query) {
-      if (path === `/office/businesses/${businessId}`) return pathname === path
       const currentQuery = searchParams.toString()
       return !currentQuery
     }

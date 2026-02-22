@@ -66,7 +66,7 @@ export default function NewBusinessPage() {
           // Редирект на существующий бизнес или в кабинет
           if (data.businessId) {
             setTimeout(() => {
-              router.push(`/office/businesses/${data.businessId}`)
+              router.push(`/office/businesses/${data.businessId}/preview`)
             }, 1500)
           } else {
             setTimeout(() => {

@@ -29,9 +29,9 @@ export default async function OfficePage() {
     select: { id: true },
   })
 
-  // Если бизнес найден → редирект на страницу бизнеса
+  // Если бизнес найден → редирект на Витрину (начальная страница резидента)
   if (business) {
-    redirect(`/office/businesses/${business.id}`)
+    redirect(`/office/businesses/${business.id}/preview`)
   }
 
   // Если бизнеса нет → редирект на создание

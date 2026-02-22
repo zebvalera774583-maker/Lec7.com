@@ -558,7 +558,7 @@ export default function RequestsPageClient({ businessId, initialSection }: Reque
         {showLeftNav && (
         <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           <Link
-            href={`/office/businesses/${businessId}`}
+            href={`/office/businesses/${businessId}/preview`}
             style={{ padding: '0.25rem 0', color: '#111827', fontSize: '1rem', fontWeight: 500, textDecoration: 'none' }}
           >
             Назад
