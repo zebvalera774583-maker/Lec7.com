@@ -131,8 +131,8 @@ export default async function PublicBusinessPage({ params }: PageProps) {
             </p>
           )}
 
-          {/* Метрики */}
-          {stats && (
+          {/* Метрики — показываем только ненулевые */}
+          {stats && (stats.cases > 0 || stats.projects > 0 || stats.cities > 0) && (
             <div
               style={{
                 display: 'flex',
@@ -142,24 +142,24 @@ export default async function PublicBusinessPage({ params }: PageProps) {
                 flexWrap: 'wrap',
               }}
             >
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
-                  {stats.cases}
+              {stats.cases > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.cases}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#666' }}>уникальных кейсов</div>
                 </div>
-                <div style={{ fontSize: '0.875rem', color: '#666' }}>уникальных кейсов</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
-                  {stats.projects}
+              )}
+              {stats.projects > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.projects}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#666' }}>проектов</div>
                 </div>
-                <div style={{ fontSize: '0.875rem', color: '#666' }}>проектов</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
-                  {stats.cities}
+              )}
+              {stats.cities > 0 && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.cities}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#666' }}>городов</div>
                 </div>
-                <div style={{ fontSize: '0.875rem', color: '#666' }}>городов</div>
-              </div>
+              )}
             </div>
           )}
 

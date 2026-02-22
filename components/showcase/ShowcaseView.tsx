@@ -77,6 +77,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
   const statsCities = business.profile?.statsCities ?? 4
+  const hasAnyStats = statsCases > 0 || statsProjects > 0 || statsCities > 0
 
   const profileCities = business.profile?.cities ?? []
   const profileServices = business.profile?.services ?? []
@@ -170,26 +171,34 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   {business.name}
                 </h1>
 
-                {/* Stats */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.25rem',
-                    fontSize: '0.85rem',
-                    color: '#111827',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontWeight: 600 }}>{statsCases}</span> кейсов
+                {/* Stats — только ненулевые */}
+                {hasAnyStats && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.25rem',
+                      fontSize: '0.85rem',
+                      color: '#111827',
+                    }}
+                  >
+                    {statsCases > 0 && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{statsCases}</span> кейсов
+                      </div>
+                    )}
+                    {statsProjects > 0 && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов
+                      </div>
+                    )}
+                    {statsCities > 0 && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{statsCities}</span> города
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов
-                  </div>
-                  <div>
-                    <span style={{ fontWeight: 600 }}>{statsCities}</span> города
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -248,18 +257,22 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               </div>
             </div>
 
-            <p
-              style={{
-                marginTop: '1.75rem',
-                marginBottom: 0,
-                fontSize: '0.95rem',
-                color: '#111827',
-              }}
-            >
-              <span style={{ fontWeight: 600 }}>{statsCases}</span> уникальных кейсов&nbsp;|{' '}
-              <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов&nbsp;|{' '}
-              <span style={{ fontWeight: 600 }}>{statsCities}</span> города
-            </p>
+            {hasAnyStats && (
+              <p
+                style={{
+                  marginTop: '1.75rem',
+                  marginBottom: 0,
+                  fontSize: '0.95rem',
+                  color: '#111827',
+                }}
+              >
+                {statsCases > 0 && <><span style={{ fontWeight: 600 }}>{statsCases}</span> уникальных кейсов</>}
+                {statsCases > 0 && (statsProjects > 0 || statsCities > 0) && ' | '}
+                {statsProjects > 0 && <><span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов</>}
+                {statsProjects > 0 && statsCities > 0 && ' | '}
+                {statsCities > 0 && <><span style={{ fontWeight: 600 }}>{statsCities}</span> города</>}
+              </p>
+            )}
           </div>
         )}
 
