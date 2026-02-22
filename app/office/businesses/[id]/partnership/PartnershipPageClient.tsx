@@ -980,10 +980,13 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
     )
   }
 
+  const showLeftColumn = initialSection !== 'telegram'
+
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* Левая колонка: заголовок, описание, ссылки, заголовки секций, аккордеоны */}
+        {/* Левая колонка: заголовок, описание, ссылки, заголовки секций, аккордеоны — скрыта при section=telegram */}
+        {showLeftColumn && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: '200px', flex: '0 0 auto' }}>
           <h1 style={{ marginBottom: '0.25rem', fontSize: '2rem' }}>Партнёрство</h1>
           <p style={{ color: '#666', fontSize: '1rem', lineHeight: 1.6, marginBottom: '0.25rem' }}>
@@ -1244,11 +1247,12 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
             )}
           </div>
         </div>
+        )}
 
         {/* Центр + правая панель Telegram */}
         <div style={{ flex: 1, minWidth: '280px', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
-          {/* Карточки назначенных прайсов и свои прайсы — скрыты при открытом «Исполнители» */}
-          {!assignPerformerOpen && (
+          {/* Карточки назначенных прайсов и свои прайсы — скрыты при открытом «Исполнители» или section=telegram */}
+          {!assignPerformerOpen && initialSection !== 'telegram' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-start' }}>
           {assignedPrices.length > 0 && (
             <>
