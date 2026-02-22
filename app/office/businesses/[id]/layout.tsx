@@ -24,7 +24,7 @@ export default async function BusinessLayout({ children, params }: LayoutProps) 
     { href: `/office/businesses/${business.id}/profile`, label: 'Профиль' },
     { href: `/office/businesses/${business.id}/requisites`, label: 'Реквизиты предприятия' },
     { href: `/office/businesses/${business.id}/requests?section=create`, label: 'Создать заявку' },
-    { href: `/office/businesses/${business.id}/requests`, label: 'Поступившие заявки' },
+    { href: `/office/businesses/${business.id}/requests?section=incoming`, label: 'Поступившие заявки' },
     { href: `/office/businesses/${business.id}/requests?section=archive`, label: 'Архив заявок' },
     { href: `/office/businesses/${business.id}/partnership`, label: 'Потребности' },
     { href: `/office/businesses/${business.id}/partnership`, label: 'Партнёрство' },

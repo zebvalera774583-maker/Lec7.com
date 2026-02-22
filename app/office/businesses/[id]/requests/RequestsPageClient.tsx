@@ -101,6 +101,10 @@ export default function RequestsPageClient({ businessId, initialSection }: Reque
   const [sendingCounterpartyId, setSendingCounterpartyId] = useState<string | null>(null)
   const [sendingAll, setSendingAll] = useState(false)
   const [viewSection, setViewSection] = useState<'create' | 'incoming'>(initialSection === 'create' ? 'create' : 'incoming')
+
+  useEffect(() => {
+    setViewSection(initialSection === 'create' ? 'create' : 'incoming')
+  }, [initialSection])
   const lastRowRef = useRef<HTMLInputElement>(null)
   const allCheckboxRef = useRef<HTMLInputElement>(null)
   const menuContainerRef = useRef<HTMLDivElement>(null)
