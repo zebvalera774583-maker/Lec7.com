@@ -80,7 +80,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const hasAnyStats = statsCases > 0 || statsProjects > 0 || statsCities > 0
 
   const profileCities = business.profile?.cities ?? []
-  const profileServices = business.profile?.services ?? []
+  const profileServices = (business.profile?.services ?? []).filter((s) => s && String(s).trim().length > 0)
 
   const initials =
     business.name && business.name.trim().length > 0

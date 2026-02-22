@@ -43,7 +43,7 @@ export default async function PublicBusinessPage({ params }: PageProps) {
   // Используем данные из профиля или fallback на бизнес
   const displayName = business.profile?.displayName || business.name
   const profileCities = business.profile?.cities || []
-  const profileServices = business.profile?.services || []
+  const profileServices = (business.profile?.services || []).filter((s) => s && String(s).trim().length > 0)
   const stats = business.profile
     ? {
         cases: business.profile.statsCases,
