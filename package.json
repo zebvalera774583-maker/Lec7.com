@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "npm run guard:primary-role && prisma generate && next build",
+    "guard:primary-role": "node scripts/guard-primary-role.js",
     "start": "next start -p 3000",
     "lint": "next lint",
     "db:generate": "prisma generate",
