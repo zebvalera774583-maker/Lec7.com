@@ -981,14 +981,256 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   }
 
   const hideLeftColumn =
-    (initialSection && ['telegram', 'performers'].includes(initialSection)) ||
+    (initialSection && ['telegram', 'performers', 'counterparties', 'incoming'].includes(initialSection)) ||
     (initialAction && ['create-price', 'import-price'].includes(initialAction))
   const showLeftColumn = !hideLeftColumn
+  const onlyCounterpartiesTable = initialSection === 'counterparties'
+  const onlyIncomingTable = initialSection === 'incoming'
+  const onlyNeedsView = !initialSection && !initialAction
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
+      {/* При section=counterparties — только таблица контрагентов */}
+      {onlyCounterpartiesTable && (
+        <div style={{ width: '100%' }}>
+          {loadingPartnership ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+          ) : activeCounterparties.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет действующих контрагентов</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeCounterparties.map((counterparty, index) => (
+                  <tr key={counterparty.partnerBusinessId}>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCounterparty(counterparty.partnerBusinessId)}
+                        disabled={removingCounterpartyId === counterparty.partnerBusinessId}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          background: '#f9fafb',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          cursor: removingCounterpartyId ? 'not-allowed' : 'pointer',
+                          fontSize: '0.8125rem',
+                        }}
+                      >
+                        {removingCounterpartyId === counterparty.partnerBusinessId ? 'Удаление...' : 'Удалить'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* При section=incoming — только таблица запросов */}
+      {onlyIncomingTable && (
+        <div style={{ width: '100%' }}>
+          {loadingPartnership ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+          ) : incomingRequests.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incomingRequests.map((request, index) => (
+                  <tr key={request.linkId}>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                      {new Date(request.createdAt).toLocaleDateString('ru-RU')}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRequestAction(request.linkId, 'accept')
+                        }}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          marginRight: '0.5rem',
+                          background: '#059669',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                        }}
+                      >
+                        Принять
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRequestAction(request.linkId, 'decline')
+                        }}
+                        style={{
+                          padding: '0.35rem 0.75rem',
+                          background: '#f3f4f6',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                        }}
+                      >
+                        Отклонить
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Потребности — только две таблицы: контрагенты и запросы */}
+      {onlyNeedsView && (
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <div>
+            <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Действующие контрагенты</h2>
+            {loadingPartnership ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+            ) : activeCounterparties.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет действующих контрагентов</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeCounterparties.map((counterparty, index) => (
+                    <tr key={counterparty.partnerBusinessId}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCounterparty(counterparty.partnerBusinessId)}
+                          disabled={removingCounterpartyId === counterparty.partnerBusinessId}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            background: '#f9fafb',
+                            color: '#111827',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            cursor: removingCounterpartyId ? 'not-allowed' : 'pointer',
+                            fontSize: '0.8125rem',
+                          }}
+                        >
+                          {removingCounterpartyId === counterparty.partnerBusinessId ? 'Удаление...' : 'Удалить'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div>
+            <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Запросы на подключение контрагентов</h2>
+            {loadingPartnership ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+            ) : incomingRequests.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incomingRequests.map((request, index) => (
+                    <tr key={request.linkId}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        {new Date(request.createdAt).toLocaleDateString('ru-RU')}
+                      </td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRequestAction(request.linkId, 'accept')
+                          }}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            marginRight: '0.5rem',
+                            background: '#059669',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.8125rem',
+                          }}
+                        >
+                          Принять
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRequestAction(request.linkId, 'decline')
+                          }}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            background: '#f3f4f6',
+                            color: '#111827',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.8125rem',
+                          }}
+                        >
+                          Отклонить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!onlyCounterpartiesTable && !onlyIncomingTable && !onlyNeedsView && (
       <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* Левая колонка: заголовок, описание, ссылки, заголовки секций, аккордеоны — скрыта при section=telegram */}
+        {/* Левая колонка: заголовок, описание, ссылки, заголовки секций, аккордеоны */}
         {showLeftColumn && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: '200px', flex: '0 0 auto' }}>
           <h1 style={{ marginBottom: '0.25rem', fontSize: '2rem' }}>Партнёрство</h1>
@@ -1911,6 +2153,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
           )}
         </div>
       </div>
+      )}
 
       <PriceUploadModal
         isOpen={isModalOpen}
