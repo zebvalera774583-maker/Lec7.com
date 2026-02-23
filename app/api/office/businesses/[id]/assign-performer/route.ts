@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
+import { getNextRequestNumber } from '@/lib/request-number'
 
 const TOKEN_BYTES = 24
 const PICKER_LABEL = 'Сборщик 1'
@@ -131,41 +132,47 @@ export const POST = withBusinessAccess(async (req, user) => {
     }
 
     // PICKER
-    let request = await prisma.request.findFirst({
-      where: { businessId },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
-    })
-
-    if (!request) {
-      request = await prisma.request.create({
-        data: {
-          businessId,
-          title: 'Заявка со страницы Партнёрства',
-          description: 'Автоматически создана для назначения исполнителя (сборщика).',
-          source: 'partnership_assign_picker',
-        },
+    const { request, pickerInvite, assignment } = await prisma.$transaction(async (tx) => {
+      let req = await tx.request.findFirst({
+        where: { businessId },
+        orderBy: { createdAt: 'desc' },
         select: { id: true },
       })
-    }
 
-    const token = randomBytes(TOKEN_BYTES).toString('hex')
-    const pickerInvite = await prisma.pickerInvite.create({
-      data: {
-        token,
-        label: PICKER_LABEL,
-        requestId: request.id,
-        createdByUserId: user.id,
-      },
-    })
+      if (!req) {
+        const number = await getNextRequestNumber(tx)
+        req = await tx.request.create({
+          data: {
+            businessId,
+            number,
+            title: 'Заявка со страницы Партнёрства',
+            description: 'Автоматически создана для назначения исполнителя (сборщика).',
+            source: 'partnership_assign_picker',
+          },
+          select: { id: true },
+        })
+      }
 
-    const assignment = await prisma.requestAssignment.create({
-      data: {
-        requestId: request.id,
-        role: 'PICKER',
-        createdByUserId: user.id,
-        inviteId: pickerInvite.id,
-      },
+      const token = randomBytes(TOKEN_BYTES).toString('hex')
+      const inv = await tx.pickerInvite.create({
+        data: {
+          token,
+          label: PICKER_LABEL,
+          requestId: req.id,
+          createdByUserId: user.id,
+        },
+      })
+
+      const ass = await tx.requestAssignment.create({
+        data: {
+          requestId: req.id,
+          role: 'PICKER',
+          createdByUserId: user.id,
+          inviteId: inv.id,
+        },
+      })
+
+      return { request: req, pickerInvite: inv, assignment: ass }
     })
 
     return NextResponse.json({

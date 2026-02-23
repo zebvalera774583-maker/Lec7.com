@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getNextRequestNumber } from '@/lib/request-number'
 
 const SECRET_HEADER = 'x-lec7-max-secret'
 
@@ -55,15 +56,22 @@ export async function POST(req: NextRequest) {
 
   // Контекст есть — создаём заявку
   if (context) {
-    await prisma.request.create({
-      data: {
-        businessId: context.businessId,
-        title: `Заявка из MAX: ${text.slice(0, 80) || 'Новое сообщение'}`,
-        description: text || 'Сообщение из MAX',
-        source: 'max_integration',
-      },
+    const { number } = await prisma.$transaction(async (tx) => {
+      const num = await getNextRequestNumber(tx)
+      await tx.request.create({
+        data: {
+          businessId: context.businessId,
+          number: num,
+          title: `Заявка из MAX: ${text.slice(0, 80) || 'Новое сообщение'}`,
+          description: text || 'Сообщение из MAX',
+          source: 'max_integration',
+        },
+      })
+      return { number: num }
     })
-    return NextResponse.json({ replyText: 'Спасибо, заявка принята' })
+    return NextResponse.json({
+      replyText: `Спасибо, заявка принята. Номер вашей заявки: ${number}`,
+    })
   }
 
   // Контекста нет — пользователь должен выбрать slug

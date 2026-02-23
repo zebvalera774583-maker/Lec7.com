@@ -37,7 +37,7 @@ export const GET = withBusinessAccess(async (req, user) => {
           businessId,
           source: { not: 'max_integration' },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { number: 'asc' },
       }),
     ])
 
@@ -45,6 +45,7 @@ export const GET = withBusinessAccess(async (req, user) => {
       id: r.id,
       type: 'incoming' as const,
       requestId: null as string | null,
+      number: null as number | null,
       senderBusinessId: r.senderBusinessId,
       senderLegalName: r.sender.legalName || r.sender.name,
       category: r.category,
@@ -65,6 +66,7 @@ export const GET = withBusinessAccess(async (req, user) => {
       id: `request_${r.id}`,
       type: 'request' as const,
       requestId: r.id,
+      number: r.number,
       senderBusinessId: '',
       senderLegalName: 'MAX',
       category: null,
@@ -81,8 +83,11 @@ export const GET = withBusinessAccess(async (req, user) => {
       }],
     }))
 
-    const requests = [...incomingMapped, ...requestMapped]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    const requests = [...incomingMapped, ...requestMapped].sort((a, b) => {
+      const na = a.number ?? 999999999
+      const nb = b.number ?? 999999999
+      return na - nb
+    })
 
     return NextResponse.json({ requests })
   } catch (error) {

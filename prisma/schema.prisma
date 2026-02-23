@@ -304,9 +304,16 @@ model Portfolio {
   @@index([businessId])
 }
 
+model PlatformCounter {
+  id               String   @id @default("global")
+  lastRequestNumber Int      @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
 model Request {
   id          String   @id @default(cuid())
   businessId  String
+  number      Int?     @unique
   title       String
   description String
   clientName  String?
@@ -323,6 +330,7 @@ model Request {
   pickerInvites PickerInvite[]
 
   @@index([businessId])
+  @@index([number])
 }
 
 enum PerformerRole {

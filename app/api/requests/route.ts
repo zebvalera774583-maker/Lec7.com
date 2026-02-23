@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getNextRequestNumber } from '@/lib/request-number'
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,17 +28,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Неверные параметры' }, { status: 400 })
     }
 
-    const createdRequest = await prisma.request.create({
-      data: {
-        businessId,
-        title,
-        description,
-        clientName,
-        clientEmail,
-        clientPhone,
-        source,
-        status: 'NEW',
-      },
+    const createdRequest = await prisma.$transaction(async (tx) => {
+      const number = await getNextRequestNumber(tx)
+      return tx.request.create({
+        data: {
+          businessId,
+          number,
+          title,
+          description,
+          clientName,
+          clientEmail,
+          clientPhone,
+          source,
+          status: 'NEW',
+        },
+      })
     })
 
     return NextResponse.json(createdRequest)

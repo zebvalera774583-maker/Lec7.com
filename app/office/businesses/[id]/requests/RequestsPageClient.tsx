@@ -43,6 +43,7 @@ interface IncomingRequestRow {
   id: string
   type?: 'incoming' | 'request'
   requestId?: string | null
+  number?: number | null
   senderBusinessId: string
   senderLegalName: string
   category: string | null
@@ -686,7 +687,9 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   const isRequestLink = req.type === 'request' && req.requestId
                   const cardContent = (
                     <>
-                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>Заявка от {req.senderLegalName}</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
+                        {req.number != null ? `№ ${req.number}. ` : ''}Заявка от {req.senderLegalName}
+                      </div>
                       <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{req.category || '—'}</div>
                       <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}. {req.total != null ? formatPrice(req.total) : ''}</div>
                     </>

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseLineItemsFromText, normalizeUnitInput } from '@/lib/max/parser'
+import { getNextRequestNumber } from '@/lib/request-number'
 import { createHash } from 'crypto'
+
+function withNumber(num: number | null, msg: string): string {
+  if (num != null) return `Номер вашей заявки: ${num}. ${msg}`
+  return msg
+}
 
 const SECRET_HEADER = 'x-lec7-max-secret'
 const BRANCH_COMMANDS = ['/branch', 'branch', 'сменить']
@@ -171,9 +177,11 @@ export async function POST(req: NextRequest) {
         const title = items.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
         const description = items.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
 
+        const requestNumber = await getNextRequestNumber(tx)
         const request = await tx.request.create({
           data: {
             businessId,
+            number: requestNumber,
             title: `Заявка из MAX: ${title.slice(0, 80)}`,
             description,
             source: 'max_integration',
@@ -193,7 +201,7 @@ export async function POST(req: NextRequest) {
         if (hasMissingUnit) {
           const missingItems = items.filter((i) => !i.unit)
           const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
-          replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+          replyText = withNumber(requestNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
           await tx.maxMessage.create({
             data: {
               conversationId: conversation.id,
@@ -205,7 +213,7 @@ export async function POST(req: NextRequest) {
           return { replyText }
         }
 
-        replyText = 'Спасибо, заявка принята'
+        replyText = withNumber(requestNumber, 'Спасибо, заявка принята')
         await tx.maxMessage.create({
           data: {
             conversationId: conversation.id,
@@ -216,6 +224,12 @@ export async function POST(req: NextRequest) {
         })
         return { replyText }
       }
+
+      const currentRequest = await tx.request.findUnique({
+        where: { id: link.requestId },
+        select: { number: true },
+      })
+      const currentNumber = currentRequest?.number ?? null
 
       if (link.status === 'NEED_DETAILS') {
         const unit = normalizeUnitInput(text)
@@ -234,28 +248,30 @@ export async function POST(req: NextRequest) {
             },
           })
           if (allFilled) {
-            replyText = 'Спасибо, заявка принята'
+            replyText = withNumber(currentNumber, 'Спасибо, заявка принята')
           } else {
             const missingItems = updated.filter((i) => !i.unit)
             const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
-            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+            replyText = withNumber(currentNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
           }
         } else {
-          replyText = 'Напишите единицу измерения. Например: кг, шт, л, мл, г, уп.'
+          replyText = withNumber(currentNumber, 'Напишите единицу измерения. Например: кг, шт, л, мл, г, уп.')
         }
       } else {
         // READY or DRAFT: new message = new request
         const items = parseLineItemsFromText(text)
         if (items.length === 0) {
-          replyText = 'Напишите товар и количество. Пример: яблоки 10 кг.'
+          replyText = withNumber(currentNumber, 'Напишите товар и количество. Пример: яблоки 10 кг.')
         } else {
           const hasMissingUnit = items.some((i) => !i.unit)
           const status = hasMissingUnit ? 'NEED_DETAILS' : 'READY'
           const title = items.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
           const description = items.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
+          const requestNumber = await getNextRequestNumber(tx)
           const request = await tx.request.create({
             data: {
               businessId,
+              number: requestNumber,
               title: `Заявка из MAX: ${title.slice(0, 80)}`,
               description,
               source: 'max_integration',
@@ -273,9 +289,9 @@ export async function POST(req: NextRequest) {
           if (hasMissingUnit) {
             const missingItems = items.filter((i) => !i.unit)
             const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
-            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+            replyText = withNumber(requestNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
           } else {
-            replyText = 'Спасибо, заявка принята'
+            replyText = withNumber(requestNumber, 'Спасибо, заявка принята')
           }
         }
       }

@@ -112,7 +112,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
   const [activeCounterparties, setActiveCounterparties] = useState<ActiveCounterparty[]>([])
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([])
-  const [maxRequests, setMaxRequests] = useState<{ requestId: string; title: string; description: string; createdAt: string }[]>([])
+  const [maxRequests, setMaxRequests] = useState<{ requestId: string; number: number | null; title: string; description: string; createdAt: string }[]>([])
   const [activeCounterpartiesExpanded, setActiveCounterpartiesExpanded] = useState(false)
   const [incomingRequestsExpanded, setIncomingRequestsExpanded] = useState(false)
   const [loadingPartnership, setLoadingPartnership] = useState(false)
@@ -1052,9 +1052,9 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
             <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
           ) : (() => {
             const allItems = [
-              ...incomingRequests.map((r) => ({ type: 'counterparty' as const, ...r })),
-              ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
-            ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              ...incomingRequests.map((r) => ({ type: 'counterparty' as const, number: null as number | null, ...r })),
+              ...maxRequests.map((r) => ({ type: 'max' as const, ...r, number: r.number })),
+            ].sort((a, b) => ((a.number ?? 999999999) - (b.number ?? 999999999)))
             if (allItems.length === 0) {
               return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
             }
@@ -1062,16 +1062,16 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
               <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {allItems.map((item, index) => (
+                  {allItems.map((item) => (
                     <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.type === 'max' && item.number != null ? item.number : '—'}</td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                         {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
                       </td>
@@ -1122,9 +1122,9 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
               <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
             ) : (() => {
               const allItems = [
-                ...incomingRequests.map((r) => ({ type: 'counterparty' as const, ...r })),
-                ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
-              ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                ...incomingRequests.map((r) => ({ type: 'counterparty' as const, number: null as number | null, ...r })),
+                ...maxRequests.map((r) => ({ type: 'max' as const, ...r, number: r.number })),
+              ].sort((a, b) => ((a.number ?? 999999999) - (b.number ?? 999999999)))
               if (allItems.length === 0) {
                 return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет потребностей</div>
               }
@@ -1132,16 +1132,16 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
                   <thead>
                     <tr style={{ background: '#f9fafb' }}>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {allItems.map((item, index) => (
+                    {allItems.map((item) => (
                       <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
-                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.type === 'max' && item.number != null ? item.number : '—'}</td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                           {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
                         </td>
@@ -1377,9 +1377,9 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : (() => {
                   const allItems = [
-                    ...incomingRequests.map((r) => ({ type: 'counterparty' as const, ...r })),
-                    ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
-                  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    ...incomingRequests.map((r) => ({ type: 'counterparty' as const, number: null as number | null, ...r })),
+                    ...maxRequests.map((r) => ({ type: 'max' as const, ...r, number: r.number })),
+                  ].sort((a, b) => ((a.number ?? 999999999) - (b.number ?? 999999999)))
                   if (allItems.length === 0) {
                     return (
                       <>
@@ -1394,16 +1394,16 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ background: '#f9fafb' }}>
-                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {allItems.map((item, index) => (
+                        {allItems.map((item) => (
                           <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
-                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.type === 'max' && item.number != null ? item.number : '—'}</td>
                             <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                               {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
                             </td>

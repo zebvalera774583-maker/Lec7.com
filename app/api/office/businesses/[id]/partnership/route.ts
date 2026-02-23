@@ -150,9 +150,10 @@ export const GET = withBusinessAccess(async (req, user) => {
         businessId,
         source: 'max_integration',
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { number: 'asc' },
       select: {
         id: true,
+        number: true,
         title: true,
         description: true,
         createdAt: true,
@@ -164,6 +165,7 @@ export const GET = withBusinessAccess(async (req, user) => {
       incomingRequests,
       maxRequests: maxRequests.map((r) => ({
         requestId: r.id,
+        number: r.number,
         title: r.title,
         description: r.description,
         createdAt: r.createdAt.toISOString(),
