@@ -131,6 +131,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [addRecipientLoading, setAddRecipientLoading] = useState(false)
   const [telegramPanelOpen, setTelegramPanelOpen] = useState(false)
   const [removingCounterpartyId, setRemovingCounterpartyId] = useState<string | null>(null)
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
 
   // Назначить исполнителя: панель справа
   const [assignPerformerOpen, setAssignPerformerOpen] = useState(false)
@@ -274,6 +275,23 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       console.error('Failed to load partnership data:', error)
     } finally {
       setLoadingPartnership(false)
+    }
+  }
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!window.confirm('Удалить эту заявку?')) return
+    try {
+      setDeletingRequestId(requestId)
+      const r = await fetch(`/api/office/businesses/${businessId}/request/${requestId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!r.ok) throw new Error('Не удалось удалить')
+      await loadPartnershipData()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Ошибка удаления заявки')
+    } finally {
+      setDeletingRequestId(null)
     }
   }
 
@@ -1097,12 +1115,22 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                             </button>
                           </>
                         ) : (
-                          <Link
-                            href={`/office/businesses/${businessId}/request/${item.requestId}`}
-                            style={{ padding: '0.35rem 0.75rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
-                          >
-                            Просмотр
-                          </Link>
+                          <>
+                            <Link
+                              href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                              style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                            >
+                              Просмотр
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteRequest(item.requestId) }}
+                              disabled={deletingRequestId === item.requestId}
+                              style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: deletingRequestId === item.requestId ? 'not-allowed' : 'pointer', fontSize: '0.8125rem' }}
+                            >
+                              {deletingRequestId === item.requestId ? 'Удаление...' : 'Удалить'}
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -1167,12 +1195,22 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                               </button>
                             </>
                           ) : (
-                            <Link
-                              href={`/office/businesses/${businessId}/request/${item.requestId}`}
-                              style={{ padding: '0.35rem 0.75rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
-                            >
-                              Просмотр
-                            </Link>
+                            <>
+                              <Link
+                                href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                                style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                              >
+                                Просмотр
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteRequest(item.requestId) }}
+                                disabled={deletingRequestId === item.requestId}
+                                style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: deletingRequestId === item.requestId ? 'not-allowed' : 'pointer', fontSize: '0.8125rem' }}
+                              >
+                                {deletingRequestId === item.requestId ? 'Удаление...' : 'Удалить'}
+                              </button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -1429,12 +1467,22 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                                   </button>
                                 </>
                               ) : (
-                                <Link
-                                  href={`/office/businesses/${businessId}/request/${item.requestId}`}
-                                  style={{ padding: '0.35rem 0.75rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
-                                >
-                                  Просмотр
-                                </Link>
+                                <>
+                                  <Link
+                                    href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                                    style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                                  >
+                                    Просмотр
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteRequest(item.requestId) }}
+                                    disabled={deletingRequestId === item.requestId}
+                                    style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: deletingRequestId === item.requestId ? 'not-allowed' : 'pointer', fontSize: '0.8125rem' }}
+                                  >
+                                    {deletingRequestId === item.requestId ? 'Удаление...' : 'Удалить'}
+                                  </button>
+                                </>
                               )}
                             </td>
                           </tr>
