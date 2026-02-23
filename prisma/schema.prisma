@@ -85,6 +85,8 @@ model Business {
   receiverUsers            User[]                 @relation("ReceiverUsers")
   receiverMemberships      ReceiverMembership[]
   maxChatContexts          MaxChatContext[]
+  maxIntegration           MaxIntegration?
+  maxConversations         MaxConversation[]
 
   telegramChatId       String?   @db.VarChar(32)
   telegramConnectedAt DateTime?
@@ -102,6 +104,79 @@ model MaxChatContext {
 
   @@index([chatId])
   @@index([businessId])
+}
+
+// MAX integration per business
+model MaxIntegration {
+  id         String   @id @default(cuid())
+  businessId String   @unique
+  isEnabled  Boolean  @default(true)
+  secret     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+// MAX conversation: business + external chat
+model MaxConversation {
+  id              String   @id @default(cuid())
+  businessId      String
+  externalChatId  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business  Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  messages  MaxMessage[]
+  requestLink MaxRequestLink?
+
+  @@unique([businessId, externalChatId])
+  @@index([businessId])
+  @@index([externalChatId])
+}
+
+enum MaxMessageDirection {
+  IN
+  OUT
+}
+
+// MAX message with idempotency
+model MaxMessage {
+  id               String            @id @default(cuid())
+  conversationId   String
+  direction        MaxMessageDirection
+  idempotencyKey   String
+  text             String            @db.Text
+  rawPayload       Json?
+  createdAt        DateTime          @default(now())
+
+  conversation MaxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, idempotencyKey])
+  @@index([conversationId])
+}
+
+enum MaxRequestLinkStatus {
+  DRAFT
+  NEED_DETAILS
+  READY
+}
+
+// Link MAX conversation to Request
+model MaxRequestLink {
+  id                 String             @id @default(cuid())
+  maxConversationId  String             @unique
+  requestId          String
+  status             MaxRequestLinkStatus @default(DRAFT)
+  itemsJson          Json?              // [{title, qty, unit?}]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  conversation MaxConversation @relation(fields: [maxConversationId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
 }
 
 // Одноразовый токен для привязки Telegram-чата к бизнесу (/start <token>)

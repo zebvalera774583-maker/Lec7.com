@@ -39,7 +39,7 @@ bot.on('message_created', async (ctx: any) => {
 
   try {
     const { data } = await axios.post<{ replyText: string }>(
-      `${LEC7_BASE_URL}/api/integrations/max/incoming`,
+      `${LEC7_BASE_URL}/api/integrations/max/webhook`,
       { chatId, userId, text, messageId, ts },
       {
         headers: {
@@ -51,7 +51,7 @@ bot.on('message_created', async (ctx: any) => {
     )
 
     const replyText = data?.replyText ?? 'Спасибо, заявка принята'
-    await ctx.reply(replyText)
+    if (replyText) await ctx.reply(replyText)
     console.log('[MAX outgoing]', { chatId, replyText: replyText.slice(0, 50) })
   } catch (err: any) {
     const msg = err?.response?.data?.error ?? err?.message ?? 'Ошибка'
