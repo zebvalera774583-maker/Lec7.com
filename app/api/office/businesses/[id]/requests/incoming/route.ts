@@ -33,7 +33,10 @@ export const GET = withBusinessAccess(async (req, user) => {
         },
       }),
       prisma.request.findMany({
-        where: { businessId },
+        where: {
+          businessId,
+          source: { not: 'max_integration' },
+        },
         orderBy: { createdAt: 'desc' },
       }),
     ])

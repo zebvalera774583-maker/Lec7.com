@@ -112,6 +112,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
   const [menuOpenPriceId, setMenuOpenPriceId] = useState<string | null>(null)
   const [activeCounterparties, setActiveCounterparties] = useState<ActiveCounterparty[]>([])
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequest[]>([])
+  const [maxRequests, setMaxRequests] = useState<{ requestId: string; title: string; description: string; createdAt: string }[]>([])
   const [activeCounterpartiesExpanded, setActiveCounterpartiesExpanded] = useState(false)
   const [incomingRequestsExpanded, setIncomingRequestsExpanded] = useState(false)
   const [loadingPartnership, setLoadingPartnership] = useState(false)
@@ -268,6 +269,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
       const data = await response.json()
       setActiveCounterparties(data.activeCounterparties || [])
       setIncomingRequests(data.incomingRequests || [])
+      setMaxRequests(data.maxRequests || [])
     } catch (error) {
       console.error('Failed to load partnership data:', error)
     } finally {
@@ -1043,75 +1045,72 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         </div>
       )}
 
-      {/* При section=incoming — только таблица запросов */}
+      {/* При section=incoming — только таблица запросов (контрагенты + MAX) */}
       {onlyIncomingTable && (
         <div style={{ width: '100%' }}>
           {loadingPartnership ? (
             <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
-          ) : incomingRequests.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
-              <thead>
-                <tr style={{ background: '#f9fafb' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {incomingRequests.map((request, index) => (
-                  <tr key={request.linkId}>
-                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
-                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
-                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                      {new Date(request.createdAt).toLocaleDateString('ru-RU')}
-                    </td>
-                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleRequestAction(request.linkId, 'accept')
-                        }}
-                        style={{
-                          padding: '0.35rem 0.75rem',
-                          marginRight: '0.5rem',
-                          background: '#059669',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                        }}
-                      >
-                        Принять
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleRequestAction(request.linkId, 'decline')
-                        }}
-                        style={{
-                          padding: '0.35rem 0.75rem',
-                          background: '#f3f4f6',
-                          color: '#111827',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                        }}
-                      >
-                        Отклонить
-                      </button>
-                    </td>
+          ) : (() => {
+            const allItems = [
+              ...incomingRequests.map((r) => ({ type: 'counterparty' as const, ...r })),
+              ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
+            ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            if (allItems.length === 0) {
+              return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+            }
+            return (
+              <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {allItems.map((item, index) => (
+                    <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
+                      </td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                      </td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        {item.type === 'counterparty' ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'accept') }}
+                              style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
+                            >
+                              Принять
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'decline') }}
+                              style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
+                            >
+                              Отклонить
+                            </button>
+                          </>
+                        ) : (
+                          <Link
+                            href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                            style={{ padding: '0.35rem 0.75rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                          >
+                            Просмотр
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          })()}
         </div>
       )}
 
@@ -1166,70 +1165,67 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
             <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Запросы на подключение контрагентов</h2>
             {loadingPartnership ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
-            ) : incomingRequests.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incomingRequests.map((request, index) => (
-                    <tr key={request.linkId}>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                        {new Date(request.createdAt).toLocaleDateString('ru-RU')}
-                      </td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRequestAction(request.linkId, 'accept')
-                          }}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            marginRight: '0.5rem',
-                            background: '#059669',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.8125rem',
-                          }}
-                        >
-                          Принять
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRequestAction(request.linkId, 'decline')
-                          }}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            background: '#f3f4f6',
-                            color: '#111827',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.8125rem',
-                          }}
-                        >
-                          Отклонить
-                        </button>
-                      </td>
+            ) : (() => {
+              const allItems = [
+                ...incomingRequests.map((r) => ({ type: 'counterparty' as const, ...r })),
+                ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
+              ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              if (allItems.length === 0) {
+                return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+              }
+              return (
+                <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                  <thead>
+                    <tr style={{ background: '#f9fafb' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  </thead>
+                  <tbody>
+                    {allItems.map((item, index) => (
+                      <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
+                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                          {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
+                        </td>
+                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                          {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                        </td>
+                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                          {item.type === 'counterparty' ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'accept') }}
+                                style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
+                              >
+                                Принять
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'decline') }}
+                                style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
+                              >
+                                Отклонить
+                              </button>
+                            </>
+                          ) : (
+                            <Link
+                              href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                              style={{ padding: '0.35rem 0.75rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                            >
+                              Просмотр
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -1425,75 +1421,74 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 </div>
                 {loadingPartnership ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
-                ) : incomingRequests.length === 0 ? (
-                  <>
-                    <div style={{ padding: '1rem 2rem 0', fontSize: '0.8125rem', color: '#6b7280' }}>
-                      Сюда попадают заявки, когда кто-то назначил ваш бизнес контрагентом в своём прайсе (по вашему ИНР).
-                    </div>
-                    <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
-                  </>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f9fafb' }}>
-                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
-                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {incomingRequests.map((request, index) => (
-                        <tr key={request.linkId}>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(request)}</td>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                            {new Date(request.createdAt).toLocaleDateString('ru-RU')}
-                          </td>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleRequestAction(request.linkId, 'accept')
-                              }}
-                              style={{
-                                padding: '0.35rem 0.75rem',
-                                marginRight: '0.5rem',
-                                background: '#059669',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '0.8125rem',
-                              }}
-                            >
-                              Принять
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleRequestAction(request.linkId, 'decline')
-                              }}
-                              style={{
-                                padding: '0.35rem 0.75rem',
-                                background: '#f3f4f6',
-                                color: '#111827',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '0.8125rem',
-                              }}
-                            >
-                              Отклонить
-                            </button>
-                          </td>
+                ) : (() => {
+                  const allItems = [
+                    ...incomingRequests.map((r) => ({ type: 'counterparty' as const, ...r })),
+                    ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
+                  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  if (allItems.length === 0) {
+                    return (
+                      <>
+                        <div style={{ padding: '1rem 2rem 0', fontSize: '0.8125rem', color: '#6b7280' }}>
+                          Сюда попадают заявки, когда кто-то назначил ваш бизнес контрагентом в своём прайсе (по вашему ИНР), а также заявки из MAX.
+                        </div>
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+                      </>
+                    )
+                  }
+                  return (
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#f9fafb' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      </thead>
+                      <tbody>
+                        {allItems.map((item, index) => (
+                          <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                              {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
+                            </td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                              {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                            </td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                              {item.type === 'counterparty' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'accept') }}
+                                    style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
+                                  >
+                                    Принять
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'decline') }}
+                                    style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
+                                  >
+                                    Отклонить
+                                  </button>
+                                </>
+                              ) : (
+                                <Link
+                                  href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                                  style={{ padding: '0.35rem 0.75rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                                >
+                                  Просмотр
+                                </Link>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                })()}
               </div>
             )}
           </div>

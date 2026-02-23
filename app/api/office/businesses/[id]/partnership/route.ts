@@ -144,9 +144,30 @@ export const GET = withBusinessAccess(async (req, user) => {
       }
     })
 
+    // Заявки из MAX (Telegram) — показываются в Потребности
+    const maxRequests = await prisma.request.findMany({
+      where: {
+        businessId,
+        source: 'max_integration',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        createdAt: true,
+      },
+    })
+
     return NextResponse.json({
       activeCounterparties: Array.from(activeCounterpartiesMap.values()),
       incomingRequests,
+      maxRequests: maxRequests.map((r) => ({
+        requestId: r.id,
+        title: r.title,
+        description: r.description,
+        createdAt: r.createdAt.toISOString(),
+      })),
     })
   } catch (error) {
     console.error('Get partnership data error:', error)
