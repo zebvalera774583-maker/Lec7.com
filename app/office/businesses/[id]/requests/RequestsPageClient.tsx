@@ -838,22 +838,40 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                 {viewMode === 'summary' && (
                   <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
-                    <button
-                      type="button"
-                      onClick={() => { window.location.href = `/office/businesses/${businessId}/requests` }}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: 'none',
-                        color: '#111827',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Назад
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={handleCreateRequest}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: '#2563eb',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Создать заявку
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { window.location.href = `/office/businesses/${businessId}/requests` }}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: 'none',
+                          color: '#111827',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Назад
+                      </button>
+                    </div>
                   </div>
                 )}
                 {viewMode === 'requestDetail' && selectedCounterpartyId && summaryData ? (() => {
