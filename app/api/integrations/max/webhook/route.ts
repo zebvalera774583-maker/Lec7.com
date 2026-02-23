@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
             maxConversationId: conversation.id,
             requestId: request.id,
             status,
-            itemsJson: items,
+            itemsJson: JSON.parse(JSON.stringify(items)),
           },
         })
 
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
           await tx.maxRequestLink.update({
             where: { id: link.id },
             data: {
-              itemsJson: updated,
+              itemsJson: JSON.parse(JSON.stringify(updated)),
               status: allFilled ? 'READY' : 'NEED_DETAILS',
             },
           })
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
             data: {
               requestId: request.id,
               status,
-              itemsJson: items,
+              itemsJson: JSON.parse(JSON.stringify(items)),
             },
           })
           replyText = hasMissingUnit ? 'кг или шт?' : 'Спасибо, заявка принята'
