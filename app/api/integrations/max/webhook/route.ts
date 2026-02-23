@@ -6,6 +6,9 @@ import { createHash } from 'crypto'
 const SECRET_HEADER = 'x-lec7-max-secret'
 const BRANCH_COMMANDS = ['/branch', 'branch', 'сменить']
 
+const RESET_COMMANDS = ['/reset', 'reset', 'сброс', 'отмена', 'очистить']
+const RESET_WITH_BRANCH = ['/reset branch', 'reset branch', 'сброс подразделение', 'сброс branch', 'отмена подразделение', 'очистить подразделение']
+
 function buildBranchMenu(businesses: { slug: string }[]): string {
   if (businesses.length === 0) return 'Нет доступных подразделений.'
   return `Выберите подразделение (ответьте slug):\n${businesses.map((b) => `- ${b.slug}`).join('\n')}`
@@ -118,6 +121,35 @@ export async function POST(req: NextRequest) {
       const link = await tx.maxRequestLink.findUnique({
         where: { maxConversationId: conversation.id },
       })
+
+      const isResetWithBranch = RESET_WITH_BRANCH.includes(textTrim)
+      const isResetCommand = RESET_COMMANDS.includes(textTrim) || isResetWithBranch
+
+      if (isResetCommand) {
+        const hadLink = !!link
+        if (link) {
+          await tx.maxRequestLink.delete({ where: { maxConversationId: conversation.id } })
+        }
+        if (isResetWithBranch) {
+          await tx.maxChatContext.deleteMany({ where: { chatId } })
+          replyText = hadLink
+            ? 'Черновик и подразделение сброшены. Выберите slug.'
+            : 'Подразделение сброшено. Выберите slug.'
+        } else {
+          replyText = hadLink
+            ? 'Черновик заявки сброшен. Напишите заявку заново.'
+            : 'Черновик заявки отсутствует. Напишите заявку.'
+        }
+        await tx.maxMessage.create({
+          data: {
+            conversationId: conversation.id,
+            direction: 'OUT',
+            idempotencyKey: `out-${idempotencyKey}`,
+            text: replyText,
+          },
+        })
+        return { replyText }
+      }
 
       if (!link) {
         const items = parseLineItemsFromText(text)
