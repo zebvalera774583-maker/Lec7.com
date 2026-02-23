@@ -819,23 +819,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   <>
                   <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={handleCreateRequest}
-                        style={{
-                          padding: '0.5rem 1rem',
-                          background: '#2563eb',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                        }}
-                      >
-                        Создать заявку
-                      </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
                       <button
                         type="button"
                         onClick={() => { window.location.href = `/office/businesses/${businessId}/requests` }}
@@ -850,8 +834,24 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           fontWeight: 500,
                         }}
                       >
-                      Назад
-                    </button>
+                        Назад
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateRequest}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: '#2563eb',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Сформировать заявку
+                      </button>
                     </div>
                   </div>
                   {summaryError && (
