@@ -3,6 +3,7 @@
   "version": "1.0.1",
   "private": true,
   "scripts": {
+    "test": "vitest run",
     "dev": "next dev",
     "build": "npm run guard:primary-role && prisma generate && next build",
     "guard:primary-role": "node scripts/guard-primary-role.js",
@@ -45,6 +46,7 @@
     "depcheck": "^1.4.7",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
   }
 }
