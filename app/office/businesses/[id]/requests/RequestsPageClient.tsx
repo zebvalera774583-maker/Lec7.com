@@ -536,6 +536,13 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     if (viewSection === 'incoming') fetchIncomingRequests()
   }, [viewSection])
 
+  // Polling: refetch incoming when section is visible so MAX READY updates appear without F5
+  useEffect(() => {
+    if (viewSection !== 'incoming') return
+    const interval = setInterval(fetchIncomingRequests, 10000)
+    return () => clearInterval(interval)
+  }, [viewSection])
+
   useEffect(() => {
     if (!sendStatus) return
     const t = setTimeout(() => setSendStatus(null), 5000)
