@@ -3,6 +3,40 @@ import { prisma } from '@/lib/prisma'
 import { parseLineItemsFromText, normalizeUnitInput } from '@/lib/max/parser'
 import { getNextRequestNumber } from '@/lib/request-number'
 import { createHash } from 'crypto'
+import { Decimal } from '@prisma/client/runtime/library'
+import type { PrismaClient } from '@prisma/client'
+
+type Tx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
+
+async function ensureIncomingRequestForMax(
+  tx: Tx,
+  requestId: string,
+  businessId: string,
+  items: { title: string; qty: string; unit?: string }[]
+): Promise<void> {
+  const zero = new Decimal(0)
+  const itemsWithUnit = items.map((i) => ({ ...i, unit: i.unit || 'шт' }))
+  await tx.incomingRequest.upsert({
+    where: { requestId },
+    create: {
+      requestId,
+      senderBusinessId: businessId,
+      recipientBusinessId: businessId,
+      status: 'NEW',
+      items: {
+        create: itemsWithUnit.map((it, idx) => ({
+          name: it.title,
+          quantity: it.qty,
+          unit: it.unit,
+          price: zero,
+          sum: zero,
+          sortOrder: idx,
+        })),
+      },
+    },
+    update: { updatedAt: new Date() },
+  })
+}
 
 function withNumber(num: number | null, msg: string): string {
   if (num != null) return `Номер вашей заявки: ${num}. ${msg}`
@@ -213,6 +247,7 @@ export async function POST(req: NextRequest) {
           return { replyText }
         }
 
+        await ensureIncomingRequestForMax(tx, request.id, businessId, items)
         replyText = withNumber(requestNumber, 'Спасибо, заявка принята')
         await tx.maxMessage.create({
           data: {
@@ -248,6 +283,7 @@ export async function POST(req: NextRequest) {
             },
           })
           if (allFilled) {
+            await ensureIncomingRequestForMax(tx, link.requestId, businessId, updated)
             replyText = withNumber(currentNumber, 'Спасибо, заявка принята')
           } else {
             const missingItems = updated.filter((i) => !i.unit)
@@ -291,6 +327,7 @@ export async function POST(req: NextRequest) {
             const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
             replyText = withNumber(requestNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
           } else {
+            await ensureIncomingRequestForMax(tx, request.id, businessId, items)
             replyText = withNumber(requestNumber, 'Спасибо, заявка принята')
           }
         }
