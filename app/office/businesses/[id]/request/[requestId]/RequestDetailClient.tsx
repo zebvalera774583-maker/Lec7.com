@@ -114,22 +114,22 @@ export default function RequestDetailClient({
           <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Дата: {dateStr}</p>
 
           <div style={{ marginTop: '1.5rem' }}>
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
+            <Link
+              href={`/office/businesses/${businessId}/requests?section=create`}
               style={{
+                display: 'inline-block',
                 padding: '0.5rem 1rem',
                 background: 'white',
                 color: '#111827',
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
-                cursor: 'pointer',
+                textDecoration: 'none',
                 fontSize: '0.875rem',
                 fontWeight: 500,
               }}
             >
-              Назначить исполнителя
-            </button>
+              Создать заявку
+            </Link>
           </div>
         </div>
 
