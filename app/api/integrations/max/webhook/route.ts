@@ -159,7 +159,9 @@ export async function POST(req: NextRequest) {
         })
 
         if (hasMissingUnit) {
-          replyText = 'кг или шт?'
+          const missingItems = items.filter((i) => !i.unit)
+          const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
+          replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
           await tx.maxMessage.create({
             data: {
               conversationId: conversation.id,
@@ -199,9 +201,15 @@ export async function POST(req: NextRequest) {
               status: allFilled ? 'READY' : 'NEED_DETAILS',
             },
           })
-          replyText = allFilled ? 'Спасибо, заявка принята' : 'кг или шт?'
+          if (allFilled) {
+            replyText = 'Спасибо, заявка принята'
+          } else {
+            const missingItems = updated.filter((i) => !i.unit)
+            const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
+            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+          }
         } else {
-          replyText = 'Не понял единицу. Напишите: кг или шт.'
+          replyText = 'Напишите единицу измерения. Например: кг, шт, л, мл, г, уп.'
         }
       } else {
         // READY or DRAFT: new message = new request
@@ -230,7 +238,13 @@ export async function POST(req: NextRequest) {
               itemsJson: JSON.parse(JSON.stringify(items)),
             },
           })
-          replyText = hasMissingUnit ? 'кг или шт?' : 'Спасибо, заявка принята'
+          if (hasMissingUnit) {
+            const missingItems = items.filter((i) => !i.unit)
+            const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
+            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+          } else {
+            replyText = 'Спасибо, заявка принята'
+          }
         }
       }
 
