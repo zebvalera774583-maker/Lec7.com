@@ -289,22 +289,13 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     if (!summaryData) return []
     const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
     if (!c) return []
-    const partners = summaryData.counterparties.filter(isPartnerCounterparty)
     return summaryData.items
       .map((item, idx) => {
         const itemKey = String(idx)
-        let rowMin: number | null = null
-        partners.forEach((cc) => {
-          const exact = item.offers[cc.id]
-          const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
-          const p = exact ?? applied ?? null
-          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-        })
         const exact = item.offers[c.id]
         const applied = appliedAnalogue[itemKey]?.[c.id]?.price
         const price = exact ?? applied ?? null
-        const isMin = price != null && rowMin != null && Number.isFinite(price) && Math.abs(price - rowMin) < 1e-6
-        if (!isMin) return null
+        if (price == null || !Number.isFinite(price)) return null
         const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
         return { item, price, qty, sum: price * qty }
       })
@@ -470,26 +461,15 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     if (!summaryData) return
     const partners = summaryData.counterparties.filter(isPartnerCounterparty)
     const selected = partners.filter((c) => useForRequest[c.id])
-    const withAtLeastOneOrder = selected.filter((c) => {
-      return summaryData.items.some((item, idx) => {
-        const itemKey = String(idx)
-        let rowMin: number | null = null
-        partners.forEach((cc) => {
-          const exact = item.offers[cc.id]
-          const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
-          const p = exact ?? applied ?? null
-          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-        })
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        const p = exact ?? applied ?? null
-        return p != null && rowMin != null && p === rowMin
-      })
-    })
+    if (selected.length === 0) {
+      setSummaryError('Отметьте хотя бы одного контрагента в колонках «В заявку»')
+      return
+    }
+    setSummaryError(null)
     const newCreated = {
       category: DEFAULT_CATEGORY,
       createdAt: new Date(),
-      counterpartyCards: withAtLeastOneOrder.map((c) => ({ id: c.id, legalName: c.legalName })),
+      counterpartyCards: selected.map((c) => ({ id: c.id, legalName: c.legalName })),
     }
     setCreatedRequest(newCreated)
     setSelectedCounterpartyId(null)
@@ -836,6 +816,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
             ) : (
               <>
                 {viewMode === 'summary' && (
+                  <>
                   <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Сводная таблица</span>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -869,34 +850,19 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           fontWeight: 500,
                         }}
                       >
-                        Назад
-                      </button>
+                      Назад
+                    </button>
                     </div>
                   </div>
+                  {summaryError && (
+                    <p style={{ marginBottom: '0.75rem', color: '#dc2626', fontSize: '0.875rem' }}>{summaryError}</p>
+                  )}
+                  </>
                 )}
                 {viewMode === 'requestDetail' && selectedCounterpartyId && summaryData ? (() => {
                   const c = summaryData.counterparties.find((x) => x.id === selectedCounterpartyId)
                   if (!c) return null
-                  const detailPartners = summaryData.counterparties.filter(isPartnerCounterparty)
-                  const rowsForCounterparty = summaryData.items
-                    .map((item, idx) => {
-                      const itemKey = String(idx)
-                      let rowMin: number | null = null
-                      detailPartners.forEach((cc) => {
-                        const exact = item.offers[cc.id]
-                        const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
-                        const p = exact ?? applied ?? null
-                        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-                      })
-                      const exact = item.offers[c.id]
-                      const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-                      const price = exact ?? applied ?? null
-                      const isMin = price != null && rowMin != null && Number.isFinite(price) && Math.abs(price - rowMin) < 1e-6
-                      if (!isMin) return null
-                      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-                      return { item, price, qty, sum: price * qty }
-                    })
-                    .filter((r): r is NonNullable<typeof r> => r != null)
+                  const rowsForCounterparty = getRowsForCounterparty(selectedCounterpartyId)
                   const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
