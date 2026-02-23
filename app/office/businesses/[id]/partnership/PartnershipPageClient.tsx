@@ -1114,55 +1114,10 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
         </div>
       )}
 
-      {/* Потребности — только две таблицы: контрагенты и запросы */}
+      {/* Потребности — только таблица потребностей (заявки из MAX и запросы контрагентов) */}
       {onlyNeedsView && (
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div>
-            <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Действующие контрагенты</h2>
-            {loadingPartnership ? (
-              <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
-            ) : activeCounterparties.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет действующих контрагентов</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
-                <thead>
-                  <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№ п/п</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Юридическое название</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeCounterparties.map((counterparty, index) => (
-                    <tr key={counterparty.partnerBusinessId}>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{index + 1}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{getCounterpartyDisplayName(counterparty)}</td>
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCounterparty(counterparty.partnerBusinessId)}
-                          disabled={removingCounterpartyId === counterparty.partnerBusinessId}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            background: '#f9fafb',
-                            color: '#111827',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '4px',
-                            cursor: removingCounterpartyId ? 'not-allowed' : 'pointer',
-                            fontSize: '0.8125rem',
-                          }}
-                        >
-                          {removingCounterpartyId === counterparty.partnerBusinessId ? 'Удаление...' : 'Удалить'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-          <div>
-            <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Запросы на подключение контрагентов</h2>
+        <div style={{ width: '100%' }}>
+          <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Потребности</h2>
             {loadingPartnership ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
             ) : (() => {
@@ -1171,7 +1126,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 ...maxRequests.map((r) => ({ type: 'max' as const, ...r })),
               ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               if (allItems.length === 0) {
-                return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет входящих заявок</div>
+                return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет потребностей</div>
               }
               return (
                 <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
@@ -1226,7 +1181,6 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                 </table>
               )
             })()}
-          </div>
         </div>
       )}
 
