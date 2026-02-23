@@ -32,6 +32,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
       businessId={params.id}
       requestId={request.id}
       requestTitle={request.title}
+      requestDescription={request.description}
       requestStatus={request.status}
       requestCreatedAt={request.createdAt.toISOString()}
     />

@@ -7,6 +7,7 @@ interface RequestDetailClientProps {
   businessId: string
   requestId: string
   requestTitle: string
+  requestDescription?: string
   requestStatus: string
   requestCreatedAt: string
 }
@@ -15,6 +16,7 @@ export default function RequestDetailClient({
   businessId,
   requestId,
   requestTitle,
+  requestDescription = '',
   requestStatus,
   requestCreatedAt,
 }: RequestDetailClientProps) {
@@ -115,7 +117,7 @@ export default function RequestDetailClient({
 
           <div style={{ marginTop: '1.5rem' }}>
             <Link
-              href={`/office/businesses/${businessId}/requests?section=create`}
+              href={`/office/businesses/${businessId}/requests?section=create&fromRequestTitle=${encodeURIComponent(requestTitle)}&fromRequestDescription=${encodeURIComponent(requestDescription || '')}`}
               style={{
                 display: 'inline-block',
                 padding: '0.5rem 1rem',

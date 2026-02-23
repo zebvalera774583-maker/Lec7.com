@@ -9,6 +9,8 @@ const STORAGE_KEY_PREFIX = 'lec7_request_created_'
 interface RequestsPageClientProps {
   businessId: string
   initialSection?: string
+  initialFromRequestTitle?: string
+  initialFromRequestDescription?: string
 }
 
 interface Row {
@@ -78,7 +80,25 @@ function formatRequestDate(d: Date): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export default function RequestsPageClient({ businessId, initialSection }: RequestsPageClientProps) {
+function parseMaxRequestToRows(title: string, description: string): Row[] {
+  const text = (description || title || '').trim()
+  if (!text) return [{}]
+  const cleanTitle = title.replace(/^Заявка из MAX:\s*/i, '').trim()
+  const src = description || cleanTitle || text
+  const rows: Row[] = []
+  const re = /([^\d]+?)\s+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед)?/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src)) !== null) {
+    const name = m[1].trim()
+    const quantity = m[2].replace(',', '.')
+    const unit = (m[3] || 'шт').toLowerCase()
+    if (name) rows.push({ name, quantity, unit })
+  }
+  if (rows.length === 0) rows.push({ name: src, quantity: '1', unit: 'шт' })
+  return rows
+}
+
+export default function RequestsPageClient({ businessId, initialSection, initialFromRequestTitle, initialFromRequestDescription }: RequestsPageClientProps) {
   const [showCreateBlock, setShowCreateBlock] = useState(true)
   const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>('form')
   const [selectedCounterpartyId, setSelectedCounterpartyId] = useState<string | null>(null)
@@ -87,7 +107,12 @@ export default function RequestsPageClient({ businessId, initialSection }: Reque
     createdAt: Date
     counterpartyCards: { id: string; legalName: string }[]
   } | null>(null)
-  const [rows, setRows] = useState<Row[]>([{}])
+  const [rows, setRows] = useState<Row[]>(() => {
+    if (initialSection === 'create' && (initialFromRequestTitle || initialFromRequestDescription)) {
+      return parseMaxRequestToRows(initialFromRequestTitle || '', initialFromRequestDescription || '')
+    }
+    return [{}]
+  })
   const [summaryData, setSummaryData] = useState<{ items: SummaryItem[]; counterparties: Counterparty[] } | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
