@@ -267,13 +267,19 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     XLSX.writeFile(wb, `${safeName}.xlsx`)
   }
 
-  const handleDeleteCreated = () => {
+  const handleCreateNewSummary = () => {
     setMenuOpenCardId(null)
     clearCreatedFromStorage()
     setCreatedRequest(null)
     setSummaryData(null)
+    setRows([{}])
     setViewMode('form')
-    setShowCreateBlock(false)
+    setShowCreateBlock(true)
+    setSummaryError(null)
+  }
+
+  const handleDeleteCreated = () => {
+    handleCreateNewSummary()
   }
 
   const handleDeleteCounterpartyCard = (counterpartyId: string) => {
@@ -921,6 +927,24 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   )
                 })(                ) : viewMode === 'created' && createdRequest ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ marginBottom: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={handleCreateNewSummary}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: '#2563eb',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Создать сводную таблицу
+                      </button>
+                    </div>
                     <div style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%', maxWidth: '22em', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', paddingRight: '0.5rem' }}>
                       <button
                         type="button"
