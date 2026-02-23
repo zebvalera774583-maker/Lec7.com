@@ -8,6 +8,7 @@ import type { PrismaClient } from '@prisma/client'
 
 type Tx = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
 
+/** GUARD: only call when status is READY (all items have unit). Creates IncomingRequest for "Поступившие заявки". */
 async function ensureIncomingRequestForMax(
   tx: Tx,
   requestId: string,
@@ -38,9 +39,8 @@ async function ensureIncomingRequestForMax(
   })
 }
 
-function withNumber(num: number | null, msg: string): string {
-  if (num != null) return `Номер вашей заявки: ${num}. ${msg}`
-  return msg
+function formatReadyReply(number: number): string {
+  return `Спасибо, заявка принята. Номер вашей заявки: №${number}.`
 }
 
 const SECRET_HEADER = 'x-lec7-max-secret'
@@ -56,9 +56,20 @@ function buildBranchMenu(businesses: { slug: string }[]): string {
 
 function computeIdempotencyKey(eventId: string | null, chatId: string, text: string): string {
   if (eventId) return eventId
-  const timeBucket = Math.floor(Date.now() / 60000) // 1 min bucket
+  const timeBucket = Math.floor(Date.now() / 60000)
   const hash = createHash('sha256').update(`${chatId}|${text}|${timeBucket}`).digest('hex')
   return hash.slice(0, 32)
+}
+
+/** Find active (non-ARCHIVED) link for conversation, most recent first. */
+async function findActiveLink(tx: Tx, conversationId: string) {
+  return tx.maxRequestLink.findFirst({
+    where: {
+      maxConversationId: conversationId,
+      status: { not: 'ARCHIVED' },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
 }
 
 export async function POST(req: NextRequest) {
@@ -87,7 +98,6 @@ export async function POST(req: NextRequest) {
 
   const textTrim = text.trim().toLowerCase()
 
-  // Branch selection command
   if (BRANCH_COMMANDS.includes(textTrim)) {
     await prisma.maxChatContext.deleteMany({ where: { chatId } })
     const businesses = await prisma.business.findMany({
@@ -141,6 +151,7 @@ export async function POST(req: NextRequest) {
         update: {},
       })
 
+      // Idempotency: must be first. On P2002 return immediately, no business logic.
       try {
         await tx.maxMessage.create({
           data: {
@@ -158,25 +169,28 @@ export async function POST(req: NextRequest) {
       }
 
       let replyText: string
-      const link = await tx.maxRequestLink.findUnique({
-        where: { maxConversationId: conversation.id },
-      })
+      const link = await findActiveLink(tx, conversation.id)
 
       const isResetWithBranch = RESET_WITH_BRANCH.includes(textTrim)
       const isResetCommand = RESET_COMMANDS.includes(textTrim) || isResetWithBranch
 
       if (isResetCommand) {
-        const hadLink = !!link
         if (link) {
-          await tx.maxRequestLink.delete({ where: { maxConversationId: conversation.id } })
+          await tx.maxRequestLink.updateMany({
+            where: {
+              maxConversationId: conversation.id,
+              status: { not: 'ARCHIVED' },
+            },
+            data: { status: 'ARCHIVED' },
+          })
         }
         if (isResetWithBranch) {
           await tx.maxChatContext.deleteMany({ where: { chatId } })
-          replyText = hadLink
+          replyText = link
             ? 'Черновик и подразделение сброшены. Выберите slug.'
             : 'Подразделение сброшено. Выберите slug.'
         } else {
-          replyText = hadLink
+          replyText = link
             ? 'Черновик заявки сброшен. Напишите заявку заново.'
             : 'Черновик заявки отсутствует. Напишите заявку.'
         }
@@ -192,6 +206,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (!link) {
+        // First message: no active link
         const items = parseLineItemsFromText(text)
         if (items.length === 0) {
           replyText = 'Напишите товар и количество. Пример: яблоки 10 кг.'
@@ -207,35 +222,19 @@ export async function POST(req: NextRequest) {
         }
 
         const hasMissingUnit = items.some((i) => !i.unit)
-        const status = hasMissingUnit ? 'NEED_DETAILS' : 'READY'
-        const title = items.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
-        const description = items.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
-
-        const requestNumber = await getNextRequestNumber(tx)
-        const request = await tx.request.create({
-          data: {
-            businessId,
-            number: requestNumber,
-            title: `Заявка из MAX: ${title.slice(0, 80)}`,
-            description,
-            source: 'max_integration',
-            status: 'NEW',
-          },
-        })
-
-        await tx.maxRequestLink.create({
-          data: {
-            maxConversationId: conversation.id,
-            requestId: request.id,
-            status,
-            itemsJson: JSON.parse(JSON.stringify(items)),
-          },
-        })
-
+        // GUARD: NEED_DETAILS — never create Request, number, or IncomingRequest
         if (hasMissingUnit) {
           const missingItems = items.filter((i) => !i.unit)
           const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
-          replyText = withNumber(requestNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
+          replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+          await tx.maxRequestLink.create({
+            data: {
+              maxConversationId: conversation.id,
+              requestId: null,
+              status: 'NEED_DETAILS',
+              itemsJson: JSON.parse(JSON.stringify(items)),
+            },
+          })
           await tx.maxMessage.create({
             data: {
               conversationId: conversation.id,
@@ -247,8 +246,30 @@ export async function POST(req: NextRequest) {
           return { replyText }
         }
 
+        // READY: all units present — create Request + number + IncomingRequest atomically
+        const title = items.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
+        const description = items.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
+        const requestNumber = await getNextRequestNumber(tx)
+        const request = await tx.request.create({
+          data: {
+            businessId,
+            number: requestNumber,
+            title: `Заявка из MAX: ${title.slice(0, 80)}`,
+            description,
+            source: 'max_integration',
+            status: 'NEW',
+          },
+        })
+        await tx.maxRequestLink.create({
+          data: {
+            maxConversationId: conversation.id,
+            requestId: request.id,
+            status: 'READY',
+            itemsJson: JSON.parse(JSON.stringify(items)),
+          },
+        })
         await ensureIncomingRequestForMax(tx, request.id, businessId, items)
-        replyText = withNumber(requestNumber, 'Спасибо, заявка принята')
+        replyText = formatReadyReply(requestNumber)
         await tx.maxMessage.create({
           data: {
             conversationId: conversation.id,
@@ -260,15 +281,57 @@ export async function POST(req: NextRequest) {
         return { replyText }
       }
 
-      const currentRequest = await tx.request.findUnique({
-        where: { id: link.requestId },
-        select: { number: true },
-      })
-      const currentNumber = currentRequest?.number ?? null
-
       if (link.status === 'NEED_DETAILS') {
         const unit = normalizeUnitInput(text)
-        if (unit) {
+        const newItems = parseLineItemsFromText(text)
+
+        // New list (overwrites draft) vs unit
+        if (newItems.length > 0 && newItems.some((i) => i.title && i.qty)) {
+          // Text parsed as line items — new draft, archive old link
+          await tx.maxRequestLink.update({
+            where: { id: link.id },
+            data: { status: 'ARCHIVED' },
+          })
+          const hasMissingUnit = newItems.some((i) => !i.unit)
+          if (hasMissingUnit) {
+            const missingItems = newItems.filter((i) => !i.unit)
+            const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
+            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+            await tx.maxRequestLink.create({
+              data: {
+                maxConversationId: conversation.id,
+                requestId: null,
+                status: 'NEED_DETAILS',
+                itemsJson: JSON.parse(JSON.stringify(newItems)),
+              },
+            })
+          } else {
+            const requestNumber = await getNextRequestNumber(tx)
+            const title = newItems.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
+            const description = newItems.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
+            const request = await tx.request.create({
+              data: {
+                businessId,
+                number: requestNumber,
+                title: `Заявка из MAX: ${title.slice(0, 80)}`,
+                description,
+                source: 'max_integration',
+                status: 'NEW',
+              },
+            })
+            await tx.maxRequestLink.create({
+              data: {
+                maxConversationId: conversation.id,
+                requestId: request.id,
+                status: 'READY',
+                itemsJson: JSON.parse(JSON.stringify(newItems)),
+              },
+            })
+            await ensureIncomingRequestForMax(tx, request.id, businessId, newItems)
+            replyText = formatReadyReply(requestNumber)
+          }
+        } else if (unit) {
+          // Unit provided — apply to current items
           const items = (link.itemsJson as { title: string; qty: string; unit?: string }[]) || []
           const updated = items.map((i) => ({
             ...i,
@@ -283,52 +346,81 @@ export async function POST(req: NextRequest) {
             },
           })
           if (allFilled) {
-            await ensureIncomingRequestForMax(tx, link.requestId, businessId, updated)
-            replyText = withNumber(currentNumber, 'Спасибо, заявка принята')
+            // NEED_DETAILS → READY: create Request + number + IncomingRequest atomically
+            const requestNumber = await getNextRequestNumber(tx)
+            const title = updated.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
+            const description = updated.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
+            const request = await tx.request.create({
+              data: {
+                businessId,
+                number: requestNumber,
+                title: `Заявка из MAX: ${title.slice(0, 80)}`,
+                description,
+                source: 'max_integration',
+                status: 'NEW',
+              },
+            })
+            await tx.maxRequestLink.update({
+              where: { id: link.id },
+              data: { requestId: request.id },
+            })
+            await ensureIncomingRequestForMax(tx, request.id, businessId, updated)
+            replyText = formatReadyReply(requestNumber)
           } else {
             const missingItems = updated.filter((i) => !i.unit)
             const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
-            replyText = withNumber(currentNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
+            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
           }
         } else {
-          replyText = withNumber(currentNumber, 'Напишите единицу измерения. Например: кг, шт, л, мл, г, уп.')
+          replyText = 'Напишите единицу измерения. Например: кг, шт, л, мл, г, уп.'
         }
       } else {
-        // READY or DRAFT: new message = new request
+        // READY or DRAFT: new message = new request. Archive old link, create new.
+        await tx.maxRequestLink.update({
+          where: { id: link.id },
+          data: { status: 'ARCHIVED' },
+        })
         const items = parseLineItemsFromText(text)
         if (items.length === 0) {
-          replyText = withNumber(currentNumber, 'Напишите товар и количество. Пример: яблоки 10 кг.')
+          replyText = 'Напишите товар и количество. Пример: яблоки 10 кг.'
         } else {
           const hasMissingUnit = items.some((i) => !i.unit)
-          const status = hasMissingUnit ? 'NEED_DETAILS' : 'READY'
-          const title = items.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
-          const description = items.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
-          const requestNumber = await getNextRequestNumber(tx)
-          const request = await tx.request.create({
-            data: {
-              businessId,
-              number: requestNumber,
-              title: `Заявка из MAX: ${title.slice(0, 80)}`,
-              description,
-              source: 'max_integration',
-              status: 'NEW',
-            },
-          })
-          await tx.maxRequestLink.update({
-            where: { maxConversationId: conversation.id },
-            data: {
-              requestId: request.id,
-              status,
-              itemsJson: JSON.parse(JSON.stringify(items)),
-            },
-          })
           if (hasMissingUnit) {
             const missingItems = items.filter((i) => !i.unit)
             const list = missingItems.map((i) => `${i.title} — ${i.qty}`).join('\n')
-            replyText = withNumber(requestNumber, `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`)
+            replyText = `Напишите единицу измерения для позиций:\n${list}\n\nНапример: кг, шт, л, мл, г, уп.`
+            await tx.maxRequestLink.create({
+              data: {
+                maxConversationId: conversation.id,
+                requestId: null,
+                status: 'NEED_DETAILS',
+                itemsJson: JSON.parse(JSON.stringify(items)),
+              },
+            })
           } else {
+            const requestNumber = await getNextRequestNumber(tx)
+            const title = items.map((i) => `${i.title} ${i.qty} ${i.unit || '?'}`).join(', ')
+            const description = items.map((i) => `${i.title} ${i.qty}${i.unit ? ` ${i.unit}` : ''}`.trim()).join(' ')
+            const request = await tx.request.create({
+              data: {
+                businessId,
+                number: requestNumber,
+                title: `Заявка из MAX: ${title.slice(0, 80)}`,
+                description,
+                source: 'max_integration',
+                status: 'NEW',
+              },
+            })
+            await tx.maxRequestLink.create({
+              data: {
+                maxConversationId: conversation.id,
+                requestId: request.id,
+                status: 'READY',
+                itemsJson: JSON.parse(JSON.stringify(items)),
+              },
+            })
             await ensureIncomingRequestForMax(tx, request.id, businessId, items)
-            replyText = withNumber(requestNumber, 'Спасибо, заявка принята')
+            replyText = formatReadyReply(requestNumber)
           }
         }
       }

@@ -130,7 +130,7 @@ model MaxConversation {
 
   business  Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   messages  MaxMessage[]
-  requestLink MaxRequestLink?
+  requestLinks MaxRequestLink[]
 
   @@unique([businessId, externalChatId])
   @@index([businessId])
@@ -162,20 +162,22 @@ enum MaxRequestLinkStatus {
   DRAFT
   NEED_DETAILS
   READY
+  ARCHIVED
 }
 
-// Link MAX conversation to Request
+// Link MAX conversation to Request. One link = one attempt; new request = new link (old archived).
 model MaxRequestLink {
-  id                 String             @id @default(cuid())
-  maxConversationId  String             @unique
-  requestId          String
+  id                 String               @id @default(cuid())
+  maxConversationId  String
+  requestId          String?              // null when NEED_DETAILS (no Request yet)
   status             MaxRequestLinkStatus @default(DRAFT)
-  itemsJson          Json?              // [{title, qty, unit?}]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  itemsJson          Json?                // [{title, qty, unit?}]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   conversation MaxConversation @relation(fields: [maxConversationId], references: [id], onDelete: Cascade)
 
+  @@index([maxConversationId])
   @@index([requestId])
 }
 

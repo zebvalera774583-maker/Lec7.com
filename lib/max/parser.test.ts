@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseLineItemsFromText } from './parser'
+import { parseLineItemsFromText, normalizeUnitInput } from './parser'
 
 describe('parseLineItemsFromText', () => {
   it('multiline: Яблоки 10, Огурцы 10к, Картофель 7кг', () => {
@@ -53,5 +53,21 @@ describe('parseLineItemsFromText', () => {
       { title: 'яблоки', qty: '10', unit: undefined },
       { title: 'груши', qty: '5', unit: undefined },
     ])
+  })
+})
+
+describe('normalizeUnitInput', () => {
+  it('maps Russian units to canonical', () => {
+    expect(normalizeUnitInput('кг')).toBe('kg')
+    expect(normalizeUnitInput('к')).toBe('kg')
+    expect(normalizeUnitInput('шт')).toBe('pcs')
+    expect(normalizeUnitInput('л')).toBe('l')
+    expect(normalizeUnitInput('мл')).toBe('ml')
+  })
+
+  it('returns null for invalid input', () => {
+    expect(normalizeUnitInput('')).toBe(null)
+    expect(normalizeUnitInput('яблоки')).toBe(null)
+    expect(normalizeUnitInput('10')).toBe(null)
   })
 })
