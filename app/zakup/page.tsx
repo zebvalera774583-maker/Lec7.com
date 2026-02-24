@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 
 const ZAKUP_AUTHED_KEY = 'zakup:authed'
 const ZAKUP_TOKEN_KEY = 'zakup:token'
@@ -41,6 +40,17 @@ function ZakupContent() {
   const [loadingNeeds, setLoadingNeeds] = useState(false)
   const [archivingRequestId, setArchivingRequestId] = useState<string | null>(null)
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null)
+  const [viewRequestId, setViewRequestId] = useState<string | null>(null)
+  const [viewRequestDetails, setViewRequestDetails] = useState<{
+    id: string
+    number: number | null
+    title: string
+    description: string
+    status: string
+    createdAt: string
+    itemsJson: unknown
+  } | null>(null)
+  const [loadingView, setLoadingView] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -136,6 +146,24 @@ function ZakupContent() {
     }
   }
 
+  const handleViewRequest = async (requestId: string) => {
+    if (!token) return
+    setViewRequestId(requestId)
+    setViewRequestDetails(null)
+    setLoadingView(true)
+    try {
+      const res = await fetch(`/api/zakup/request/${requestId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setViewRequestDetails(data)
+      }
+    } finally {
+      setLoadingView(false)
+    }
+  }
+
   const handleRequestAction = async (linkId: string, action: 'accept' | 'decline') => {
     if (!token) return
     setRequestActionLoading(linkId)
@@ -168,7 +196,6 @@ function ZakupContent() {
   }
 
   if (authed) {
-    const businessId = needsData?.businessId ?? ''
     const businessName = needsData?.businessName ?? '—'
     const allItems = needsData
       ? [
@@ -231,12 +258,13 @@ function ZakupContent() {
                         </>
                       ) : (
                         <>
-                          <Link
-                            href={`/office/businesses/${businessId}/request/${item.requestId}`}
-                            style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleViewRequest(item.requestId) }}
+                            style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8125rem' }}
                           >
                             Просмотр
-                          </Link>
+                          </button>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleArchive(item.requestId) }}
@@ -252,6 +280,68 @@ function ZakupContent() {
                 ))}
               </tbody>
             </table>
+          )}
+
+          {viewRequestId && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+              onClick={() => setViewRequestId(null)}
+            >
+              <div
+                style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '1.5rem',
+                  maxWidth: '480px',
+                  width: '90%',
+                  maxHeight: '80vh',
+                  overflow: 'auto',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Детали заявки</h3>
+                  <button
+                    type="button"
+                    onClick={() => setViewRequestId(null)}
+                    style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', lineHeight: 1, color: '#6b7280' }}
+                  >
+                    ×
+                  </button>
+                </div>
+                {loadingView ? (
+                  <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+                ) : viewRequestDetails ? (
+                  <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div><strong>ID:</strong> {viewRequestDetails.id}</div>
+                    <div><strong>№:</strong> {viewRequestDetails.number ?? '—'}</div>
+                    <div><strong>Дата:</strong> {new Date(viewRequestDetails.createdAt).toLocaleString('ru-RU')}</div>
+                    <div><strong>Статус:</strong> {viewRequestDetails.status}</div>
+                    <div><strong>Заголовок:</strong> {viewRequestDetails.title}</div>
+                    <div><strong>Описание:</strong> {viewRequestDetails.description || '—'}</div>
+                    <div>
+                      <strong>itemsJson:</strong>
+                      <pre style={{ margin: '0.25rem 0 0', padding: '0.75rem', background: '#f3f4f6', borderRadius: '4px', overflow: 'auto', fontSize: '0.75rem', maxHeight: '200px' }}>
+                        {viewRequestDetails.itemsJson != null
+                          ? JSON.stringify(viewRequestDetails.itemsJson, null, 2)
+                          : '—'}
+                      </pre>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Не удалось загрузить</div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </main>
