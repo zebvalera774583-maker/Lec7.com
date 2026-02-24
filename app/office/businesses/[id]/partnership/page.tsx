@@ -17,6 +17,7 @@ export default async function PartnershipPage({ params, searchParams }: PageProp
     where: { id: params.id },
     select: {
       id: true,
+      name: true,
       slug: true,
       telegramChatId: true,
       telegramRecipients: {
@@ -53,6 +54,7 @@ export default async function PartnershipPage({ params, searchParams }: PageProp
   return (
     <PartnershipPageClient
       businessId={business.id}
+      businessName={business.name}
       telegramChatId={business.telegramChatId}
       telegramRecipients={recipients}
       requests={requests}

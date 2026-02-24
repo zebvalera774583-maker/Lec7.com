@@ -53,6 +53,7 @@ interface RequestItem {
 
 interface PartnershipPageClientProps {
   businessId: string
+  businessName: string
   telegramChatId: string | null
   telegramRecipients: TelegramRecipientItem[]
   requests: RequestItem[]
@@ -95,7 +96,7 @@ interface IncomingRequest {
   createdAt: string
 }
 
-export default function PartnershipPageClient({ businessId, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients, requests, initialAction, initialSection }: PartnershipPageClientProps) {
+export default function PartnershipPageClient({ businessId, businessName, telegramChatId: initialTelegramChatId, telegramRecipients: initialRecipients, requests, initialAction, initialSection }: PartnershipPageClientProps) {
   const router = useRouter()
   const [prices, setPrices] = useState<Price[]>([])
   const [assignedPrices, setAssignedPrices] = useState<AssignedPrice[]>([])
@@ -1171,7 +1172,7 @@ export default function PartnershipPageClient({ businessId, telegramChatId: init
                       <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.type === 'max' && item.number != null ? item.number : '—'}</td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                          {item.type === 'counterparty' ? getCounterpartyDisplayName(item) : (item.title || item.description || '—')}
+                          {businessName}
                         </td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                           {new Date(item.createdAt).toLocaleDateString('ru-RU')}
