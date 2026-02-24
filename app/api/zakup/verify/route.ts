@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import jwt from 'jsonwebtoken'
 
 const ZAKUP_PASSWORD = process.env.ZAKUP_PASSWORD ?? ''
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +14,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (password === ZAKUP_PASSWORD) {
-      return NextResponse.json({ success: true })
+      const token = jwt.sign({ zakup: true }, JWT_SECRET, { expiresIn: '24h' })
+      return NextResponse.json({ success: true, token })
     }
 
     return NextResponse.json({ error: 'Неверный пароль' }, { status: 401 })

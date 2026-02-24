@@ -1,20 +1,85 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 
 const ZAKUP_AUTHED_KEY = 'zakup:authed'
+const ZAKUP_TOKEN_KEY = 'zakup:token'
+
+interface IncomingRequest {
+  linkId: string
+  fromBusinessId: string
+  fromLegalName: string | null
+  fromName: string | null
+  fromSlug: string | null
+  fromResidentNumber: string | null
+  createdAt: string
+}
+
+interface MaxRequest {
+  requestId: string
+  number: number | null
+  title: string
+  description: string
+  createdAt: string
+}
+
+interface NeedsData {
+  businessId: string
+  businessName: string
+  incomingRequests: IncomingRequest[]
+  maxRequests: MaxRequest[]
+}
 
 function ZakupContent() {
   const [authed, setAuthed] = useState<boolean | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needsData, setNeedsData] = useState<NeedsData | null>(null)
+  const [loadingNeeds, setLoadingNeeds] = useState(false)
+  const [archivingRequestId, setArchivingRequestId] = useState<string | null>(null)
+  const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const stored = sessionStorage.getItem(ZAKUP_AUTHED_KEY)
-    setAuthed(stored === '1')
+    const storedAuthed = sessionStorage.getItem(ZAKUP_AUTHED_KEY)
+    const storedToken = sessionStorage.getItem(ZAKUP_TOKEN_KEY)
+    if (storedAuthed === '1' && storedToken) {
+      setAuthed(true)
+      setToken(storedToken)
+    } else {
+      sessionStorage.removeItem(ZAKUP_AUTHED_KEY)
+      sessionStorage.removeItem(ZAKUP_TOKEN_KEY)
+      setAuthed(false)
+    }
   }, [])
+
+  const fetchNeeds = useCallback(async () => {
+    if (!token) return
+    setLoadingNeeds(true)
+    try {
+      const res = await fetch('/api/zakup/needs', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.status === 401) {
+        sessionStorage.removeItem(ZAKUP_AUTHED_KEY)
+        sessionStorage.removeItem(ZAKUP_TOKEN_KEY)
+        setAuthed(false)
+        setToken(null)
+        return
+      }
+      const data = await res.json()
+      if (res.ok) setNeedsData(data)
+    } finally {
+      setLoadingNeeds(false)
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (authed && token) fetchNeeds()
+  }, [authed, token, fetchNeeds])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,12 +101,61 @@ function ZakupContent() {
         return
       }
 
-      sessionStorage.setItem(ZAKUP_AUTHED_KEY, '1')
-      setAuthed(true)
+      const newToken = data.token
+      if (newToken) {
+        sessionStorage.setItem(ZAKUP_AUTHED_KEY, '1')
+        sessionStorage.setItem(ZAKUP_TOKEN_KEY, newToken)
+        setAuthed(true)
+        setToken(newToken)
+      } else {
+        setError('Ошибка сервера')
+      }
     } catch {
       setError('Ошибка соединения')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleArchive = async (requestId: string) => {
+    if (!token) return
+    setArchivingRequestId(requestId)
+    try {
+      const res = await fetch(`/api/zakup/request/${requestId}/archive`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok && needsData) {
+        setNeedsData({
+          ...needsData,
+          maxRequests: needsData.maxRequests.filter((r) => r.requestId !== requestId),
+        })
+      }
+    } finally {
+      setArchivingRequestId(null)
+    }
+  }
+
+  const handleRequestAction = async (linkId: string, action: 'accept' | 'decline') => {
+    if (!token) return
+    setRequestActionLoading(linkId)
+    try {
+      const res = await fetch(`/api/zakup/partnership/requests/${linkId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action }),
+      })
+      if (res.ok && needsData) {
+        setNeedsData({
+          ...needsData,
+          incomingRequests: needsData.incomingRequests.filter((r) => r.linkId !== linkId),
+        })
+      }
+    } finally {
+      setRequestActionLoading(null)
     }
   }
 
@@ -54,27 +168,91 @@ function ZakupContent() {
   }
 
   if (authed) {
+    const businessId = needsData?.businessId ?? ''
+    const businessName = needsData?.businessName ?? '—'
+    const allItems = needsData
+      ? [
+          ...needsData.incomingRequests.map((r) => ({ type: 'counterparty' as const, number: null as number | null, ...r })),
+          ...needsData.maxRequests.map((r) => ({ type: 'max' as const, ...r, number: r.number })),
+        ].sort((a, b) => ((a.number ?? 999999999) - (b.number ?? 999999999)))
+      : []
+
     return (
       <main
         style={{
           minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          padding: '2rem',
           background: '#f5f5f5',
         }}
       >
-        <div
-          style={{
-            padding: '2rem',
-            background: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          }}
-        >
-          <h1 style={{ margin: 0, fontSize: '1.25rem', color: '#111827' }}>
-            Zakup: доступ открыт
-          </h1>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Потребности</h2>
+          {loadingNeeds ? (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
+          ) : allItems.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Нет потребностей</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allItems.map((item) => (
+                  <tr key={item.type === 'counterparty' ? item.linkId : item.requestId}>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.type === 'max' && item.number != null ? item.number : '—'}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{businessName}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                      {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                      {item.type === 'counterparty' ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'accept') }}
+                            disabled={requestActionLoading === item.linkId}
+                            style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: requestActionLoading === item.linkId ? 'not-allowed' : 'pointer', fontSize: '0.8125rem' }}
+                          >
+                            Принять
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleRequestAction(item.linkId, 'decline') }}
+                            disabled={requestActionLoading === item.linkId}
+                            style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: requestActionLoading === item.linkId ? 'not-allowed' : 'pointer', fontSize: '0.8125rem' }}
+                          >
+                            Отклонить
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/office/businesses/${businessId}/request/${item.requestId}`}
+                            style={{ padding: '0.35rem 0.75rem', marginRight: '0.5rem', background: '#059669', color: 'white', textDecoration: 'none', borderRadius: '4px', fontSize: '0.8125rem', display: 'inline-block' }}
+                          >
+                            Просмотр
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleArchive(item.requestId) }}
+                            disabled={archivingRequestId === item.requestId}
+                            style={{ padding: '0.35rem 0.75rem', background: '#f3f4f6', color: '#111827', border: '1px solid #d1d5db', borderRadius: '4px', cursor: archivingRequestId === item.requestId ? 'not-allowed' : 'pointer', fontSize: '0.8125rem' }}
+                          >
+                            {archivingRequestId === item.requestId ? 'Архивация...' : 'Удалить'}
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </main>
     )

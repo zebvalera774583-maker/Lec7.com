@@ -4,7 +4,7 @@ import { withBusinessAccess, getBusinessIdFromPath } from '@/lib/access'
 
 /**
  * DELETE /api/office/businesses/[id]/request/[requestId]
- * Удаление заявки (Request)
+ * Архивирование заявки (Request) — перевод в ARCHIVED
  */
 export const DELETE = withBusinessAccess(async (req, user) => {
   try {
@@ -31,8 +31,9 @@ export const DELETE = withBusinessAccess(async (req, user) => {
       return NextResponse.json({ error: 'Request does not belong to this business' }, { status: 403 })
     }
 
-    await prisma.request.delete({
+    await prisma.request.update({
       where: { id: requestId },
+      data: { status: 'ARCHIVED' },
     })
 
     return NextResponse.json({ ok: true })

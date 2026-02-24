@@ -144,11 +144,12 @@ export const GET = withBusinessAccess(async (req, user) => {
       }
     })
 
-    // Заявки из MAX (Telegram) — показываются в Потребности
+    // Заявки из MAX (Telegram) — показываются в Потребности (без ARCHIVED)
     const maxRequests = await prisma.request.findMany({
       where: {
         businessId,
         source: 'max_integration',
+        status: { not: 'ARCHIVED' },
       },
       orderBy: { number: 'asc' },
       select: {
