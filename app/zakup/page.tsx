@@ -5,6 +5,13 @@ import { useEffect, useState, useCallback } from 'react'
 const ZAKUP_AUTHED_KEY = 'zakup:authed'
 const ZAKUP_TOKEN_KEY = 'zakup:token'
 
+const UNIT_RU: Record<string, string> = { kg: 'кг', g: 'г', l: 'л', ml: 'мл', pcs: 'шт', pc: 'шт' }
+
+function formatUnit(unit: string | undefined): string {
+  if (!unit) return ''
+  return UNIT_RU[unit.toLowerCase()] ?? unit
+}
+
 interface IncomingRequest {
   linkId: string
   fromBusinessId: string
@@ -321,22 +328,29 @@ function ZakupContent() {
                 {loadingView ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : viewRequestDetails ? (
-                  <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div><strong>ID:</strong> {viewRequestDetails.id}</div>
-                    <div><strong>№:</strong> {viewRequestDetails.number ?? '—'}</div>
-                    <div><strong>Дата:</strong> {new Date(viewRequestDetails.createdAt).toLocaleString('ru-RU')}</div>
-                    <div><strong>Статус:</strong> {viewRequestDetails.status}</div>
-                    <div><strong>Заголовок:</strong> {viewRequestDetails.title}</div>
-                    <div><strong>Описание:</strong> {viewRequestDetails.description || '—'}</div>
-                    <div>
-                      <strong>itemsJson:</strong>
-                      <pre style={{ margin: '0.25rem 0 0', padding: '0.75rem', background: '#f3f4f6', borderRadius: '4px', overflow: 'auto', fontSize: '0.75rem', maxHeight: '200px' }}>
-                        {viewRequestDetails.itemsJson != null
-                          ? JSON.stringify(viewRequestDetails.itemsJson, null, 2)
-                          : '—'}
-                      </pre>
-                    </div>
-                  </div>
+                  (() => {
+                    const items = (Array.isArray(viewRequestDetails.itemsJson) ? viewRequestDetails.itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
+                    return (
+                      <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {items.length === 0 ? (
+                          <div style={{ color: '#6b7280' }}>Нет позиций</div>
+                        ) : (
+                          items.map((it, i) => {
+                            const title = it.title || '—'
+                            const qty = it.qty ?? ''
+                            const unit = formatUnit(it.unit)
+                            const weight = unit ? `${qty} ${unit}` : qty
+                            return (
+                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                                <span>{title}</span>
+                                <span>{weight}</span>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    )
+                  })()
                 ) : (
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Не удалось загрузить</div>
                 )}
