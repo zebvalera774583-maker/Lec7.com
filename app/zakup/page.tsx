@@ -307,7 +307,7 @@ function ZakupContent() {
                   background: 'white',
                   borderRadius: '8px',
                   padding: '1.5rem',
-                  maxWidth: '480px',
+                  maxWidth: '560px',
                   width: '90%',
                   maxHeight: '80vh',
                   overflow: 'auto',
@@ -328,29 +328,39 @@ function ZakupContent() {
                 {loadingView ? (
                   <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
                 ) : viewRequestDetails ? (
-                  (() => {
-                    const items = (Array.isArray(viewRequestDetails.itemsJson) ? viewRequestDetails.itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
-                    return (
-                      <div style={{ fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {items.length === 0 ? (
-                          <div style={{ color: '#6b7280' }}>Нет позиций</div>
-                        ) : (
-                          items.map((it, i) => {
-                            const title = it.title || '—'
-                            const qty = it.qty ?? ''
-                            const unit = formatUnit(it.unit)
-                            const weight = unit ? `${qty} ${unit}` : qty
-                            return (
-                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                                <span>{title}</span>
-                                <span>{weight}</span>
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
-                    )
-                  })()
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem' }}>
+                    <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>{viewRequestDetails.title}</h1>
+                    <p style={{ margin: 0, color: '#6b7280' }}>Статус: {viewRequestDetails.status}</p>
+                    <p style={{ margin: 0, color: '#6b7280' }}>Дата: {new Date(viewRequestDetails.createdAt).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                    {(() => {
+                      const items = (Array.isArray(viewRequestDetails.itemsJson) ? viewRequestDetails.itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
+                      if (items.length === 0) return <div style={{ color: '#6b7280', marginTop: '0.5rem' }}>Нет позиций</div>
+                      return (
+                        <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', marginTop: '0.5rem' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>№</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Наименование</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Кол-во</th>
+                                <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Ед.</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {items.map((it, i) => (
+                                <tr key={i}>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{it.title || '—'}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{it.qty ?? '—'}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{formatUnit(it.unit) || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()}
+                  </div>
                 ) : (
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Не удалось загрузить</div>
                 )}
