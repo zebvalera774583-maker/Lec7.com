@@ -27,14 +27,16 @@ export default async function RequestDetailPage({ params }: PageProps) {
   if (!request || request.businessId !== params.id) notFound()
   if (user.role !== 'LEC7_ADMIN' && request.business?.ownerId !== user.id) notFound()
 
+  const link = await prisma.maxRequestLink.findFirst({
+    where: { requestId: params.requestId },
+    select: { itemsJson: true },
+  })
+  const itemsJson = link?.itemsJson ?? null
+
   return (
     <RequestDetailClient
       businessId={params.id}
-      requestId={request.id}
-      requestTitle={request.title}
-      requestDescription={request.description}
-      requestStatus={request.status}
-      requestCreatedAt={request.createdAt.toISOString()}
+      itemsJson={itemsJson}
     />
   )
 }
