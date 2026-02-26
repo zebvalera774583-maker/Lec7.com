@@ -1877,12 +1877,22 @@ export default function BusinessProfileEditor({
             )}
           </section>
 
-          {/* Метрики — подписи фиксированы, поля редактируемые */}
-          <section style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          {/* Метрики — подписи фиксированы (не редактируются), поля ввода редактируемые */}
+          <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem', color: '#111827' }}>Метрики</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
               <div>
-                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151', userSelect: 'none' }}>
+                <div
+                  contentEditable={false}
+                  style={{
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
+                    fontWeight: 500,
+                  }}
+                >
                   Уникальных кейсов
                 </div>
                 <input
@@ -1905,7 +1915,17 @@ export default function BusinessProfileEditor({
                 />
               </div>
               <div>
-                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151', userSelect: 'none' }}>
+                <div
+                  contentEditable={false}
+                  style={{
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
+                    fontWeight: 500,
+                  }}
+                >
                   Проектов
                 </div>
                 <input
@@ -1928,7 +1948,17 @@ export default function BusinessProfileEditor({
                 />
               </div>
               <div>
-                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151', userSelect: 'none' }}>
+                <div
+                  contentEditable={false}
+                  style={{
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
+                    fontWeight: 500,
+                  }}
+                >
                   Городов
                 </div>
                 <input
