@@ -92,6 +92,8 @@ export default function BusinessProfileEditor({
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [loadingPortfolioItems, setLoadingPortfolioItems] = useState(false)
   const [savingCommentItemId, setSavingCommentItemId] = useState<string | null>(null)
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
+  const commentDraftsRef = useRef<Record<string, string>>({})
   const [uploadingPhotosItemId, setUploadingPhotosItemId] = useState<string | null>(null)
   const [compressingPhotosItemId, setCompressingPhotosItemId] = useState<string | null>(null)
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
@@ -259,10 +261,8 @@ export default function BusinessProfileEditor({
   const commentSaveTimeouts = new Map<string, NodeJS.Timeout>()
 
   const handleCommentChange = (itemId: string, comment: string) => {
-    // Обновляем локальное состояние сразу
-    setPortfolioItems((items) =>
-      items.map((item) => (item.id === itemId ? { ...item, comment } : item))
-    )
+    setCommentDrafts((prev) => ({ ...prev, [itemId]: comment }))
+    commentDraftsRef.current = { ...commentDraftsRef.current, [itemId]: comment }
 
     // Очищаем предыдущий timeout
     const existingTimeout = commentSaveTimeouts.get(itemId)
@@ -289,7 +289,12 @@ export default function BusinessProfileEditor({
         }
 
         const updatedItem: PortfolioItem = await response.json()
-        setPortfolioItems((items) => items.map((item) => (item.id === itemId ? updatedItem : item)))
+        const latestComment = commentDraftsRef.current[itemId] ?? updatedItem.comment
+        setPortfolioItems((items) =>
+          items.map((item) =>
+            item.id === itemId ? { ...updatedItem, comment: latestComment } : item
+          )
+        )
       } catch (err) {
         console.error('Failed to save comment:', err)
       } finally {
@@ -320,6 +325,13 @@ export default function BusinessProfileEditor({
       }
 
       setPortfolioItems(portfolioItems.filter((item) => item.id !== itemId))
+      setCommentDrafts((prev) => {
+        const next = { ...prev }
+        delete next[itemId]
+        return next
+      })
+      commentDraftsRef.current = { ...commentDraftsRef.current }
+      delete commentDraftsRef.current[itemId]
       setSuccess(true)
       setTimeout(() => {
         setSuccess(false)
@@ -424,7 +436,7 @@ export default function BusinessProfileEditor({
       const result = await response.json()
       const newPhotos: PortfolioItemPhoto[] = result.photos
 
-      // Обновляем кейс с новыми фото
+      // Обновляем кейс с новыми фото. ...item сохраняет comment; caption в commentDrafts не трогаем.
       setPortfolioItems((items) =>
         items.map((item) =>
           item.id === itemId
@@ -436,6 +448,9 @@ export default function BusinessProfileEditor({
         )
       )
 
+      if (process.env.NODE_ENV === 'development' && commentDraftsRef.current[itemId]) {
+        console.log('[Profile] Photo upload done, caption preserved:', commentDraftsRef.current[itemId].slice(0, 20) + '...')
+      }
       setSuccess(true)
       setTimeout(() => {
         setSuccess(false)
@@ -1771,9 +1786,9 @@ export default function BusinessProfileEditor({
                         )}
                       </div>
 
-                      {/* Комментарий */}
+                      {/* Комментарий (подпись под фото). commentDrafts изолирован от setPortfolioItems при upload. */}
                       <textarea
-                        value={item.comment || ''}
+                        value={commentDrafts[item.id] ?? item.comment ?? ''}
                         onChange={(e) => handleCommentChange(item.id, e.target.value)}
                         placeholder="Добавьте комментарий к кейсу..."
                         disabled={savingCommentItemId === item.id}
