@@ -30,7 +30,7 @@ export const GET = withBusinessAccess(async (req, user) => {
             select: { id: true, legalName: true, name: true },
           },
           request: {
-            select: { id: true, number: true, createdAt: true },
+            select: { id: true, number: true, createdAt: true, title: true, description: true, clientName: true, clientPhone: true, source: true },
           },
           items: { orderBy: { sortOrder: 'asc' } },
         },
@@ -51,6 +51,11 @@ export const GET = withBusinessAccess(async (req, user) => {
       number: number | null
       senderBusinessId: string
       senderLegalName: string
+      title: string | null
+      description: string | null
+      clientName: string | null
+      clientPhone: string | null
+      source: string | null
       category: string | null
       total: number | null
       status: string
@@ -59,17 +64,23 @@ export const GET = withBusinessAccess(async (req, user) => {
     }> = []
     for (const r of incomingList) {
       if (r.requestId && r.request) {
+        const req = r.request as { id: string; number: number | null; createdAt: Date; title?: string; description?: string; clientName?: string | null; clientPhone?: string | null; source?: string }
         incomingMapped.push({
-          id: `request_${r.request.id}`,
+          id: `request_${req.id}`,
           type: 'request',
-          requestId: r.request.id,
-          number: r.request.number,
+          requestId: req.id,
+          number: req.number,
           senderBusinessId: '',
-          senderLegalName: 'MAX',
+          senderLegalName: req.source === 'showcase' && req.clientName ? req.clientName : 'MAX',
+          title: req.title ?? null,
+          description: req.description ?? null,
+          clientName: req.clientName ?? null,
+          clientPhone: req.clientPhone ?? null,
+          source: req.source ?? null,
           category: null,
           total: null,
           status: r.status,
-          createdAt: r.request.createdAt.toISOString(),
+          createdAt: req.createdAt.toISOString(),
           items: r.items.map((i) => ({
             id: i.id,
             name: i.name,
@@ -87,6 +98,11 @@ export const GET = withBusinessAccess(async (req, user) => {
           number: null,
           senderBusinessId: r.senderBusinessId,
           senderLegalName: r.sender.legalName || r.sender.name,
+          title: null,
+          description: null,
+          clientName: null,
+          clientPhone: null,
+          source: null,
           category: r.category,
           total: r.total != null ? Number(r.total) : null,
           status: r.status,
@@ -109,7 +125,12 @@ export const GET = withBusinessAccess(async (req, user) => {
       requestId: r.id,
       number: r.number,
       senderBusinessId: '',
-      senderLegalName: 'MAX',
+      senderLegalName: r.source === 'showcase' && r.clientName ? r.clientName : r.clientName || 'Витрина',
+      title: r.title,
+      description: r.description,
+      clientName: r.clientName || null,
+      clientPhone: r.clientPhone || null,
+      source: r.source,
       category: null,
       total: null,
       status: r.status,

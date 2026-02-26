@@ -46,6 +46,11 @@ interface IncomingRequestRow {
   number?: number | null
   senderBusinessId: string
   senderLegalName: string
+  title?: string | null
+  description?: string | null
+  clientName?: string | null
+  clientPhone?: string | null
+  source?: string | null
   category: string | null
   total: number | null
   status: string
@@ -79,6 +84,22 @@ function formatPrice(value: number): string {
 
 function formatRequestDate(d: Date): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+/** Превью для карточки: description (1–2 строки) → title → category/items → #id */
+function getRequestPreviewText(req: IncomingRequestRow): string {
+  const desc = (req.description || '').trim()
+  if (desc) {
+    const lines = desc.split(/\r?\n/)
+    const truncated = lines.slice(0, 2).join('\n').slice(0, 120)
+    return truncated + (desc.length > 120 ? '…' : '')
+  }
+  const title = (req.title || '').trim()
+  if (title) return title
+  if (req.category) return req.category
+  const firstItem = req.items?.[0]?.name
+  if (firstItem) return firstItem
+  return `#${req.requestId || req.id}`
 }
 
 function parseMaxRequestToRows(title: string, description: string): Row[] {
@@ -641,6 +662,8 @@ export default function RequestsPageClient({ businessId, initialSection, initial
               const req = incomingRequests.find((r) => r.id === selectedIncomingId)
               if (!req) return null
               const total = req.items.reduce((a, i) => a + i.sum, 0)
+              const previewText = getRequestPreviewText(req)
+              const clientInfo = [req.clientName, req.clientPhone].filter(Boolean).join(' · ')
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <button
@@ -651,7 +674,9 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                     Назад к списку
                   </button>
                   <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827' }}>Заявка от {req.senderLegalName}</div>
-                  <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.5rem' }}>{req.category || '—'}. {req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}</div>
+                  <div style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem' }}>{previewText}</div>
+                  {clientInfo && <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>{clientInfo}</div>}
+                  <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.5rem' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}</div>
                   <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                       <thead>
@@ -692,13 +717,20 @@ export default function RequestsPageClient({ businessId, initialSection, initial
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {incomingRequests.map((req) => {
                   const isRequestLink = req.type === 'request' && req.requestId
+                  const previewText = getRequestPreviewText(req)
+                  const clientInfo = [req.clientName, req.clientPhone].filter(Boolean).join(' · ')
                   const cardContent = (
                     <>
                       <div style={{ fontSize: '1rem', fontWeight: 600, color: '#111827', marginBottom: '0.35rem' }}>
                         {req.number != null ? `№ ${req.number}. ` : ''}Заявка от {req.senderLegalName}
                       </div>
-                      <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.25rem' }}>{req.category || '—'}</div>
-                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}. {req.total != null ? formatPrice(req.total) : ''}</div>
+                      <div style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem', whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+                        {previewText}
+                      </div>
+                      {clientInfo && (
+                        <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.25rem' }}>{clientInfo}</div>
+                      )}
+                      <div style={{ fontSize: '0.875rem', color: '#4b5563' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}{req.total != null ? `. ${formatPrice(req.total)}` : ''}</div>
                     </>
                   )
                   return isRequestLink ? (
