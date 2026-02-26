@@ -250,7 +250,7 @@ export default function BusinessProfileEditor({
       }
 
       const newItem: PortfolioItem = await response.json()
-      setPortfolioItems([...portfolioItems, newItem])
+      setPortfolioItems([newItem, ...portfolioItems])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания кейса')
     }
