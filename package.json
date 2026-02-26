@@ -17,6 +17,7 @@
     "backfill:request-numbers": "npx tsx scripts/backfill-request-numbers.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.998.0",
     "@google-cloud/storage": "^7.7.0",
     "@prisma/client": "^5.19.0",
     "@prisma/engines": "^5.19.0",
