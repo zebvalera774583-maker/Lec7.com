@@ -1877,55 +1877,76 @@ export default function BusinessProfileEditor({
             )}
           </section>
 
-          {/* Метрики */}
-          <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-            <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem' }}>Метрики</h2>
+          {/* Метрики — подписи фиксированы, поля редактируемые */}
+          <section style={{ background: '#f9fafb', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+            <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem', color: '#111827' }}>Метрики</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151', userSelect: 'none' }}>
                   Уникальных кейсов
-                </label>
+                </div>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={metrics.cases}
-                  onChange={(e) => setMetrics({ ...metrics, cases: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '')
+                    setMetrics({ ...metrics, cases: v === '' ? 0 : parseInt(v, 10) || 0 })
+                  }}
+                  placeholder="0"
                   style={{
                     width: '100%',
-                    padding: '0.5rem',
+                    padding: '0.5rem 0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '4px',
+                    background: 'white',
+                    fontSize: '0.9rem',
                   }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151', userSelect: 'none' }}>
                   Проектов
-                </label>
+                </div>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={metrics.projects}
-                  onChange={(e) => setMetrics({ ...metrics, projects: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '')
+                    setMetrics({ ...metrics, projects: v === '' ? 0 : parseInt(v, 10) || 0 })
+                  }}
+                  placeholder="0"
                   style={{
                     width: '100%',
-                    padding: '0.5rem',
+                    padding: '0.5rem 0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '4px',
+                    background: 'white',
+                    fontSize: '0.9rem',
                   }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#374151', userSelect: 'none' }}>
                   Городов
-                </label>
+                </div>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={metrics.cities}
-                  onChange={(e) => setMetrics({ ...metrics, cities: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, '')
+                    setMetrics({ ...metrics, cities: v === '' ? 0 : parseInt(v, 10) || 0 })
+                  }}
+                  placeholder="0"
                   style={{
                     width: '100%',
-                    padding: '0.5rem',
+                    padding: '0.5rem 0.75rem',
                     border: '1px solid #d1d5db',
                     borderRadius: '4px',
+                    background: 'white',
+                    fontSize: '0.9rem',
                   }}
                 />
               </div>
