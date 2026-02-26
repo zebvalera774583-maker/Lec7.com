@@ -82,6 +82,9 @@ export const PUT = withBusinessAccess(async (req, user) => {
       statsCases,
       statsProjects,
       statsCities,
+      statsCasesLabel,
+      statsProjectsLabel,
+      statsCitiesLabel,
       cities,
       services,
       featuredServices,
@@ -107,6 +110,15 @@ export const PUT = withBusinessAccess(async (req, user) => {
     }
     if (statsCities !== undefined && (typeof statsCities !== 'number' || statsCities < 0)) {
       return NextResponse.json({ error: 'Invalid statsCities' }, { status: 400 })
+    }
+    if (statsCasesLabel !== undefined && typeof statsCasesLabel !== 'string') {
+      return NextResponse.json({ error: 'Invalid statsCasesLabel' }, { status: 400 })
+    }
+    if (statsProjectsLabel !== undefined && typeof statsProjectsLabel !== 'string') {
+      return NextResponse.json({ error: 'Invalid statsProjectsLabel' }, { status: 400 })
+    }
+    if (statsCitiesLabel !== undefined && typeof statsCitiesLabel !== 'string') {
+      return NextResponse.json({ error: 'Invalid statsCitiesLabel' }, { status: 400 })
     }
     if (cities !== undefined && !Array.isArray(cities)) {
       return NextResponse.json({ error: 'Invalid cities' }, { status: 400 })
@@ -160,6 +172,9 @@ export const PUT = withBusinessAccess(async (req, user) => {
         statsCases: statsCases !== undefined ? statsCases : undefined,
         statsProjects: statsProjects !== undefined ? statsProjects : undefined,
         statsCities: statsCities !== undefined ? statsCities : undefined,
+        statsCasesLabel: statsCasesLabel !== undefined ? (statsCasesLabel || null) : undefined,
+        statsProjectsLabel: statsProjectsLabel !== undefined ? (statsProjectsLabel || null) : undefined,
+        statsCitiesLabel: statsCitiesLabel !== undefined ? (statsCitiesLabel || null) : undefined,
         cities: cities !== undefined ? cities : undefined,
         services: servicesToSave !== undefined ? servicesToSave : undefined,
         servicesRaw: servicesRaw !== undefined ? servicesRaw || null : undefined,

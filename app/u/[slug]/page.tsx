@@ -49,6 +49,9 @@ export default async function PublicBusinessPage({ params }: PageProps) {
         cases: business.profile.statsCases,
         projects: business.profile.statsProjects,
         cities: business.profile.statsCities,
+        casesLabel: business.profile.statsCasesLabel || 'уникальных кейсов',
+        projectsLabel: business.profile.statsProjectsLabel || 'проектов',
+        citiesLabel: business.profile.statsCitiesLabel || 'городов',
       }
     : null
 
@@ -145,19 +148,19 @@ export default async function PublicBusinessPage({ params }: PageProps) {
               {stats.cases > 0 && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.cases}</div>
-                  <div style={{ fontSize: '0.875rem', color: '#666' }}>уникальных кейсов</div>
+                  <div style={{ fontSize: '0.875rem', color: '#666' }}>{stats.casesLabel}</div>
                 </div>
               )}
               {stats.projects > 0 && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.projects}</div>
-                  <div style={{ fontSize: '0.875rem', color: '#666' }}>проектов</div>
+                  <div style={{ fontSize: '0.875rem', color: '#666' }}>{stats.projectsLabel}</div>
                 </div>
               )}
               {stats.cities > 0 && (
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.cities}</div>
-                  <div style={{ fontSize: '0.875rem', color: '#666' }}>городов</div>
+                  <div style={{ fontSize: '0.875rem', color: '#666' }}>{stats.citiesLabel}</div>
                 </div>
               )}
             </div>

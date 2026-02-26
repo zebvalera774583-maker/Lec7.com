@@ -25,6 +25,9 @@ interface BusinessProfile {
   statsCases: number
   statsProjects: number
   statsCities: number
+  statsCasesLabel?: string | null
+  statsProjectsLabel?: string | null
+  statsCitiesLabel?: string | null
   cities: string[]
   services: string[]
   servicesRaw: string | null
@@ -77,6 +80,11 @@ export default function BusinessProfileEditor({
     cases: 40,
     projects: 2578,
     cities: 4,
+  })
+  const [metricsLabels, setMetricsLabels] = useState({
+    cases: 'Уникальных кейсов',
+    projects: 'Проектов',
+    cities: 'Городов',
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -177,6 +185,11 @@ export default function BusinessProfileEditor({
           cases: profile.statsCases,
           projects: profile.statsProjects,
           cities: profile.statsCities,
+        })
+        setMetricsLabels({
+          cases: profile.statsCasesLabel || 'Уникальных кейсов',
+          projects: profile.statsProjectsLabel || 'Проектов',
+          cities: profile.statsCitiesLabel || 'Городов',
         })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки профиля')
@@ -522,6 +535,9 @@ export default function BusinessProfileEditor({
         statsCases: metrics.cases,
         statsProjects: metrics.projects,
         statsCities: metrics.cities,
+        statsCasesLabel: metricsLabels.cases || null,
+        statsProjectsLabel: metricsLabels.projects || null,
+        statsCitiesLabel: metricsLabels.cities || null,
         cities,
         services,
         featuredServices: featuredServices.filter((s) => s.trim() !== '').slice(0, 4),
@@ -1877,24 +1893,26 @@ export default function BusinessProfileEditor({
             )}
           </section>
 
-          {/* Метрики — подписи фиксированы (не редактируются), поля ввода редактируемые */}
+          {/* Метрики — два поля на каждую: подпись (сверху) и число (снизу) */}
           <section style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
             <h2 style={{ marginBottom: '1rem', fontSize: '1.125rem', color: '#111827' }}>Метрики</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
               <div>
-                <div
-                  contentEditable={false}
+                <input
+                  type="text"
+                  value={metricsLabels.cases}
+                  onChange={(e) => setMetricsLabels({ ...metricsLabels, cases: e.target.value })}
+                  placeholder="Уникальных кейсов"
                   style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    background: 'white',
+                    fontSize: '0.9rem',
                     marginBottom: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    userSelect: 'none',
-                    pointerEvents: 'none',
-                    fontWeight: 500,
                   }}
-                >
-                  Уникальных кейсов
-                </div>
+                />
                 <input
                   type="text"
                   inputMode="numeric"
@@ -1915,19 +1933,21 @@ export default function BusinessProfileEditor({
                 />
               </div>
               <div>
-                <div
-                  contentEditable={false}
+                <input
+                  type="text"
+                  value={metricsLabels.projects}
+                  onChange={(e) => setMetricsLabels({ ...metricsLabels, projects: e.target.value })}
+                  placeholder="Проектов"
                   style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    background: 'white',
+                    fontSize: '0.9rem',
                     marginBottom: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    userSelect: 'none',
-                    pointerEvents: 'none',
-                    fontWeight: 500,
                   }}
-                >
-                  Проектов
-                </div>
+                />
                 <input
                   type="text"
                   inputMode="numeric"
@@ -1948,19 +1968,21 @@ export default function BusinessProfileEditor({
                 />
               </div>
               <div>
-                <div
-                  contentEditable={false}
+                <input
+                  type="text"
+                  value={metricsLabels.cities}
+                  onChange={(e) => setMetricsLabels({ ...metricsLabels, cities: e.target.value })}
+                  placeholder="Городов"
                   style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    background: 'white',
+                    fontSize: '0.9rem',
                     marginBottom: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: '#6b7280',
-                    userSelect: 'none',
-                    pointerEvents: 'none',
-                    fontWeight: 500,
                   }}
-                >
-                  Городов
-                </div>
+                />
                 <input
                   type="text"
                   inputMode="numeric"

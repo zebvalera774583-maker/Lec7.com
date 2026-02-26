@@ -32,6 +32,9 @@ interface ShowcaseBusiness {
     statsCases: number
     statsProjects: number
     statsCities: number
+    statsCasesLabel?: string | null
+    statsProjectsLabel?: string | null
+    statsCitiesLabel?: string | null
     cities: string[]
     services: string[]
   } | null
@@ -77,6 +80,9 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
   const statsCities = business.profile?.statsCities ?? 4
+  const statsCasesLabel = business.profile?.statsCasesLabel || 'уникальных кейсов'
+  const statsProjectsLabel = business.profile?.statsProjectsLabel || 'проектов'
+  const statsCitiesLabel = business.profile?.statsCitiesLabel || 'городов'
   const hasAnyStats = statsCases > 0 || statsProjects > 0 || statsCities > 0
 
   const profileCities = business.profile?.cities ?? []
@@ -184,17 +190,17 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   >
                     {statsCases > 0 && (
                       <div>
-                        <span style={{ fontWeight: 600 }}>{statsCases}</span> кейсов
+                        <span style={{ fontWeight: 600 }}>{statsCases}</span> {statsCasesLabel}
                       </div>
                     )}
                     {statsProjects > 0 && (
                       <div>
-                        <span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов
+                        <span style={{ fontWeight: 600 }}>{statsProjects}</span> {statsProjectsLabel}
                       </div>
                     )}
                     {statsCities > 0 && (
                       <div>
-                        <span style={{ fontWeight: 600 }}>{statsCities}</span> города
+                        <span style={{ fontWeight: 600 }}>{statsCities}</span> {statsCitiesLabel}
                       </div>
                     )}
                   </div>
@@ -266,11 +272,11 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   color: '#111827',
                 }}
               >
-                {statsCases > 0 && <><span style={{ fontWeight: 600 }}>{statsCases}</span> уникальных кейсов</>}
+                {statsCases > 0 && <><span style={{ fontWeight: 600 }}>{statsCases}</span> {statsCasesLabel}</>}
                 {statsCases > 0 && (statsProjects > 0 || statsCities > 0) && ' | '}
-                {statsProjects > 0 && <><span style={{ fontWeight: 600 }}>{statsProjects}</span> проектов</>}
+                {statsProjects > 0 && <><span style={{ fontWeight: 600 }}>{statsProjects}</span> {statsProjectsLabel}</>}
                 {statsProjects > 0 && statsCities > 0 && ' | '}
-                {statsCities > 0 && <><span style={{ fontWeight: 600 }}>{statsCities}</span> города</>}
+                {statsCities > 0 && <><span style={{ fontWeight: 600 }}>{statsCities}</span> {statsCitiesLabel}</>}
               </p>
             )}
           </div>

@@ -237,6 +237,9 @@ model BusinessProfile {
   statsCases      Int      @default(40)
   statsProjects   Int      @default(2578)
   statsCities     Int      @default(4)
+  statsCasesLabel  String?  // Подпись для метрики (напр. «Уникальных кейсов»)
+  statsProjectsLabel String?
+  statsCitiesLabel  String?
   cities          String[]
   services        String[]
   servicesRaw     String?  // Сырой текст услуг от пользователя (до структурирования AI)
