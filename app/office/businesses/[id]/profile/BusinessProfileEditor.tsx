@@ -92,8 +92,7 @@ export default function BusinessProfileEditor({
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([])
   const [loadingPortfolioItems, setLoadingPortfolioItems] = useState(false)
   const [savingCommentItemId, setSavingCommentItemId] = useState<string | null>(null)
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
-  const commentDraftsRef = useRef<Record<string, string>>({})
+  const commentInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({})
   const [uploadingPhotosItemId, setUploadingPhotosItemId] = useState<string | null>(null)
   const [compressingPhotosItemId, setCompressingPhotosItemId] = useState<string | null>(null)
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
@@ -260,10 +259,7 @@ export default function BusinessProfileEditor({
   // Сохранение комментария кейса (с debounce)
   const commentSaveTimeouts = new Map<string, NodeJS.Timeout>()
 
-  const handleCommentChange = (itemId: string, comment: string) => {
-    setCommentDrafts((prev) => ({ ...prev, [itemId]: comment }))
-    commentDraftsRef.current = { ...commentDraftsRef.current, [itemId]: comment }
-
+  const handleCommentChange = (itemId: string) => {
     // Очищаем предыдущий timeout
     const existingTimeout = commentSaveTimeouts.get(itemId)
     if (existingTimeout) {
@@ -272,6 +268,7 @@ export default function BusinessProfileEditor({
 
     // Устанавливаем новый timeout для сохранения через 800ms
     const timeout = setTimeout(async () => {
+      const comment = commentInputRefs.current[itemId]?.value ?? ''
       setSavingCommentItemId(itemId)
       try {
         const response = await fetch(`/api/office/businesses/${businessId}/portfolio-items/${itemId}`, {
@@ -289,11 +286,8 @@ export default function BusinessProfileEditor({
         }
 
         const updatedItem: PortfolioItem = await response.json()
-        const latestComment = commentDraftsRef.current[itemId] ?? updatedItem.comment
         setPortfolioItems((items) =>
-          items.map((item) =>
-            item.id === itemId ? { ...updatedItem, comment: latestComment } : item
-          )
+          items.map((item) => (item.id === itemId ? { ...updatedItem, comment } : item))
         )
       } catch (err) {
         console.error('Failed to save comment:', err)
@@ -325,13 +319,7 @@ export default function BusinessProfileEditor({
       }
 
       setPortfolioItems(portfolioItems.filter((item) => item.id !== itemId))
-      setCommentDrafts((prev) => {
-        const next = { ...prev }
-        delete next[itemId]
-        return next
-      })
-      commentDraftsRef.current = { ...commentDraftsRef.current }
-      delete commentDraftsRef.current[itemId]
+      delete commentInputRefs.current[itemId]
       setSuccess(true)
       setTimeout(() => {
         setSuccess(false)
@@ -448,8 +436,8 @@ export default function BusinessProfileEditor({
         )
       )
 
-      if (process.env.NODE_ENV === 'development' && commentDraftsRef.current[itemId]) {
-        console.log('[Profile] Photo upload done, caption preserved:', commentDraftsRef.current[itemId].slice(0, 20) + '...')
+      if (process.env.NODE_ENV === 'development' && commentInputRefs.current[itemId]?.value) {
+        console.log('[Profile] Photo upload done, caption preserved:', commentInputRefs.current[itemId]!.value.slice(0, 20) + '...')
       }
       setSuccess(true)
       setTimeout(() => {
@@ -1786,10 +1774,11 @@ export default function BusinessProfileEditor({
                         )}
                       </div>
 
-                      {/* Комментарий (подпись под фото). commentDrafts изолирован от setPortfolioItems при upload. */}
+                      {/* Комментарий (подпись под фото). Uncontrolled — не сбрасывается при setPortfolioItems при upload. */}
                       <textarea
-                        value={commentDrafts[item.id] ?? item.comment ?? ''}
-                        onChange={(e) => handleCommentChange(item.id, e.target.value)}
+                        ref={(el) => { commentInputRefs.current[item.id] = el }}
+                        defaultValue={item.comment ?? ''}
+                        onChange={() => handleCommentChange(item.id)}
                         placeholder="Добавьте комментарий к кейсу..."
                         disabled={savingCommentItemId === item.id}
                         style={{
