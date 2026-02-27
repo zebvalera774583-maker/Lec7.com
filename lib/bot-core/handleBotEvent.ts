@@ -11,7 +11,7 @@ export interface BotEvent {
 
 export interface HandleBotEventResult {
   messages: string[]
-  replyMarkup?: { keyboard: { text: string }[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean }
+  replyKeyboard?: { buttons: string[] }
   removeKeyboard?: boolean
 }
 
@@ -73,10 +73,6 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
   return {
     messages: [companyMessage],
-    replyMarkup: {
-      keyboard: [[{ text: 'Да' }, { text: 'Нет' }]],
-      resize_keyboard: true,
-      one_time_keyboard: true,
-    },
+    replyKeyboard: { buttons: ['Да', 'Нет'] },
   }
 }

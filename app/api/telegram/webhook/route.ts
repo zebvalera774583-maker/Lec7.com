@@ -6,7 +6,7 @@ const TELEGRAM_API = 'https://api.telegram.org'
 async function sendTelegramMessage(
   chatId: string,
   text: string,
-  replyMarkup?: { keyboard: { text: string }[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean },
+  replyKeyboard?: { buttons: string[] },
   removeKeyboard?: boolean
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -18,8 +18,12 @@ async function sendTelegramMessage(
     const body: { chat_id: string; text: string; reply_markup?: object } = { chat_id: chatId, text }
     if (removeKeyboard) {
       body.reply_markup = { remove_keyboard: true }
-    } else if (replyMarkup) {
-      body.reply_markup = replyMarkup
+    } else if (replyKeyboard?.buttons?.length) {
+      body.reply_markup = {
+        keyboard: [replyKeyboard.buttons.map((b) => ({ text: b }))],
+        resize_keyboard: true,
+        one_time_keyboard: false,
+      }
     }
     const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
       method: 'POST',
@@ -58,7 +62,7 @@ export async function POST(req: NextRequest) {
       raw: body,
     }
 
-    const { messages, replyMarkup, removeKeyboard } = await handleBotEvent(event)
+    const { messages, replyKeyboard, removeKeyboard } = await handleBotEvent(event)
 
     console.log('[tg] reply messages:', messages)
 
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
       await sendTelegramMessage(
         String(chatId),
         messages[i],
-        i === 0 ? replyMarkup : undefined,
+        i === 0 ? replyKeyboard : undefined,
         i === 0 ? removeKeyboard : undefined
       )
     }

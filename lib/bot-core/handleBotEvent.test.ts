@@ -35,11 +35,7 @@ describe('handleBotEvent', () => {
     })
 
     expect(result.messages).toEqual(['Вы делаете заявки в компании Блины Юга'])
-    expect(result.replyMarkup).toEqual({
-      keyboard: [[{ text: 'Да' }, { text: 'Нет' }]],
-      resize_keyboard: true,
-      one_time_keyboard: true,
-    })
+    expect(result.replyKeyboard).toEqual({ buttons: ['Да', 'Нет'] })
   })
 
   it('"да" when awaiting confirm returns accepted', async () => {
