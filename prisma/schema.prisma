@@ -226,6 +226,17 @@ model Category {
   @@index([type])
 }
 
+model BotChatState {
+  id        String   @id @default(cuid())
+  channel   String   // 'telegram' | 'max'
+  chatId    String
+  stateJson Json?   // { type: 'awaiting_company_confirm', ... }
+  updatedAt DateTime @updatedAt
+
+  @@unique([channel, chatId])
+  @@index([channel, chatId])
+}
+
 model BusinessProfile {
   id              String   @id @default(cuid())
   businessId      String   @unique

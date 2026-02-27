@@ -1,5 +1,19 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handleBotEvent } from './handleBotEvent'
+
+const mockFindUnique = vi.fn()
+const mockUpsert = vi.fn()
+const mockUpdate = vi.fn()
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    botChatState: {
+      findUnique: (...args: unknown[]) => mockFindUnique(...args),
+      upsert: (...args: unknown[]) => mockUpsert(...args),
+      update: (...args: unknown[]) => mockUpdate(...args),
+    },
+  },
+}))
 
 describe('handleBotEvent', () => {
   const baseEvent = {
@@ -8,31 +22,63 @@ describe('handleBotEvent', () => {
     text: '',
   }
 
-  it('returns greeting for /start', async () => {
-    const { messages } = await handleBotEvent({
-      ...baseEvent,
-      text: '/start',
-    })
-    expect(messages).toEqual([
-      'Привет! Напиши потребность одним сообщением, я передам в Lec7 ✅',
-    ])
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
-  it('returns greeting for /start with args', async () => {
-    const { messages } = await handleBotEvent({
+  it('first message shows company confirmation with Да/Нет', async () => {
+    mockFindUnique.mockResolvedValue(null)
+
+    const result = await handleBotEvent({
       ...baseEvent,
-      text: '/start token123',
+      text: 'привет',
     })
-    expect(messages).toEqual([
-      'Привет! Напиши потребность одним сообщением, я передам в Lec7 ✅',
-    ])
+
+    expect(result.messages).toEqual(['Вы делаете заявки в компании Блины Юга'])
+    expect(result.replyMarkup).toEqual({
+      keyboard: [['Да', 'Нет']],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+    })
   })
 
-  it('returns accepted for ordinary text', async () => {
-    const { messages } = await handleBotEvent({
+  it('"да" when awaiting confirm returns accepted', async () => {
+    mockFindUnique.mockResolvedValue({
+      stateJson: { type: 'awaiting_company_confirm' },
+    })
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'да',
+    })
+
+    expect(result.messages).toEqual(['Принято. Напишите потребность одним сообщением.'])
+    expect(mockUpdate).toHaveBeenCalled()
+  })
+
+  it('"нет" when awaiting confirm returns admin message', async () => {
+    mockFindUnique.mockResolvedValue({
+      stateJson: { type: 'awaiting_company_confirm' },
+    })
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'нет',
+    })
+
+    expect(result.messages).toEqual(['Обратитесь к администратору для смены компании.'])
+  })
+
+  it('accepted text when confirmed returns принял', async () => {
+    mockFindUnique.mockResolvedValue({
+      stateJson: { type: 'confirmed' },
+    })
+
+    const result = await handleBotEvent({
       ...baseEvent,
       text: 'яблоки 10 кг',
     })
-    expect(messages).toEqual(['Принял: "яблоки 10 кг" ✅'])
+
+    expect(result.messages).toEqual(['Принял: "яблоки 10 кг" ✅'])
   })
 })

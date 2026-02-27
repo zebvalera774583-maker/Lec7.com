@@ -3,17 +3,25 @@ import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
 
 const TELEGRAM_API = 'https://api.telegram.org'
 
-async function sendTelegramMessage(chatId: string, text: string): Promise<void> {
+async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  replyMarkup?: { keyboard: string[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean }
+): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
     console.error('TELEGRAM_BOT_TOKEN not set')
     return
   }
   try {
+    const body: { chat_id: string; text: string; reply_markup?: object } = { chat_id: chatId, text }
+    if (replyMarkup) {
+      body.reply_markup = replyMarkup
+    }
     const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify(body),
     })
     console.log('[tg] sendMessage status:', res.status)
     if (!res.ok) {
@@ -47,12 +55,12 @@ export async function POST(req: NextRequest) {
       raw: body,
     }
 
-    const { messages } = await handleBotEvent(event)
+    const { messages, replyMarkup } = await handleBotEvent(event)
 
     console.log('[tg] reply messages:', messages)
 
-    for (const msg of messages) {
-      await sendTelegramMessage(String(chatId), msg)
+    for (let i = 0; i < messages.length; i++) {
+      await sendTelegramMessage(String(chatId), messages[i], i === 0 ? replyMarkup : undefined)
     }
 
     return NextResponse.json({ ok: true })
