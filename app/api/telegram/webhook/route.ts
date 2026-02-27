@@ -9,14 +9,18 @@ async function sendTelegramMessage(chatId: string, text: string): Promise<void> 
     console.error('TELEGRAM_BOT_TOKEN not set')
     return
   }
-  const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    console.error('Telegram sendMessage error:', res.status, err)
+  try {
+    const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    })
+    console.log('[tg] sendMessage status:', res.status)
+    if (!res.ok) {
+      console.error('[tg] sendMessage error:', await res.text())
+    }
+  } catch (e) {
+    console.error('[tg] sendMessage exception:', e)
   }
 }
 
@@ -44,6 +48,8 @@ export async function POST(req: NextRequest) {
     }
 
     const { messages } = await handleBotEvent(event)
+
+    console.log('[tg] reply messages:', messages)
 
     for (const msg of messages) {
       await sendTelegramMessage(String(chatId), msg)
