@@ -6,7 +6,8 @@ const TELEGRAM_API = 'https://api.telegram.org'
 async function sendTelegramMessage(
   chatId: string,
   text: string,
-  replyMarkup?: { keyboard: string[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean }
+  replyMarkup?: { keyboard: { text: string }[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean },
+  removeKeyboard?: boolean
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
@@ -15,7 +16,9 @@ async function sendTelegramMessage(
   }
   try {
     const body: { chat_id: string; text: string; reply_markup?: object } = { chat_id: chatId, text }
-    if (replyMarkup) {
+    if (removeKeyboard) {
+      body.reply_markup = { remove_keyboard: true }
+    } else if (replyMarkup) {
       body.reply_markup = replyMarkup
     }
     const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
@@ -55,12 +58,17 @@ export async function POST(req: NextRequest) {
       raw: body,
     }
 
-    const { messages, replyMarkup } = await handleBotEvent(event)
+    const { messages, replyMarkup, removeKeyboard } = await handleBotEvent(event)
 
     console.log('[tg] reply messages:', messages)
 
     for (let i = 0; i < messages.length; i++) {
-      await sendTelegramMessage(String(chatId), messages[i], i === 0 ? replyMarkup : undefined)
+      await sendTelegramMessage(
+        String(chatId),
+        messages[i],
+        i === 0 ? replyMarkup : undefined,
+        i === 0 ? removeKeyboard : undefined
+      )
     }
 
     return NextResponse.json({ ok: true })

@@ -11,7 +11,8 @@ export interface BotEvent {
 
 export interface HandleBotEventResult {
   messages: string[]
-  replyMarkup?: { keyboard: string[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean }
+  replyMarkup?: { keyboard: { text: string }[][]; resize_keyboard?: boolean; one_time_keyboard?: boolean }
+  removeKeyboard?: boolean
 }
 
 const COMPANY_NAME = process.env.BOT_COMPANY_NAME || 'Блины Юга'
@@ -35,11 +36,13 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       })
       return {
         messages: ['Принято. Напишите потребность одним сообщением.'],
+        removeKeyboard: true,
       }
     }
     if (text === 'нет') {
       return {
         messages: ['Обратитесь к администратору для смены компании.'],
+        removeKeyboard: true,
       }
     }
     return {
@@ -71,7 +74,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
   return {
     messages: [companyMessage],
     replyMarkup: {
-      keyboard: [['Да', 'Нет']],
+      keyboard: [[{ text: 'Да' }, { text: 'Нет' }]],
       resize_keyboard: true,
       one_time_keyboard: true,
     },

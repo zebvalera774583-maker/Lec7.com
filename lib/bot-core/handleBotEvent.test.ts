@@ -36,7 +36,7 @@ describe('handleBotEvent', () => {
 
     expect(result.messages).toEqual(['Вы делаете заявки в компании Блины Юга'])
     expect(result.replyMarkup).toEqual({
-      keyboard: [['Да', 'Нет']],
+      keyboard: [[{ text: 'Да' }, { text: 'Нет' }]],
       resize_keyboard: true,
       one_time_keyboard: true,
     })
