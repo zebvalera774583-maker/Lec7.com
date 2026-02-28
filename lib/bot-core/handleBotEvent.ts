@@ -10,11 +10,20 @@ function isNonNeed(text: string): boolean {
   return !t || NON_NEED_PATTERNS.test(t)
 }
 
+const NEED_FORMAT_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}]+)?$/u
+
+/** Проверка: есть ли в тексте вес (число) и ед. изм. — иначе заявка не создаётся */
+function isValidNeedFormat(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  return NEED_FORMAT_REGEX.test(trimmed)
+}
+
 /** Парсинг "яблоки 10 кг" → { name, quantity, unit } */
 function parseNeedText(text: string): { name: string; quantity: string; unit: string } {
   const trimmed = text.trim()
   if (!trimmed) return { name: trimmed, quantity: '1', unit: 'шт' }
-  const match = trimmed.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}]+)?$/u)
+  const match = trimmed.match(NEED_FORMAT_REGEX)
   if (match) {
     const [, name, qty, unit] = match
     const quantity = (qty ?? '1').replace(',', '.')
@@ -89,6 +98,14 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
+    if (!isValidNeedFormat(needText)) {
+      return {
+        messages: [
+          'Укажите наименование, количество и единицу измерения. Например: яблоки 10 кг',
+        ],
+      }
+    }
+
     if (businessId && needText) {
       try {
         const { number } = await prisma.$transaction(async (tx) => {
@@ -130,7 +147,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           return { number: num }
         })
         return {
-          messages: [`Номер заявки: ${number}`],
+          messages: [`Заявка принята. Номер заявки: ${number}`],
         }
       } catch (e) {
         console.error('[handleBotEvent] create request error:', e)
