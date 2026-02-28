@@ -46,6 +46,8 @@ services:
       LEC7_GATEWAY_SECRET: ${LEC7_GATEWAY_SECRET:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       BOT_COMPANY_NAME: ${BOT_COMPANY_NAME:-Блины Юга}
+      MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:-}
+      MAX_API_URL: ${MAX_API_URL:-https://botapi.max.ru}
     depends_on:
       postgres:
         condition: service_healthy

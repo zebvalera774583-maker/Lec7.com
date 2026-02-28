@@ -38,13 +38,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages, replyInlineKeyboard, removeKeyboard } = await handleBotEvent(event)
+    const { messages, replyInlineKeyboard } = await handleBotEvent(event)
     const replyText = messages.length > 0 ? messages.join('\n') : 'Спасибо, заявка принята'
-    return NextResponse.json({ replyText, replyInlineKeyboard, removeKeyboard })
+    return NextResponse.json({ replyText, replyInlineKeyboard })
   } catch (e) {
     console.error('[MAX webhook error]', e)
-    return NextResponse.json({
-      replyText: 'Произошла ошибка. Попробуйте позже.',
-    })
+    return NextResponse.json({ replyText: 'Произошла ошибка. Попробуйте позже.' })
   }
 }

@@ -1,9 +1,9 @@
 /**
  * MAX client for sending messages.
- * Endpoint and token from env: MAX_API_URL, MAX_BOT_TOKEN or similar.
+ * Endpoint and token from env: MAX_API_URL, MAX_BOT_TOKEN.
  */
 
-const MAX_API_URL = process.env.MAX_API_URL || ''
+const MAX_API_URL = process.env.MAX_API_URL || 'https://botapi.max.ru'
 const MAX_BOT_TOKEN = process.env.MAX_BOT_TOKEN || ''
 
 export interface SendMessageResult {
@@ -11,26 +11,57 @@ export interface SendMessageResult {
   error?: string
 }
 
+export interface InlineKeyboardButton {
+  text: string
+  callback_data: string
+}
+
 /**
  * Send message to MAX chat.
+ * If replyInlineKeyboard is provided, adds attachments with inline_keyboard (2 buttons Да/Нет as callback).
+ * MAX API format: attachments: [{ type: 'inline_keyboard', payload: { buttons: [[{ type:'callback', text, payload }]] } }]
  * Returns { ok: true } on success, { ok: false, error } on failure.
- * Note: The max-bot-service typically handles replies via webhook response (replyText).
- * This client is for direct API calls when needed.
  */
-export async function sendMessage(chatId: string, text: string): Promise<SendMessageResult> {
-  if (!MAX_API_URL || !MAX_BOT_TOKEN) {
-    return { ok: false, error: 'MAX_API_URL or MAX_BOT_TOKEN not configured' }
+export async function sendMessage(
+  chatId: string,
+  text: string,
+  replyInlineKeyboard?: { buttons: InlineKeyboardButton[] }
+): Promise<SendMessageResult> {
+  if (!MAX_BOT_TOKEN) {
+    return { ok: false, error: 'MAX_BOT_TOKEN not configured' }
   }
 
   try {
     const url = `${MAX_API_URL.replace(/\/$/, '')}/chats/${chatId}/messages`
+    const body: {
+      text: string
+      attachments?: Array<{ type: 'inline_keyboard'; payload: { buttons: Array<Array<{ type: 'callback'; text: string; payload: string }>> } }
+    } = { text }
+
+    if (replyInlineKeyboard?.buttons?.length) {
+      body.attachments = [
+        {
+          type: 'inline_keyboard',
+          payload: {
+            buttons: [
+              replyInlineKeyboard.buttons.map((b) => ({
+                type: 'callback' as const,
+                text: b.text,
+                payload: b.callback_data,
+              })),
+            ],
+          },
+        },
+      ]
+    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${MAX_BOT_TOKEN}`,
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {

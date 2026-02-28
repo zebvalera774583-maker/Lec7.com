@@ -26,6 +26,83 @@ app.listen(PORT, () => {
 
 const bot = new Bot(MAX_BOT_TOKEN)
 
+type WebhookResponse = {
+  replyText?: string
+  replyInlineKeyboard?: { buttons: { text: string; callback_data: string }[] }
+}
+
+async function forwardToWebhook(
+  chatId: string | number,
+  userId: string | number | undefined,
+  text: string,
+  choice?: 'YES' | 'NO',
+  messageId?: string,
+  ts?: string
+) {
+  const { data } = await axios.post<WebhookResponse>(
+    `${LEC7_BASE_URL}/api/integrations/max/webhook`,
+    { chatId, userId, text, messageId, ts, choice },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-LEC7-MAX-SECRET': LEC7_MAX_SECRET,
+      },
+      timeout: 15000,
+    }
+  )
+  return data
+}
+
+function sendReply(ctx: any, replyText: string, replyInlineKeyboard?: WebhookResponse['replyInlineKeyboard']) {
+  if (replyInlineKeyboard?.buttons?.length) {
+    return ctx.reply(replyText, {
+      reply_markup: {
+        inline_keyboard: [
+          replyInlineKeyboard.buttons.map((btn) => ({
+            text: btn.text,
+            callback_data: btn.callback_data,
+          })),
+        ],
+      },
+    })
+  }
+  return ctx.reply(replyText)
+}
+
+bot.on('message_callback', async (ctx: any) => {
+  const payload = ctx.update?.callback?.payload ?? ctx.callbackQuery?.data
+  const chatId = ctx.chatId ?? ctx.chat?.chat_id ?? ctx.message?.recipient?.chat_id
+  const userId = ctx.user?.user_id ?? ctx.update?.callback?.user?.user_id
+
+  if (!payload || !chatId) return
+
+  console.log('[MAX callback]', { chatId, userId, choice: payload })
+
+  try {
+    await ctx.answerOnCallback?.()
+  } catch (e) {
+    console.warn('[MAX] answerOnCallback error:', e)
+  }
+
+  try {
+    const data = await forwardToWebhook(
+      String(chatId),
+      userId != null ? String(userId) : undefined,
+      '',
+      payload === 'YES' || payload === 'NO' ? payload : undefined,
+      undefined,
+      undefined
+    )
+    const replyText = data?.replyText ?? 'Спасибо, заявка принята'
+    await sendReply(ctx, replyText, data?.replyInlineKeyboard)
+    console.log('[MAX outgoing]', { chatId, replyText: replyText.slice(0, 50) })
+  } catch (err: any) {
+    const msg = err?.response?.data?.error ?? err?.message ?? 'Ошибка'
+    console.error('[MAX error]', msg)
+    await ctx.reply('Произошла ошибка. Попробуйте позже.')
+  }
+})
+
 bot.on('message_created', async (ctx: any) => {
   const text = ctx.message?.body?.text
   if (!text || typeof text !== 'string') return
@@ -38,20 +115,10 @@ bot.on('message_created', async (ctx: any) => {
   console.log('[MAX incoming]', { chatId, userId, text: text.slice(0, 50) })
 
   try {
-    const { data } = await axios.post<{ replyText: string }>(
-      `${LEC7_BASE_URL}/api/integrations/max/webhook`,
-      { chatId, userId, text, messageId, ts },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-LEC7-MAX-SECRET': LEC7_MAX_SECRET,
-        },
-        timeout: 15000,
-      }
-    )
+    const data = await forwardToWebhook(chatId, userId, text, undefined, messageId, ts)
 
     const replyText = data?.replyText ?? 'Спасибо, заявка принята'
-    if (replyText) await ctx.reply(replyText)
+    await sendReply(ctx, replyText, data?.replyInlineKeyboard)
     console.log('[MAX outgoing]', { chatId, replyText: replyText.slice(0, 50) })
   } catch (err: any) {
     const msg = err?.response?.data?.error ?? err?.message ?? 'Ошибка'
