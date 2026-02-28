@@ -48,18 +48,18 @@ function isItemComplete(item: { hasUnit: boolean }): boolean {
   return item.hasUnit
 }
 
-/** Возвращает список позиций без веса/ед.изм. — для сообщения "Укажите вес и ед. изм. для: X" */
-function getIncompleteItemNames(text: string): string[] {
+/** Позиции с недостающими полями: onlyUnit = true если есть вес, но нет ед.изм. */
+function getIncompleteItems(text: string): { displayName: string; onlyUnitMissing: boolean }[] {
   const items = splitIntoItems(text)
-  const incomplete: string[] = []
+  const result: { displayName: string; onlyUnitMissing: boolean }[] = []
   for (const raw of items) {
     const parsed = parseOneItem(raw)
-    if (parsed.name && !isItemComplete(parsed)) {
-      const displayName = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1).toLowerCase()
-      incomplete.push(displayName)
-    }
+    if (!parsed.name || isItemComplete(parsed)) continue
+    const displayName = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1).toLowerCase()
+    const hasWeight = /\d/.test(raw)
+    result.push({ displayName, onlyUnitMissing: hasWeight })
   }
-  return incomplete
+  return result
 }
 
 /** Проверка: все ли позиции имеют вес и ед. изм. */
@@ -155,13 +155,16 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     const items = splitIntoItems(needText)
-    const incompleteNames = getIncompleteItemNames(needText)
+    const incomplete = getIncompleteItems(needText)
 
-    if (incompleteNames.length > 0) {
+    if (incomplete.length > 0) {
+      const onlyUnit = incomplete.filter((i) => i.onlyUnitMissing).map((i) => i.displayName)
+      const needBoth = incomplete.filter((i) => !i.onlyUnitMissing).map((i) => i.displayName)
+      const parts: string[] = []
+      if (onlyUnit.length > 0) parts.push(`Укажите ед. изм. для: ${onlyUnit.join(', ')}`)
+      if (needBoth.length > 0) parts.push(`Укажите вес и ед. изм. для: ${needBoth.join(', ')}`)
       return {
-        messages: [
-          `Укажите вес и ед. изм. для: ${incompleteNames.join(', ')}`,
-        ],
+        messages: [parts.join('. ')],
       }
     }
 
