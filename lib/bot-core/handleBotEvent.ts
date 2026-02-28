@@ -13,42 +13,79 @@ function isNonNeed(text: string): boolean {
 const NEED_FORMAT_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}]+)?$/u
 const UNIT_PATTERN = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*([\p{L}]{1,10})$/u
 
-/** Возвращает список недостающих полей: «наименование», «количество», «единица измерения» */
+/** Разбивает текст на позиции: по переносу, запятой, " и "; или по границе "наименование число" (новая позиция) */
+function splitIntoItems(text: string): string[] {
+  const byDelim = text.split(/[\n,;]|\s+и\s+/i).map((s) => s.trim()).filter(Boolean)
+  const result: string[] = []
+  for (const part of byDelim) {
+    const items = part.split(/\s+(?=[\p{L}]+\s+\d)/u).map((s) => s.trim()).filter(Boolean)
+    result.push(...items)
+  }
+  return result.length > 0 ? result : [text.trim()].filter(Boolean)
+}
+
+/** Парсинг одной позиции "яблоки 10 кг" → { name, quantity, unit, hasUnit } */
+function parseOneItem(text: string): { name: string; quantity: string; unit: string; hasUnit: boolean } {
+  const trimmed = text.trim()
+  if (!trimmed) return { name: '', quantity: '1', unit: 'шт', hasUnit: false }
+  const match = trimmed.match(NEED_FORMAT_REGEX)
+  if (match) {
+    const [, name, qty, unit] = match
+    const quantity = (qty ?? '1').replace(',', '.')
+    const unitVal = (unit ?? '').trim()
+    return {
+      name: (name ?? trimmed).trim(),
+      quantity,
+      unit: unitVal || 'шт',
+      hasUnit: unitVal.length > 0,
+    }
+  }
+  return { name: trimmed, quantity: '1', unit: 'шт', hasUnit: false }
+}
+
+/** Проверка одной позиции: есть ли вес и ед. изм. */
+function isItemComplete(item: { hasUnit: boolean }): boolean {
+  return item.hasUnit
+}
+
+/** Возвращает список позиций без веса/ед.изм. — для сообщения "Укажите вес и ед. изм. для: X" */
+function getIncompleteItemNames(text: string): string[] {
+  const items = splitIntoItems(text)
+  const incomplete: string[] = []
+  for (const raw of items) {
+    const parsed = parseOneItem(raw)
+    if (parsed.name && !isItemComplete(parsed)) {
+      const displayName = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1).toLowerCase()
+      incomplete.push(displayName)
+    }
+  }
+  return incomplete
+}
+
+/** Проверка: все ли позиции имеют вес и ед. изм. */
+function areAllItemsValid(text: string): boolean {
+  const items = splitIntoItems(text)
+  if (items.length === 0) return false
+  for (const raw of items) {
+    const parsed = parseOneItem(raw)
+    if (!parsed.name || !isItemComplete(parsed)) return false
+  }
+  return true
+}
+
+/** Возвращает список недостающих полей для одной позиции (если одна) */
 function getMissingNeedFields(text: string): string[] {
   const t = text.trim()
   if (!t) return ['наименование', 'количество', 'единица измерения'];
-
   if (NEED_FORMAT_REGEX.test(t)) return [];
-
   const hasNumber = /\d/.test(t);
   const hasUnit = UNIT_PATTERN.test(t);
   const hasName = !/^\d/.test(t) && /[\p{L}]/u.test(t);
-
   const missing: string[] = [];
   if (!hasName) missing.push('наименование');
   if (!hasNumber) missing.push('количество');
   if (!hasUnit) missing.push('единица измерения');
   return missing;
-}
-
-/** Проверка: есть ли в тексте вес (число) и ед. изм. — иначе заявка не создаётся */
-function isValidNeedFormat(text: string): boolean {
-  const trimmed = text.trim()
-  if (!trimmed) return false
-  return NEED_FORMAT_REGEX.test(trimmed)
-}
-
-/** Парсинг "яблоки 10 кг" → { name, quantity, unit } */
-function parseNeedText(text: string): { name: string; quantity: string; unit: string } {
-  const trimmed = text.trim()
-  if (!trimmed) return { name: trimmed, quantity: '1', unit: 'шт' }
-  const match = trimmed.match(NEED_FORMAT_REGEX)
-  if (match) {
-    const [, name, qty, unit] = match
-    const quantity = (qty ?? '1').replace(',', '.')
-    return { name: (name ?? trimmed).trim(), quantity, unit: (unit ?? 'шт').trim() }
-  }
-  return { name: trimmed, quantity: '1', unit: 'шт' }
 }
 
 export interface BotEvent {
@@ -117,7 +154,18 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
-    if (!isValidNeedFormat(needText)) {
+    const items = splitIntoItems(needText)
+    const incompleteNames = getIncompleteItemNames(needText)
+
+    if (incompleteNames.length > 0) {
+      return {
+        messages: [
+          `Укажите вес и ед. изм. для: ${incompleteNames.join(', ')}`,
+        ],
+      }
+    }
+
+    if (!areAllItemsValid(needText)) {
       const missing = getMissingNeedFields(needText)
       const missingStr = missing.length > 0 ? `Не указано: ${missing.join(', ')}. ` : ''
       return {
@@ -129,6 +177,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
     if (businessId && needText) {
       try {
+        const parsedItems = items.map((raw) => parseOneItem(raw))
         const { number } = await prisma.$transaction(async (tx) => {
           const num = await getNextRequestNumber(tx)
           const request = await tx.request.create({
@@ -142,7 +191,6 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
             },
           })
 
-          const parsed = parseNeedText(needText)
           const incoming = await tx.incomingRequest.create({
             data: {
               senderBusinessId: businessId,
@@ -150,14 +198,14 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
               requestId: request.id,
               status: 'NEW',
               items: {
-                create: {
-                  name: parsed.name,
-                  quantity: parsed.quantity,
-                  unit: parsed.unit,
+                create: parsedItems.map((p, i) => ({
+                  name: p.name,
+                  quantity: p.quantity,
+                  unit: p.unit,
                   price: new Decimal(0),
                   sum: new Decimal(0),
-                  sortOrder: 0,
-                },
+                  sortOrder: i,
+                })),
               },
             },
             include: { items: true },
