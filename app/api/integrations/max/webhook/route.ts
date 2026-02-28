@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let body: { chatId?: unknown; userId?: unknown; text?: string; messageId?: unknown }
+  let body: { chatId?: unknown; userId?: unknown; text?: string; messageId?: unknown; choice?: string }
   try {
     body = await req.json()
   } catch {
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
 
   const chatId = body?.chatId != null ? String(body.chatId) : null
   const text = typeof body?.text === 'string' ? body.text : ''
+  const choice = body?.choice === 'YES' || body?.choice === 'NO' ? body.choice : undefined
 
   if (!chatId) {
     return NextResponse.json({ replyText: 'Ошибка: chatId отсутствует' })
@@ -32,13 +33,14 @@ export async function POST(req: NextRequest) {
     userId: body?.userId != null ? String(body.userId) : undefined,
     username: undefined,
     text: text.trim() || '',
+    choice,
     raw: body,
   }
 
   try {
-    const { messages } = await handleBotEvent(event)
+    const { messages, replyInlineKeyboard, removeKeyboard } = await handleBotEvent(event)
     const replyText = messages.length > 0 ? messages.join('\n') : 'Спасибо, заявка принята'
-    return NextResponse.json({ replyText })
+    return NextResponse.json({ replyText, replyInlineKeyboard, removeKeyboard })
   } catch (e) {
     console.error('[MAX webhook error]', e)
     return NextResponse.json({
