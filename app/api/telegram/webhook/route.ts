@@ -3,10 +3,24 @@ import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
 
 const TELEGRAM_API = 'https://api.telegram.org'
 
+async function answerCallbackQuery(callbackQueryId: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return
+  try {
+    await fetch(`${TELEGRAM_API}/bot${token}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId }),
+    })
+  } catch (e) {
+    console.error('[tg] answerCallbackQuery exception:', e)
+  }
+}
+
 async function sendTelegramMessage(
   chatId: string,
   text: string,
-  replyKeyboard?: { buttons: string[] },
+  replyInlineKeyboard?: { buttons: { text: string; callback_data: string }[] },
   removeKeyboard?: boolean
 ): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -18,11 +32,9 @@ async function sendTelegramMessage(
     const body: { chat_id: string; text: string; reply_markup?: object } = { chat_id: chatId, text }
     if (removeKeyboard) {
       body.reply_markup = { remove_keyboard: true }
-    } else if (replyKeyboard?.buttons?.length) {
+    } else if (replyInlineKeyboard?.buttons?.length) {
       body.reply_markup = {
-        keyboard: [replyKeyboard.buttons.map((b) => ({ text: b }))],
-        resize_keyboard: true,
-        one_time_keyboard: false,
+        inline_keyboard: [replyInlineKeyboard.buttons.map((b) => ({ text: b.text, callback_data: b.callback_data }))],
       }
     }
     const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
@@ -45,6 +57,45 @@ export async function POST(req: NextRequest) {
 
     console.log('Telegram update:', JSON.stringify(body, null, 2))
 
+    const callbackQuery = body?.callback_query
+    if (callbackQuery) {
+      const callbackData = callbackQuery.data
+      const chatId = callbackQuery.message?.chat?.id
+      const from = callbackQuery.from
+      const callbackQueryId = callbackQuery.id
+
+      if (!chatId || (callbackData !== 'YES' && callbackData !== 'NO')) {
+        return NextResponse.json({ ok: true })
+      }
+
+      await answerCallbackQuery(callbackQueryId)
+
+      const event = {
+        channel: 'telegram' as const,
+        chatId: String(chatId),
+        userId: from?.id != null ? String(from.id) : undefined,
+        username: from?.username,
+        text: '',
+        choice: callbackData as 'YES' | 'NO',
+        raw: body,
+      }
+
+      const { messages, replyInlineKeyboard, removeKeyboard } = await handleBotEvent(event)
+
+      console.log('[tg] reply messages (callback):', messages)
+
+      for (let i = 0; i < messages.length; i++) {
+        await sendTelegramMessage(
+          String(chatId),
+          messages[i],
+          i === 0 ? replyInlineKeyboard : undefined,
+          i === 0 ? removeKeyboard : undefined
+        )
+      }
+
+      return NextResponse.json({ ok: true })
+    }
+
     const chatId = body?.message?.chat?.id
     const text = body?.message?.text
     const from = body?.message?.from
@@ -62,7 +113,7 @@ export async function POST(req: NextRequest) {
       raw: body,
     }
 
-    const { messages, replyKeyboard, removeKeyboard } = await handleBotEvent(event)
+    const { messages, replyInlineKeyboard, removeKeyboard } = await handleBotEvent(event)
 
     console.log('[tg] reply messages:', messages)
 
@@ -70,7 +121,7 @@ export async function POST(req: NextRequest) {
       await sendTelegramMessage(
         String(chatId),
         messages[i],
-        i === 0 ? replyKeyboard : undefined,
+        i === 0 ? replyInlineKeyboard : undefined,
         i === 0 ? removeKeyboard : undefined
       )
     }

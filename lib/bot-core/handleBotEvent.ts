@@ -7,19 +7,24 @@ export interface BotEvent {
   username?: string
   text: string
   raw?: unknown
+  /** Выбор из InlineKeyboard (callback): "YES" | "NO" */
+  choice?: 'YES' | 'NO'
 }
 
 export interface HandleBotEventResult {
   messages: string[]
-  replyKeyboard?: { buttons: string[] }
+  replyInlineKeyboard?: { buttons: { text: string; callback_data: string }[] }
   removeKeyboard?: boolean
 }
 
 const COMPANY_NAME = process.env.BOT_COMPANY_NAME || 'Блины Юга'
 
 export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventResult> {
-  const text = event.text.trim().toLowerCase()
   const { channel, chatId } = event
+  const text = event.text.trim().toLowerCase()
+  const choice = event.choice
+  const isYes = choice === 'YES' || text === 'да'
+  const isNo = choice === 'NO' || text === 'нет'
 
   const state = await prisma.botChatState.findUnique({
     where: { channel_chatId: { channel, chatId } },
@@ -29,7 +34,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
   // Ожидание подтверждения компании
   if (stateData?.type === 'awaiting_company_confirm') {
-    if (text === 'да') {
+    if (isYes) {
       await prisma.botChatState.update({
         where: { channel_chatId: { channel, chatId } },
         data: { stateJson: { type: 'confirmed' } },
@@ -39,14 +44,14 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         removeKeyboard: true,
       }
     }
-    if (text === 'нет') {
+    if (isNo) {
       return {
         messages: ['Обратитесь к администратору для смены компании.'],
         removeKeyboard: true,
       }
     }
     return {
-      messages: ['Ответьте Да или Нет'],
+      messages: ['Нажмите Да или Нет'],
     }
   }
 
@@ -73,6 +78,11 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
   return {
     messages: [companyMessage],
-    replyKeyboard: { buttons: ['Да', 'Нет'] },
+    replyInlineKeyboard: {
+      buttons: [
+        { text: 'Да', callback_data: 'YES' },
+        { text: 'Нет', callback_data: 'NO' },
+      ],
+    },
   }
 }

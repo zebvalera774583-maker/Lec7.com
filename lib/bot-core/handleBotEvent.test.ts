@@ -35,7 +35,12 @@ describe('handleBotEvent', () => {
     })
 
     expect(result.messages).toEqual(['Вы делаете заявки в компании Блины Юга'])
-    expect(result.replyKeyboard).toEqual({ buttons: ['Да', 'Нет'] })
+    expect(result.replyInlineKeyboard).toEqual({
+      buttons: [
+        { text: 'Да', callback_data: 'YES' },
+        { text: 'Нет', callback_data: 'NO' },
+      ],
+    })
   })
 
   it('"да" when awaiting confirm returns accepted', async () => {
@@ -46,6 +51,21 @@ describe('handleBotEvent', () => {
     const result = await handleBotEvent({
       ...baseEvent,
       text: 'да',
+    })
+
+    expect(result.messages).toEqual(['Принято. Напишите потребность одним сообщением.'])
+    expect(mockUpdate).toHaveBeenCalled()
+  })
+
+  it('choice YES (callback) when awaiting confirm returns accepted', async () => {
+    mockFindUnique.mockResolvedValue({
+      stateJson: { type: 'awaiting_company_confirm' },
+    })
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: '',
+      choice: 'YES',
     })
 
     expect(result.messages).toEqual(['Принято. Напишите потребность одним сообщением.'])
