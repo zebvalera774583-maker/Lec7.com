@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 interface BotCatalogItem {
   id: string
   canonicalName: string
-  synonyms: string[]
+  synonyms: string[] | string
   defaultUnit: string | null
   isActive: boolean
 }
@@ -175,32 +175,40 @@ export default function BotToolsClient() {
           <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Нет записей. Загрузите Excel.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {items.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: '0.75rem',
-                  background: '#f9fafb',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                }}
-              >
-                <strong>{item.canonicalName}</strong>
-                {item.defaultUnit && (
-                  <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
-                    ({item.defaultUnit})
-                  </span>
-                )}
-                {!item.isActive && (
-                  <span style={{ marginLeft: '0.5rem', color: '#9ca3af' }}>неактивен</span>
-                )}
-                {item.synonyms.length > 0 && (
-                  <div style={{ marginTop: '0.25rem', color: '#6b7280' }}>
-                    Синонимы: {item.synonyms.join(', ')}
-                  </div>
-                )}
-              </div>
-            ))}
+            {items.map((item) => {
+              const synonymsList = Array.isArray(item.synonyms)
+                ? item.synonyms
+                : (typeof item.synonyms === 'string' ? item.synonyms.split(',') : [])
+                    .map((s: string) => s.trim())
+                    .filter(Boolean)
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    marginBottom: 16,
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{item.canonicalName}</div>
+                  {item.defaultUnit && (
+                    <span style={{ marginLeft: 0, color: '#6b7280', fontSize: '0.875rem' }}>
+                      ({item.defaultUnit})
+                    </span>
+                  )}
+                  {!item.isActive && (
+                    <span style={{ marginLeft: '0.5rem', color: '#9ca3af' }}>неактивен</span>
+                  )}
+                  {synonymsList.length > 0 && (
+                    <div style={{ color: '#666', fontSize: 14, marginTop: '0.25rem' }}>
+                      Синонимы: {synonymsList.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
