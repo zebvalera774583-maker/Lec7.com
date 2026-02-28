@@ -11,6 +11,25 @@ function isNonNeed(text: string): boolean {
 }
 
 const NEED_FORMAT_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}]+)?$/u
+const UNIT_PATTERN = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*([\p{L}]{1,10})$/u
+
+/** Возвращает список недостающих полей: «наименование», «количество», «единица измерения» */
+function getMissingNeedFields(text: string): string[] {
+  const t = text.trim()
+  if (!t) return ['наименование', 'количество', 'единица измерения'];
+
+  if (NEED_FORMAT_REGEX.test(t)) return [];
+
+  const hasNumber = /\d/.test(t);
+  const hasUnit = UNIT_PATTERN.test(t);
+  const hasName = !/^\d/.test(t) && /[\p{L}]/u.test(t);
+
+  const missing: string[] = [];
+  if (!hasName) missing.push('наименование');
+  if (!hasNumber) missing.push('количество');
+  if (!hasUnit) missing.push('единица измерения');
+  return missing;
+}
 
 /** Проверка: есть ли в тексте вес (число) и ед. изм. — иначе заявка не создаётся */
 function isValidNeedFormat(text: string): boolean {
@@ -99,9 +118,11 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     if (!isValidNeedFormat(needText)) {
+      const missing = getMissingNeedFields(needText)
+      const missingStr = missing.length > 0 ? `Не указано: ${missing.join(', ')}. ` : ''
       return {
         messages: [
-          'Укажите наименование, количество и единицу измерения. Например: яблоки 10 кг',
+          `${missingStr}Формат: наименование количество ед.изм. Например: яблоки 10 кг`,
         ],
       }
     }
