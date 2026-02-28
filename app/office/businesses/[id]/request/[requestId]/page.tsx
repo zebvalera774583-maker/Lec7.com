@@ -51,6 +51,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
     <RequestDetailClient
       businessId={params.id}
       itemsJson={itemsJson}
+      descriptionFallback={request.description}
     />
   )
 }

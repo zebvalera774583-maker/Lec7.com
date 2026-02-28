@@ -2,6 +2,14 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
 
+const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
+
+/** Является ли текст "не-потребностью" (приветствие и т.п.) — не создаём заявку */
+function isNonNeed(text: string): boolean {
+  const t = text.trim().toLowerCase()
+  return !t || NON_NEED_PATTERNS.test(t)
+}
+
 /** Парсинг "яблоки 10 кг" → { name, quantity, unit } */
 function parseNeedText(text: string): { name: string; quantity: string; unit: string } {
   const trimmed = text.trim()
@@ -75,6 +83,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const needText = event.text.trim()
     const businessId = process.env.BOT_BUSINESS_ID?.trim()
 
+    if (isNonNeed(needText)) {
+      return {
+        messages: ['Напишите потребность в формате, например: яблоки 10 кг'],
+      }
+    }
+
     if (businessId && needText) {
       try {
         const { number } = await prisma.$transaction(async (tx) => {
@@ -91,13 +105,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           })
 
           const parsed = parseNeedText(needText)
-          await tx.incomingRequest.create({
+          const incoming = await tx.incomingRequest.create({
             data: {
               senderBusinessId: businessId,
               recipientBusinessId: businessId,
               requestId: request.id,
               status: 'NEW',
-              updatedAt: new Date(),
               items: {
                 create: {
                   name: parsed.name,
@@ -109,8 +122,11 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
                 },
               },
             },
+            include: { items: true },
           })
-
+          console.log(
+            `[handleBotEvent] Request+IncomingRequest+Items created: requestId=${request.id} incomingId=${incoming.id} items=${incoming.items.length}`
+          )
           return { number: num }
         })
         return {

@@ -12,11 +12,13 @@ function formatUnit(unit: string | undefined): string {
 interface RequestDetailClientProps {
   businessId: string
   itemsJson: unknown
+  descriptionFallback?: string | null
 }
 
 export default function RequestDetailClient({
   businessId,
   itemsJson,
+  descriptionFallback,
 }: RequestDetailClientProps) {
   const items = (Array.isArray(itemsJson) ? itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
 
@@ -30,7 +32,16 @@ export default function RequestDetailClient({
 
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
         {items.length === 0 ? (
-          <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>Нет позиций</div>
+          <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+            {descriptionFallback ? (
+              <>
+                <div style={{ marginBottom: '0.5rem', fontWeight: 500 }}>Описание</div>
+                <div>{descriptionFallback}</div>
+              </>
+            ) : (
+              'Нет позиций'
+            )}
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
