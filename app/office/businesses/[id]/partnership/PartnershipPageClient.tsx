@@ -1006,6 +1006,73 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
     return modifierText
   }
 
+  const renderPriceCard = (price: Price) => (
+    <div key={price.id} style={{ position: 'relative' }}>
+      <div
+        style={{
+          padding: '0.5rem 0.75rem',
+          background: '#dbeafe',
+          border: '1px solid #93c5fd',
+          borderRadius: '4px',
+          color: '#1e40af',
+          fontSize: '0.8125rem',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          width: 'fit-content',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span onClick={() => handlePriceClick(price.id)} style={{ cursor: 'pointer' }}>
+            {price.name}{getPriceBadge(price)}
+          </span>
+          {(price._count?.assignments || 0) > 0 && (
+            <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>Контрагенты: {price._count?.assignments || 0}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpenPriceId(menuOpenPriceId === price.id ? null : price.id) }}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}
+        >
+          <div style={{ width: 14, height: 2, background: '#1e40af' }} />
+          <div style={{ width: 14, height: 2, background: '#1e40af' }} />
+          <div style={{ width: 14, height: 2, background: '#1e40af' }} />
+        </button>
+      </div>
+      {menuOpenPriceId === price.id && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998 }} onClick={() => setMenuOpenPriceId(null)} />
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.25rem', background: 'white', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', border: '1px solid #e5e7eb', minWidth: 150, zIndex: 999, overflow: 'hidden' }}>
+            {price.kind === 'BASE' && (
+              <button onClick={() => { setIsCreateDerivedModalOpen(true); setMenuOpenPriceId(null) }} style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#111827' }}>Создать производный прайс</button>
+            )}
+            <button onClick={() => { setUpdatePriceId(price.id); setIsImportModalOpen(true); setMenuOpenPriceId(null) }} style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', background: 'none', border: 'none', borderTop: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '0.875rem', color: '#111827' }}>Обновить из Excel</button>
+            <button onClick={() => handleEdit(price.id)} style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', background: 'none', border: 'none', borderTop: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '0.875rem', color: '#111827' }}>Редактировать</button>
+            <button onClick={() => handleAssignCounterparty(price.id)} style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', background: 'none', border: 'none', borderTop: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '0.875rem', color: '#111827' }}>Назначить контрагента</button>
+            <button onClick={() => handleDownloadPrice(price.id, price.name)} style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', background: 'none', border: 'none', borderTop: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '0.875rem', color: '#111827' }}>Скачать прайс</button>
+            <button
+              onClick={async () => {
+                setMenuOpenPriceId(null)
+                if (!confirm('Удалить прайс «' + price.name + '»?')) return
+                try {
+                  const res = await fetch(`/api/office/businesses/${businessId}/prices/${price.id}`, { method: 'DELETE', credentials: 'include' })
+                  if (!res.ok) throw new Error('Не удалось удалить')
+                  await loadPrices()
+                } catch (e) {
+                  alert('Ошибка удаления прайса')
+                }
+              }}
+              style={{ width: '100%', padding: '0.75rem 1rem', textAlign: 'left', background: 'none', border: 'none', borderTop: '1px solid #e5e7eb', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}
+            >
+              Удалить прайс
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+
   if (loading) {
     return (
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
@@ -1166,29 +1233,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {prices.map((price) => (
-                <div
-                  key={price.id}
-                  onClick={() => handlePriceClick(price.id)}
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    background: '#dbeafe',
-                    border: '1px solid #93c5fd',
-                    borderRadius: '4px',
-                    color: '#1e40af',
-                    fontSize: '0.8125rem',
-                    display: 'inline-flex',
-                    flexDirection: 'column',
-                    gap: '0.25rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span>{price.name}{getPriceBadge(price)}</span>
-                  {(price._count?.assignments || 0) > 0 && (
-                    <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>Контрагенты: {price._count?.assignments || 0}</span>
-                  )}
-                </div>
-              ))}
+              {prices.map((price) => renderPriceCard(price))}
               <button
                 type="button"
                 onClick={() => { setEditingPriceId(null); setEditingPriceData(null); setIsModalOpen(true) }}
@@ -1290,29 +1335,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {prices.map((price) => (
-                  <div
-                    key={price.id}
-                    onClick={() => handlePriceClick(price.id)}
-                    style={{
-                      padding: '0.5rem 0.75rem',
-                      background: '#dbeafe',
-                      border: '1px solid #93c5fd',
-                      borderRadius: '4px',
-                      color: '#1e40af',
-                      fontSize: '0.8125rem',
-                      display: 'inline-flex',
-                      flexDirection: 'column',
-                      gap: '0.25rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span>{price.name}{getPriceBadge(price)}</span>
-                    {(price._count?.assignments || 0) > 0 && (
-                      <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>Контрагенты: {price._count?.assignments || 0}</span>
-                    )}
-                  </div>
-                ))}
+                {prices.map((price) => renderPriceCard(price))}
                 <button
                   type="button"
                   onClick={() => { setEditingPriceId(null); setEditingPriceData(null); setIsModalOpen(true) }}
