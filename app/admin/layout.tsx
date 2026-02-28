@@ -1,6 +1,13 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { verifyToken } from '@/lib/auth'
+
+const SIDEBAR_ITEMS = [
+  { label: 'AI-агент', href: '/admin' },
+  { label: 'Бизнесы', href: '/admin/businesses' },
+  { label: 'Справочник бота', href: '/admin/bot-tools' },
+] as const
 
 export default async function AdminLayout({
   children,
@@ -42,7 +49,37 @@ export default async function AdminLayout({
           </div>
         </div>
       </nav>
-      {children}
+      <div style={{ display: 'flex', maxWidth: '1200px', margin: '0 auto' }}>
+        <aside
+          style={{
+            minWidth: '200px',
+            padding: '2rem 0 2rem 2rem',
+            borderRight: '1px solid #e5e7eb',
+          }}
+        >
+          {SIDEBAR_ITEMS.map(({ label, href }) => {
+            const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href))
+            return (
+              <Link
+                key={href}
+                href={href}
+                style={{
+                  display: 'block',
+                  padding: '0.75rem 1.5rem',
+                  color: isActive ? '#111827' : '#6b7280',
+                  fontWeight: isActive ? 600 : 500,
+                  textDecoration: 'none',
+                  borderLeft: isActive ? '2px solid #111827' : '2px solid transparent',
+                  marginLeft: isActive ? '-2px' : 0,
+                }}
+              >
+                {label}
+              </Link>
+            )
+          })}
+        </aside>
+        <main style={{ flex: 1, padding: '2rem' }}>{children}</main>
+      </div>
     </div>
   )
 }
