@@ -26,6 +26,7 @@ export default async function BusinessLayout({ children, params }: LayoutProps) 
     { href: `/office/businesses/${business.id}/requests?section=incoming`, label: 'Поступившие заявки' },
     { href: `/office/businesses/${business.id}/requests?section=archive`, label: 'Архив заявок' },
     { href: `/office/businesses/${business.id}/partnership`, label: 'Потребности' },
+    { href: `/office/businesses/${business.id}/partnership?section=prices`, label: 'Мои прайсы' },
     { href: `/office/businesses/${business.id}/prices/compare`, label: 'Сводная таблица прайсов' },
     { href: `/office/businesses/${business.id}/partnership?action=create-price`, label: 'Создать прайс' },
     { href: `/office/businesses/${business.id}/partnership?action=import-price`, label: 'Импорт прайса' },
