@@ -1152,9 +1152,9 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
         </div>
       )}
 
-      {/* Потребности — только таблица потребностей (заявки из MAX и запросы контрагентов) */}
+      {/* Потребности — таблица потребностей + мои прайсы */}
       {onlyNeedsView && (
-        <div style={{ width: '100%' }}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Потребности</h2>
             {loadingPartnership ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
@@ -1229,6 +1229,51 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                 </table>
               )
             })()}
+
+          {/* Мои прайсы — всегда видны на странице Потребности */}
+          <div>
+            <h3 style={{ marginBottom: '0.75rem', fontSize: '1.125rem', fontWeight: 600 }}>Мои прайсы</h3>
+            {loading ? (
+              <div style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>Загрузка...</div>
+            ) : prices.length === 0 ? (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#6b7280', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                Нет прайсов. <button type="button" onClick={() => { setEditingPriceId(null); setEditingPriceData(null); setIsModalOpen(true) }} style={{ background: 'none', border: 'none', color: '#0070f3', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}>Создать прайс</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {prices.map((price) => (
+                  <div
+                    key={price.id}
+                    onClick={() => handlePriceClick(price.id)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      background: '#dbeafe',
+                      border: '1px solid #93c5fd',
+                      borderRadius: '4px',
+                      color: '#1e40af',
+                      fontSize: '0.8125rem',
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      gap: '0.25rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>{price.name}{getPriceBadge(price)}</span>
+                    {(price._count?.assignments || 0) > 0 && (
+                      <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>Контрагенты: {price._count?.assignments || 0}</span>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => { setEditingPriceId(null); setEditingPriceData(null); setIsModalOpen(true) }}
+                  style={{ padding: '0.5rem 0.75rem', background: '#f3f4f6', border: '1px dashed #d1d5db', borderRadius: '4px', color: '#6b7280', fontSize: '0.8125rem', cursor: 'pointer' }}
+                >
+                  + Добавить прайс
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
