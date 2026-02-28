@@ -237,6 +237,21 @@ model BotChatState {
   @@index([channel, chatId])
 }
 
+// Глобальный каталог товаров для распознавания ботом (scope=GLOBAL)
+model BotCatalogItem {
+  id            String   @id @default(cuid())
+  scope         String   // GLOBAL | BUSINESS
+  canonicalName String
+  synonyms      String[] // синонимы для распознавания
+  defaultUnit   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([scope, canonicalName])
+  @@index([scope])
+}
+
 model BusinessProfile {
   id              String   @id @default(cuid())
   businessId      String   @unique
