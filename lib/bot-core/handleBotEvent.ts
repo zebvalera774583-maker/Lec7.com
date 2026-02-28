@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
-const UNIT_ONLY_PATTERN = /^(кг|г|т|шт|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка)$/i
+const UNIT_ONLY_PATTERN = /^(кг|г|т|шт|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
 
 /** Является ли текст "не-потребностью" (приветствие и т.п.) — не создаём заявку */
 function isNonNeed(text: string): boolean {
@@ -150,9 +150,10 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const businessId = process.env.BOT_BUSINESS_ID?.trim()
 
     const pendingUnit = stateData?.pendingUnit as { needText: string; incompleteRaw: string[] } | undefined
+    const unitInput = needText.toLowerCase().trim()
 
-    if (pendingUnit?.needText && UNIT_ONLY_PATTERN.test(needText)) {
-      const unit = needText
+    if (pendingUnit?.needText && pendingUnit?.incompleteRaw?.length && UNIT_ONLY_PATTERN.test(unitInput)) {
+      const unit = unitInput
       let combined = pendingUnit.needText
       for (const raw of pendingUnit.incompleteRaw) {
         combined = combined.replace(raw, `${raw} ${unit}`)
@@ -162,6 +163,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         where: { channel_chatId: { channel, chatId } },
         data: { stateJson: { type: 'confirmed' } },
       })
+      console.log('[handleBotEvent] pendingUnit applied:', { unit, combined: combined.slice(0, 80) })
     }
 
     if (isNonNeed(needText)) {
