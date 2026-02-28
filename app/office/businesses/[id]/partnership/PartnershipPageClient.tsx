@@ -2172,6 +2172,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
         initialColumns={editingPriceData?.columns}
         initialCategory={editingPriceData?.category}
         readOnly={isViewOnlyMode}
+        businessId={businessId}
       />
 
       <PriceImportModal

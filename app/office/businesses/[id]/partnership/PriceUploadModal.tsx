@@ -21,6 +21,7 @@ interface PriceUploadModalProps {
   initialColumns?: Column[]
   initialCategory?: string | null
   readOnly?: boolean // Режим только просмотра (для назначенных прайсов)
+  businessId?: string // Для загрузки прайса из файла
 }
 
 const BASE_COLUMNS: Column[] = [
@@ -32,7 +33,7 @@ const BASE_COLUMNS: Column[] = [
 
 const FALLBACK_CATEGORY = 'Свежая плодоовощная продукция'
 
-export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, initialCategory, readOnly = false }: PriceUploadModalProps) {
+export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows, initialColumns, initialCategory, readOnly = false, businessId }: PriceUploadModalProps) {
   const [columns, setColumns] = useState<Column[]>(initialColumns || BASE_COLUMNS)
   const [rows, setRows] = useState<Row[]>(initialRows && initialRows.length > 0 ? initialRows : [{}])
   const [showAddColumnForm, setShowAddColumnForm] = useState(false)
@@ -42,6 +43,9 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
   const [focusNewRow, setFocusNewRow] = useState(false)
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [category, setCategory] = useState<string>(FALLBACK_CATEGORY)
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     fetch('/api/categories?type=PRICE', { credentials: 'include' })
@@ -115,6 +119,67 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
     onClose()
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !businessId) return
+
+    setUploadError('')
+    setUploadLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch(`/api/office/businesses/${businessId}/price-lists/import/parse`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setUploadError(data.error || 'Ошибка при разборе файла')
+        setUploadLoading(false)
+        return
+      }
+
+      const items = data.items || []
+      const hasPriceWithoutVat = items.some(
+        (it: { priceWithoutVat?: number | null }) => it.priceWithoutVat != null && typeof it.priceWithoutVat === 'number'
+      )
+
+      const newColumns: Column[] = hasPriceWithoutVat
+        ? [...BASE_COLUMNS]
+        : BASE_COLUMNS.filter((c) => c.id !== 'priceWithoutVat')
+
+      const newRows: Row[] = items.map((it: { title?: string; unit?: string | null; price?: number | null; priceWithVat?: number | null; priceWithoutVat?: number | null }) => {
+        const row: Row = {
+          name: String(it.title || '').trim(),
+          unit: it.unit && String(it.unit).trim() ? String(it.unit).trim() : '',
+          priceWithVat:
+            it.priceWithVat != null && typeof it.priceWithVat === 'number'
+              ? String(it.priceWithVat)
+              : it.price != null && typeof it.price === 'number'
+                ? String(it.price)
+                : '',
+        }
+        if (hasPriceWithoutVat) {
+          row.priceWithoutVat =
+            it.priceWithoutVat != null && typeof it.priceWithoutVat === 'number' ? String(it.priceWithoutVat) : ''
+        }
+        return row
+      })
+
+      setColumns(newColumns)
+      setRows(newRows.length > 0 ? newRows : [{}])
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } catch {
+      setUploadError('Ошибка соединения')
+    } finally {
+      setUploadLoading(false)
+    }
+  }
+
   // Синхронизация данных при открытии модалки
   useEffect(() => {
     if (isOpen) {
@@ -129,6 +194,7 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
         setRows([{}])
       }
       setCategory(initialCategory?.trim() || (categories.length > 0 ? categories[0].name : FALLBACK_CATEGORY))
+      setUploadError('')
     }
   }, [isOpen, initialRows, initialColumns, initialCategory, categories.length])
 
@@ -219,7 +285,37 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
                 >
                   Добавить столбец
                 </button>
+                {businessId && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv,.pdf,.docx"
+                      onChange={handleFileUpload}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadLoading}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#f3f4f6',
+                        color: '#111827',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        cursor: uploadLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      {uploadLoading ? 'Загрузка…' : 'Загрузить из файла'}
+                    </button>
+                  </>
+                )}
               </>
+            )}
+            {uploadError && (
+              <span style={{ color: '#dc2626', fontSize: '0.875rem' }}>{uploadError}</span>
             )}
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
               <span style={{ color: '#374151' }}>Категория прайса</span>
