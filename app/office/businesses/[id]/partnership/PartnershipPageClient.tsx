@@ -806,9 +806,18 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
       setIsModalOpen(false)
       setEditingPriceId(null)
       setEditingPriceData(null)
+      // Убираем action из URL, чтобы показать блок с прайсами (он скрыт при action=create-price)
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        if (url.searchParams.has('action')) {
+          url.searchParams.delete('action')
+          router.replace(url.pathname + (url.search || ''))
+        }
+      }
     } catch (error: any) {
       console.error('Failed to save price:', error)
       alert(error.message || 'Ошибка сохранения прайса')
+      throw error
     }
   }
 
@@ -2181,7 +2190,16 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
           setIsImportModalOpen(false)
           setUpdatePriceId(null)
         }}
-        onSuccess={loadPrices}
+        onSuccess={async () => {
+          await loadPrices()
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href)
+            if (url.searchParams.has('action')) {
+              url.searchParams.delete('action')
+              router.replace(url.pathname + (url.search || ''))
+            }
+          }
+        }}
         businessId={businessId}
         updatePriceId={updatePriceId}
       />

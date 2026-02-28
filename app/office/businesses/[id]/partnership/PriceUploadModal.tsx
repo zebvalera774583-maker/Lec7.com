@@ -114,9 +114,18 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
     setRows(newRows)
   }
 
-  const handleSave = () => {
-    onSave(rows, columns, category)
-    onClose()
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(rows, columns, category)
+      onClose()
+    } catch {
+      // Ошибка показана в onSave, модалка остаётся открытой
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -598,17 +607,18 @@ export default function PriceUploadModal({ isOpen, onClose, onSave, initialRows,
               {!readOnly && (
                 <button
                   onClick={handleSave}
+                  disabled={saving}
                   style={{
                     padding: '0.5rem 1rem',
-                    background: '#0070f3',
+                    background: saving ? '#9ca3af' : '#0070f3',
                     color: 'white',
                     border: 'none',
                     borderRadius: '4px',
-                    cursor: 'pointer',
+                    cursor: saving ? 'not-allowed' : 'pointer',
                     fontSize: '0.875rem',
                   }}
                 >
-                  Сохранить
+                  {saving ? 'Сохранение…' : 'Сохранить'}
                 </button>
               )}
             </div>
