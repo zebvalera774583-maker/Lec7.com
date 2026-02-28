@@ -27,11 +27,25 @@ export default async function RequestDetailPage({ params }: PageProps) {
   if (!request || request.businessId !== params.id) notFound()
   if (user.role !== 'LEC7_ADMIN' && request.business?.ownerId !== user.id) notFound()
 
-  const link = await prisma.maxRequestLink.findFirst({
+  // Сначала пробуем IncomingRequest (заявки из бота MAX/Telegram)
+  const incoming = await prisma.incomingRequest.findFirst({
     where: { requestId: params.requestId },
-    select: { itemsJson: true },
+    include: { items: { orderBy: { sortOrder: 'asc' } } },
   })
-  const itemsJson = link?.itemsJson ?? null
+  let itemsJson: unknown = null
+  if (incoming?.items?.length) {
+    itemsJson = incoming.items.map((it) => ({
+      title: it.name,
+      qty: it.quantity,
+      unit: it.unit,
+    }))
+  } else {
+    const link = await prisma.maxRequestLink.findFirst({
+      where: { requestId: params.requestId },
+      select: { itemsJson: true },
+    })
+    itemsJson = link?.itemsJson ?? null
+  }
 
   return (
     <RequestDetailClient

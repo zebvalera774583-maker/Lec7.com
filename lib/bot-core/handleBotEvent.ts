@@ -1,5 +1,19 @@
+import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
+
+/** Парсинг "яблоки 10 кг" → { name, quantity, unit } */
+function parseNeedText(text: string): { name: string; quantity: string; unit: string } {
+  const trimmed = text.trim()
+  if (!trimmed) return { name: trimmed, quantity: '1', unit: 'шт' }
+  const match = trimmed.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}]+)?$/u)
+  if (match) {
+    const [, name, qty, unit] = match
+    const quantity = (qty ?? '1').replace(',', '.')
+    return { name: (name ?? trimmed).trim(), quantity, unit: (unit ?? 'шт').trim() }
+  }
+  return { name: trimmed, quantity: '1', unit: 'шт' }
+}
 
 export interface BotEvent {
   channel: 'telegram' | 'max'
@@ -65,7 +79,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       try {
         const { number } = await prisma.$transaction(async (tx) => {
           const num = await getNextRequestNumber(tx)
-          await tx.request.create({
+          const request = await tx.request.create({
             data: {
               businessId,
               number: num,
@@ -75,10 +89,32 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
               status: 'NEW',
             },
           })
+
+          const parsed = parseNeedText(needText)
+          await tx.incomingRequest.create({
+            data: {
+              senderBusinessId: businessId,
+              recipientBusinessId: businessId,
+              requestId: request.id,
+              status: 'NEW',
+              updatedAt: new Date(),
+              items: {
+                create: {
+                  name: parsed.name,
+                  quantity: parsed.quantity,
+                  unit: parsed.unit,
+                  price: new Decimal(0),
+                  sum: new Decimal(0),
+                  sortOrder: 0,
+                },
+              },
+            },
+          })
+
           return { number: num }
         })
         return {
-          messages: [`Принял: "${needText}" ✅ Номер заявки: ${number}`],
+          messages: [`Номер заявки: ${number}`],
         }
       } catch (e) {
         console.error('[handleBotEvent] create request error:', e)
