@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
+const UNIT_ONLY_PATTERN = /^(кг|г|т|шт|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка)$/i
 
 /** Является ли текст "не-потребностью" (приветствие и т.п.) — не создаём заявку */
 function isNonNeed(text: string): boolean {
@@ -145,8 +146,23 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
   // Уже подтвердил — принимаем текст как потребность
   if (stateData?.type === 'confirmed') {
-    const needText = event.text.trim()
+    let needText = event.text.trim()
     const businessId = process.env.BOT_BUSINESS_ID?.trim()
+
+    const pendingUnit = stateData?.pendingUnit as { needText: string; incompleteRaw: string[] } | undefined
+
+    if (pendingUnit?.needText && UNIT_ONLY_PATTERN.test(needText)) {
+      const unit = needText
+      let combined = pendingUnit.needText
+      for (const raw of pendingUnit.incompleteRaw) {
+        combined = combined.replace(raw, `${raw} ${unit}`)
+      }
+      needText = combined
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: { stateJson: { type: 'confirmed' } },
+      })
+    }
 
     if (isNonNeed(needText)) {
       return {
@@ -163,6 +179,23 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       const parts: string[] = []
       if (onlyUnit.length > 0) parts.push(`Укажите ед. изм. для: ${onlyUnit.join(', ')}`)
       if (needBoth.length > 0) parts.push(`Укажите вес и ед. изм. для: ${needBoth.join(', ')}`)
+
+      const incompleteRaw = onlyUnit.length > 0
+        ? items.filter((raw) => {
+            const p = parseOneItem(raw)
+            return p.name && !isItemComplete(p) && /\d/.test(raw)
+          })
+        : []
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson:
+            incompleteRaw.length > 0
+              ? { type: 'confirmed', pendingUnit: { needText, incompleteRaw } }
+              : { type: 'confirmed' },
+        },
+      })
+
       return {
         messages: [parts.join('. ')],
       }
