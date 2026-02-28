@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getNextRequestNumber } from '@/lib/request-number'
 
 export interface BotEvent {
   channel: 'telegram' | 'max'
@@ -57,8 +58,35 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
   // Уже подтвердил — принимаем текст как потребность
   if (stateData?.type === 'confirmed') {
+    const needText = event.text.trim()
+    const businessId = process.env.BOT_BUSINESS_ID?.trim()
+
+    if (businessId && needText) {
+      try {
+        const { number } = await prisma.$transaction(async (tx) => {
+          const num = await getNextRequestNumber(tx)
+          await tx.request.create({
+            data: {
+              businessId,
+              number: num,
+              title: `Заявка из MAX: ${needText.slice(0, 80) || 'Новое сообщение'}`,
+              description: needText,
+              source: 'max_integration',
+              status: 'NEW',
+            },
+          })
+          return { number: num }
+        })
+        return {
+          messages: [`Принял: "${needText}" ✅ Номер заявки: ${number}`],
+        }
+      } catch (e) {
+        console.error('[handleBotEvent] create request error:', e)
+      }
+    }
+
     return {
-      messages: [`Принял: "${event.text.trim()}" ✅`],
+      messages: [`Принял: "${needText}" ✅`],
     }
   }
 
