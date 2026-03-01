@@ -1,14 +1,14 @@
 import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
-import { getCatalogNormMap, matchToCatalogSync } from '@/lib/catalog-match'
+import { getCatalogNormMap, matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
 const UNIT_ONLY_PATTERN = /^(кг|г|гр|т|шт\.?|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
 
-/** Known units for split boundary: after "number unit" + space + letter = next item */
+/** Split boundary: "number unit" + space + letter = next item. Unit must follow a number to avoid matching "г" in "Айсберг". */
 const UNIT_FOR_SPLIT =
-  /(?:шт\.?|кг|гр|г|л|мл|т|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)\s+(?=[\p{L}])/iu
+  /\d+(?:[.,]\d+)?\s*(?:шт\.?|кг|гр|г|л|мл|т|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)\s+(?=[\p{L}])/iu
 
 /** Является ли текст "не-потребностью" (приветствие и т.п.) — не создаём заявку */
 function isNonNeed(text: string): boolean {
@@ -22,10 +22,10 @@ const UNIT_PATTERN = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*([\p{L}.]{1,10})$/u
 
 /**
  * Split text into items. Delimiters: newline, comma, ";", " и ".
- * Within a segment: split by "unit + space + start of next product" (e.g. "кг груши")
- * so "Айсберг салат 3 шт" stays as one item (no next product after "шт").
+ * Within a segment: split by "number unit + space + start of next product" (e.g. "5 кг груши")
+ * so "Айсберг салат 3 шт" stays as one item (unit must follow number; "г" in "Айсберг" is not a unit).
  */
-function splitIntoItems(text: string): string[] {
+export function splitIntoItems(text: string): string[] {
   const byDelim = text.split(/[\n,;]|\s+и\s+/i).map((s) => s.trim()).filter(Boolean)
   const result: string[] = []
   for (const part of byDelim) {
@@ -36,7 +36,7 @@ function splitIntoItems(text: string): string[] {
 }
 
 /** Parse one item "яблоки 10 кг" or "Айсберг салат 3 шт" → { name, quantity, unit, hasUnit } */
-function parseOneItem(text: string): { name: string; quantity: string; unit: string; hasUnit: boolean } {
+export function parseOneItem(text: string): { name: string; quantity: string; unit: string; hasUnit: boolean } {
   const trimmed = text.trim()
   if (!trimmed) return { name: '', quantity: '1', unit: 'шт', hasUnit: false }
   const match = trimmed.match(NEED_FORMAT_REGEX)
@@ -45,7 +45,7 @@ function parseOneItem(text: string): { name: string; quantity: string; unit: str
     const quantity = (qty ?? '1').replace(',', '.')
     const unitVal = (unit ?? '').trim().replace(/\.$/, '') || ''
     return {
-      name: (name ?? trimmed).trim(),
+      name: (name ?? trimmed).trim().replace(/\s+/g, ' '),
       quantity,
       unit: unitVal || 'шт',
       hasUnit: unitVal.length > 0,
@@ -191,20 +191,20 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       normToId = new Map()
     }
 
-    const mappedItems: string[] = []
+    const mappedItems: { raw: string; canonical: string }[] = []
     const unmappedRaw: string[] = []
     for (const raw of rawItems) {
       const parsed = parseOneItem(raw)
       if (!parsed.name) continue
-      const mapped = matchToCatalogSync(normToId, parsed.name)
-      if (mapped) {
-        mappedItems.push(raw)
+      const canonical = matchToCatalogSyncWithNorm(normToId, parsed.name)
+      if (canonical) {
+        mappedItems.push({ raw, canonical })
       } else {
         unmappedRaw.push(raw)
       }
     }
 
-    const mappedNeedText = mappedItems.join(', ')
+    const mappedNeedText = mappedItems.map((m) => m.raw).join(', ')
     const incomplete = mappedItems.length > 0 ? getIncompleteItems(mappedNeedText) : []
 
     if (incomplete.length > 0) {
@@ -215,10 +215,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       if (needBoth.length > 0) parts.push(`Укажите вес и ед. изм. для: ${needBoth.join(', ')}`)
 
       const incompleteRaw = onlyUnit.length > 0
-        ? mappedItems.filter((raw) => {
-            const p = parseOneItem(raw)
-            return p.name && !isItemComplete(p) && /\d/.test(raw)
-          })
+        ? mappedItems
+            .filter((m) => {
+              const p = parseOneItem(m.raw)
+              return p.name && !isItemComplete(p) && /\d/.test(m.raw)
+            })
+            .map((m) => m.raw)
         : []
       await prisma.botChatState.update({
         where: { channel_chatId: { channel, chatId } },
@@ -247,8 +249,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
     if (businessId && needText) {
       try {
-        const parsedItems = mappedItems.map((raw) => parseOneItem(raw))
-        const commentsText = unmappedRaw.length > 0 ? unmappedRaw.join('\n').trim() : null
+        const parsedItems = mappedItems.map(({ raw, canonical }) => {
+          const p = parseOneItem(raw)
+          return { ...p, name: canonical }
+        })
+        const commentsText =
+          unmappedRaw.length > 0 ? unmappedRaw.map((s) => s.trim()).filter(Boolean).join('\n') : null
         const { number } = await prisma.$transaction(async (tx) => {
           const num = await getNextRequestNumber(tx)
           const request = await tx.request.create({

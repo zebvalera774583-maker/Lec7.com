@@ -70,12 +70,17 @@ function getBestMatchCandidates(norm: string): string[] {
 
 /** Check if item name maps to catalog. Best-match: exact, then n-grams 2+ words, then first word only. */
 export function matchToCatalogSync(normToId: Map<string, string>, itemName: string): boolean {
+  return matchToCatalogSyncWithNorm(normToId, itemName) != null
+}
+
+/** Same as matchToCatalogSync but returns matched norm (canonical) or null. */
+export function matchToCatalogSyncWithNorm(normToId: Map<string, string>, itemName: string): string | null {
   const norm = normalizeForMatch(itemName)
-  if (!norm) return false
+  if (!norm) return null
   for (const c of getBestMatchCandidates(norm)) {
-    if (normToId.has(c)) return true
+    if (normToId.has(c)) return c
   }
-  return false
+  return null
 }
 
 /** Build norm map for sync use in batch. Caller should call this once. */

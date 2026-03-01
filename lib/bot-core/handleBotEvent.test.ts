@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { handleBotEvent } from './handleBotEvent'
+import { handleBotEvent, splitIntoItems, parseOneItem } from './handleBotEvent'
 
 const mockFindUnique = vi.fn()
 const mockUpsert = vi.fn()
@@ -20,7 +20,7 @@ vi.mock('@/lib/catalog-match', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/catalog-match')>()
   return {
     getCatalogNormMap: () => mockGetCatalogNormMap(),
-    matchToCatalogSync: actual.matchToCatalogSync,
+    matchToCatalogSyncWithNorm: actual.matchToCatalogSyncWithNorm,
   }
 })
 
@@ -131,6 +131,48 @@ describe('handleBotEvent', () => {
     const result = await handleBotEvent({
       ...baseEvent,
       text: 'Айсберг салат 3 шт, груши 5 кг',
+    })
+
+    expect(result.messages.some((m) => m.includes('Укажите'))).toBe(false)
+    expect(result.messages[0]).toContain('Принял')
+  })
+
+  it('"Айсберг салат 3 шт" stays one item (not split into "салат 3 шт"); with айсберг in catalog → match, no clarification', async () => {
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
+    mockGetCatalogNormMap.mockResolvedValue(new Map([['айсберг', 'id1']]))
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'Айсберг салат 3 шт',
+    })
+
+    expect(result.messages.some((m) => m.includes('Укажите'))).toBe(false)
+    expect(result.messages[0]).toContain('Принял')
+  })
+
+  it('splitIntoItems: "Айсберг салат 3 шт" stays one item (not split by "г" in Айсберг)', () => {
+    const items = splitIntoItems('Айсберг салат 3 шт')
+    expect(items).toEqual(['Айсберг салат 3 шт'])
+    expect(items[0]).toContain('Айсберг')
+  })
+
+  it('"Айсберг  салат  3  шт" (double spaces) parses as one item', () => {
+    const items = splitIntoItems('Айсберг  салат  3  шт')
+    expect(items).toHaveLength(1)
+    expect(items[0]).toContain('Айсберг')
+    const parsed = parseOneItem(items[0])
+    expect(parsed.name).toBe('Айсберг салат')
+    expect(parsed.quantity).toBe('3')
+    expect(parsed.unit).toBe('шт')
+  })
+
+  it('"Айсберг салат 3 шт" with only "салат" in catalog → unmapped, no "салат" item', async () => {
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
+    mockGetCatalogNormMap.mockResolvedValue(new Map([['салат', 'id1']]))
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'Айсберг салат 3 шт',
     })
 
     expect(result.messages.some((m) => m.includes('Укажите'))).toBe(false)
