@@ -129,7 +129,9 @@ function parseMaxRequestToRows(title: string, description: string): Row[] {
 
 export default function RequestsPageClient({ businessId, initialSection, initialFromRequestTitle, initialFromRequestDescription }: RequestsPageClientProps) {
   const [showCreateBlock, setShowCreateBlock] = useState(true)
-  const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>('form')
+  const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>(
+    initialSection === 'create' ? 'created' : 'form'
+  )
   const [selectedCounterpartyId, setSelectedCounterpartyId] = useState<string | null>(null)
   const [selectedSummaryId, setSelectedSummaryId] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<SummaryEntry[]>([])
@@ -791,6 +793,22 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                       type="button"
+                      onClick={() => { setViewMode('created'); setSummaryError(null) }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'none',
+                        color: '#111827',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
                       onClick={handleAddRow}
                       style={{
                         padding: '0.5rem 1rem',
@@ -1030,9 +1048,12 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           fontWeight: 500,
                         }}
                       >
-                        Создать сводную таблицу
+                        Создать заявку
                       </button>
                     </div>
+                    {summaries.length === 0 && (
+                      <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Созданных заявок пока нет</p>
+                    )}
                     {summaries.map((entry) => (
                       <div key={entry.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <div style={{ ...REQUEST_CARD_STYLE, background: '#f9fafb', width: '100%', maxWidth: '22em', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', paddingRight: '0.5rem' }}>
