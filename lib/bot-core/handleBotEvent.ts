@@ -4,7 +4,11 @@ import { getNextRequestNumber } from '@/lib/request-number'
 import { getCatalogNormMap, matchToCatalogSync } from '@/lib/catalog-match'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
-const UNIT_ONLY_PATTERN = /^(кг|г|т|шт|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
+const UNIT_ONLY_PATTERN = /^(кг|г|гр|т|шт\.?|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
+
+/** Known units for split boundary: after "number unit" + space + letter = next item */
+const UNIT_FOR_SPLIT =
+  /(?:шт\.?|кг|гр|г|л|мл|т|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)\s+(?=[\p{L}])/iu
 
 /** Является ли текст "не-потребностью" (приветствие и т.п.) — не создаём заявку */
 function isNonNeed(text: string): boolean {
@@ -12,21 +16,26 @@ function isNonNeed(text: string): boolean {
   return !t || NON_NEED_PATTERNS.test(t)
 }
 
-const NEED_FORMAT_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}]+)?$/u
-const UNIT_PATTERN = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*([\p{L}]{1,10})$/u
+/** name + number + optional unit. Unit can include period (шт.) */
+const NEED_FORMAT_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}.]+)?$/u
+const UNIT_PATTERN = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*([\p{L}.]{1,10})$/u
 
-/** Разбивает текст на позиции: по переносу, запятой, " и "; или по границе "наименование число" (новая позиция) */
+/**
+ * Split text into items. Delimiters: newline, comma, ";", " и ".
+ * Within a segment: split by "unit + space + start of next product" (e.g. "кг груши")
+ * so "Айсберг салат 3 шт" stays as one item (no next product after "шт").
+ */
 function splitIntoItems(text: string): string[] {
   const byDelim = text.split(/[\n,;]|\s+и\s+/i).map((s) => s.trim()).filter(Boolean)
   const result: string[] = []
   for (const part of byDelim) {
-    const items = part.split(/\s+(?=[\p{L}]+\s+\d)/u).map((s) => s.trim()).filter(Boolean)
+    const items = part.split(UNIT_FOR_SPLIT).map((s) => s.trim()).filter(Boolean)
     result.push(...items)
   }
   return result.length > 0 ? result : [text.trim()].filter(Boolean)
 }
 
-/** Парсинг одной позиции "яблоки 10 кг" → { name, quantity, unit, hasUnit } */
+/** Parse one item "яблоки 10 кг" or "Айсберг салат 3 шт" → { name, quantity, unit, hasUnit } */
 function parseOneItem(text: string): { name: string; quantity: string; unit: string; hasUnit: boolean } {
   const trimmed = text.trim()
   if (!trimmed) return { name: '', quantity: '1', unit: 'шт', hasUnit: false }
@@ -34,7 +43,7 @@ function parseOneItem(text: string): { name: string; quantity: string; unit: str
   if (match) {
     const [, name, qty, unit] = match
     const quantity = (qty ?? '1').replace(',', '.')
-    const unitVal = (unit ?? '').trim()
+    const unitVal = (unit ?? '').trim().replace(/\.$/, '') || ''
     return {
       name: (name ?? trimmed).trim(),
       quantity,
@@ -154,7 +163,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const unitInput = needText.toLowerCase().trim()
 
     if (pendingUnit?.needText && pendingUnit?.incompleteRaw?.length && UNIT_ONLY_PATTERN.test(unitInput)) {
-      const unit = unitInput
+      const unit = unitInput.trim()
       let combined = pendingUnit.needText
       for (const raw of pendingUnit.incompleteRaw) {
         combined = combined.replace(raw, `${raw} ${unit}`)

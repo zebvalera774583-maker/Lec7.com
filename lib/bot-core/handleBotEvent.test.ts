@@ -15,6 +15,18 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+const mockGetCatalogNormMap = vi.fn()
+vi.mock('@/lib/catalog-match', () => ({
+  getCatalogNormMap: () => mockGetCatalogNormMap(),
+  matchToCatalogSync: (map: Map<string, string>, name: string) => {
+    const norm = (name || '').trim().toLowerCase().replace(/\s+/g, ' ')
+    if (!norm) return false
+    if (map.has(norm)) return true
+    const first = norm.split(/\s+/)[0]
+    return first ? map.has(first) : false
+  },
+}))
+
 describe('handleBotEvent', () => {
   const baseEvent = {
     channel: 'telegram' as const,
@@ -86,9 +98,8 @@ describe('handleBotEvent', () => {
   })
 
   it('accepted text when confirmed returns принял', async () => {
-    mockFindUnique.mockResolvedValue({
-      stateJson: { type: 'confirmed' },
-    })
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
+    mockGetCatalogNormMap.mockResolvedValue(new Map([['яблоки', 'id1']]))
 
     const result = await handleBotEvent({
       ...baseEvent,
@@ -96,5 +107,70 @@ describe('handleBotEvent', () => {
     })
 
     expect(result.messages).toEqual(['Принял: "яблоки 10 кг" ✅'])
+  })
+
+  it('"Айсберг салат 3 шт" does NOT ask for clarification (qty+unit present)', async () => {
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
+    mockGetCatalogNormMap.mockResolvedValue(new Map([['айсберг', 'id1']]))
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'Айсберг салат 3 шт',
+    })
+
+    expect(result.messages.some((m) => m.includes('Укажите') || m.includes('ед. изм'))).toBe(false)
+    expect(result.messages[0]).toContain('Принял')
+  })
+
+  it('multi-item "Айсберг салат 3 шт, груши 5 кг" parses as two items without asking', async () => {
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
+    mockGetCatalogNormMap.mockResolvedValue(
+      new Map([
+        ['айсберг', 'id1'],
+        ['груши', 'id2'],
+      ])
+    )
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'Айсберг салат 3 шт, груши 5 кг',
+    })
+
+    expect(result.messages.some((m) => m.includes('Укажите'))).toBe(false)
+    expect(result.messages[0]).toContain('Принял')
+  })
+
+  it('clarification: "Айсберг салат 3 шт, груши 5" asks for unit, then "кг" yields full list', async () => {
+    mockGetCatalogNormMap.mockResolvedValue(
+      new Map([
+        ['айсберг', 'id1'],
+        ['груши', 'id2'],
+      ])
+    )
+
+    mockFindUnique
+      .mockResolvedValueOnce({ stateJson: { type: 'confirmed' } })
+      .mockResolvedValueOnce({
+        stateJson: {
+          type: 'confirmed',
+          pendingUnit: {
+            needText: 'Айсберг салат 3 шт, груши 5',
+            incompleteRaw: ['груши 5'],
+          },
+        },
+      })
+
+    const askResult = await handleBotEvent({
+      ...baseEvent,
+      text: 'Айсберг салат 3 шт, груши 5',
+    })
+    expect(askResult.messages.some((m) => m.includes('Укажите'))).toBe(true)
+
+    const replyResult = await handleBotEvent({
+      ...baseEvent,
+      text: 'кг',
+    })
+    expect(replyResult.messages.some((m) => m.includes('Укажите'))).toBe(false)
+    expect(replyResult.messages[0]).toContain('Принял')
   })
 })
