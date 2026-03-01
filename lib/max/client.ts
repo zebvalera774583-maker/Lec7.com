@@ -35,7 +35,12 @@ export async function sendMessage(
     const url = `${MAX_API_URL.replace(/\/$/, '')}/chats/${chatId}/messages`
     const body: {
       text: string
-      attachments?: Array<{ type: 'inline_keyboard'; payload: { buttons: Array<Array<{ type: 'callback'; text: string; payload: string }>> } }
+      attachments?: Array<{
+        type: 'inline_keyboard'
+        payload: {
+          buttons: Array<Array<{ type: 'callback'; text: string; payload: string }>>
+        }
+      }>
     } = { text }
 
     if (replyInlineKeyboard?.buttons?.length) {

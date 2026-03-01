@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const chatId = body?.chatId != null ? String(body.chatId) : null
   const text = typeof body?.text === 'string' ? body.text : ''
-  const choice = body?.choice === 'YES' || body?.choice === 'NO' ? body.choice : undefined
+  const choice: 'YES' | 'NO' | undefined = body?.choice === 'YES' ? 'YES' : body?.choice === 'NO' ? 'NO' : undefined
 
   if (!chatId) {
     return NextResponse.json({ replyText: 'Ошибка: chatId отсутствует' })

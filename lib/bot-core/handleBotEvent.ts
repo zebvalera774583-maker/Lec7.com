@@ -120,7 +120,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     where: { channel_chatId: { channel, chatId } },
   })
 
-  const stateData = state?.stateJson as { type?: string } | null
+  const stateData = state?.stateJson as { type?: string; pendingUnit?: { needText: string; incompleteRaw: string[] } } | null
 
   // Ожидание подтверждения компании
   if (stateData?.type === 'awaiting_company_confirm') {
@@ -150,7 +150,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     let needText = event.text.trim()
     const businessId = process.env.BOT_BUSINESS_ID?.trim()
 
-    const pendingUnit = stateData?.pendingUnit as { needText: string; incompleteRaw: string[] } | undefined
+    const pendingUnit = stateData?.pendingUnit
     const unitInput = needText.toLowerCase().trim()
 
     if (pendingUnit?.needText && pendingUnit?.incompleteRaw?.length && UNIT_ONLY_PATTERN.test(unitInput)) {
