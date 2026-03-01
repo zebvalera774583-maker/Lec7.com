@@ -14,6 +14,13 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+ARG GIT_SHA=unknown
+ARG BUILD_TIME
+ENV NEXT_PUBLIC_GIT_SHA=$GIT_SHA
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+ENV NEXT_PUBLIC_BUILD_TIME=$BUILD_TIME
+
 # Generate Prisma Client
 RUN npx prisma generate
 
@@ -25,7 +32,11 @@ RUN ls -la .next && ls -la .next/standalone
 FROM base AS runner
 WORKDIR /app
 
+ARG GIT_SHA=unknown
+ARG BUILD_TIME
 ENV NODE_ENV=production
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
 
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs

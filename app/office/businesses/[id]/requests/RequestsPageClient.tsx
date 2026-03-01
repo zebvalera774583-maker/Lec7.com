@@ -149,6 +149,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   const [sendingAll, setSendingAll] = useState(false)
   const [rematchLoading, setRematchLoading] = useState(false)
   const [viewSection, setViewSection] = useState<'create' | 'incoming'>(initialSection === 'create' ? 'create' : 'incoming')
+  const [version, setVersion] = useState<{ gitSha: string | null; buildTime: string } | null>(null)
 
   useEffect(() => {
     setViewSection(initialSection === 'create' ? 'create' : 'incoming')
@@ -577,6 +578,13 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   useEffect(() => {
     if (viewSection === 'incoming') fetchIncomingRequests()
   }, [viewSection])
+
+  useEffect(() => {
+    fetch('/api/version', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((v) => v && setVersion({ gitSha: v.gitSha ?? null, buildTime: v.buildTime ?? '' }))
+      .catch(() => {})
+  }, [])
 
   // Polling: refetch incoming when section is visible so MAX READY updates appear without F5
   useEffect(() => {
@@ -1277,6 +1285,14 @@ export default function RequestsPageClient({ businessId, initialSection, initial
           </div>
         )}
       </div>
+      {version && (
+        <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb', fontSize: '0.75rem', color: '#9ca3af' }}>
+          build: {version.gitSha || 'unknown'}
+          {version.buildTime && (
+            <span style={{ marginLeft: '0.5rem' }}>{version.buildTime}</span>
+          )}
+        </div>
+      )}
     </main>
   )
 }
