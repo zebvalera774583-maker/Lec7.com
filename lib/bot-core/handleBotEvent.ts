@@ -6,9 +6,9 @@ import { getCatalogNormMap, matchToCatalogSyncWithNorm } from '@/lib/catalog-mat
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
 const UNIT_ONLY_PATTERN = /^(кг|г|гр|т|шт\.?|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
 
-/** Split boundary: "number unit" + space + letter = next item. Unit must follow a number to avoid matching "г" in "Айсберг". */
+/** Split at space after "number unit" when followed by letter (next item). Keeps "1 кг" with preceding name. */
 const UNIT_FOR_SPLIT =
-  /\d+(?:[.,]\d+)?\s*(?:шт\.?|кг|гр|г|л|мл|т|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)\s+(?=[\p{L}])/iu
+  /(?<=\d+(?:[.,]\d+)?\s*(?:шт\.?|кг|гр|г|л|мл|т|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg))\s+(?=[\p{L}])/iu
 
 /** Является ли текст "не-потребностью" (приветствие и т.п.) — не создаём заявку */
 function isNonNeed(text: string): boolean {

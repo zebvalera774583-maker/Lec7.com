@@ -150,6 +150,16 @@ describe('handleBotEvent', () => {
     expect(result.messages[0]).toContain('Принял')
   })
 
+  it('splitIntoItems: continuous "шампиньоны 1 кг перец красный 1 кг" keeps number+unit with each item', () => {
+    const items = splitIntoItems('шампиньоны 1 кг перец красный 1 кг помидоры розовые 2 кг')
+    expect(items).toContain('шампиньоны 1 кг')
+    expect(items).toContain('перец красный 1 кг')
+    expect(items).toContain('помидоры розовые 2 кг')
+    const p1 = parseOneItem('шампиньоны 1 кг')
+    expect(p1.hasUnit).toBe(true)
+    expect(p1.unit).toBe('кг')
+  })
+
   it('splitIntoItems: "Голубика 0,5 кг" stays one item (comma in 0,5 is decimal, not delimiter)', () => {
     const items = splitIntoItems('Голубика 0,5 кг\nМиндаль 1 кг')
     expect(items).toContain('Голубика 0,5 кг')
