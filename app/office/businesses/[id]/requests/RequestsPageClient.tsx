@@ -38,6 +38,8 @@ interface SummaryEntry {
   summaryData: { items: SummaryItem[]; counterparties: Counterparty[] }
   createdRequest: { category: string; createdAt: Date; counterpartyCards: { id: string; legalName: string }[] }
   appliedAnalogue: Record<string, Record<string, { name: string; price: number }>>
+  /** Ручной выбор поставщика по позиции: itemKey -> counterpartyId. null = авто (мин. цена). Позволяет включать позиции без цены (цена 0). */
+  selectedPriceByItem?: Record<string, string | null>
 }
 
 interface IncomingRequestItem {
@@ -151,6 +153,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [appliedAnalogue, setAppliedAnalogue] = useState<Record<string, Record<string, { name: string; price: number }>>>({})
   const [useForRequest, setUseForRequest] = useState<Record<string, boolean>>({})
+  const [selectedPriceByItem, setSelectedPriceByItem] = useState<Record<string, string | null>>({})
   const [menuOpenCardId, setMenuOpenCardId] = useState<'summary' | string | null>(null)
   const [incomingRequests, setIncomingRequests] = useState<IncomingRequestRow[]>([])
   const [incomingLoading, setIncomingLoading] = useState(false)
@@ -177,7 +180,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   }
 
   const downloadSummaryAsExcel = (entry: SummaryEntry) => {
-    const { summaryData, createdRequest, appliedAnalogue } = entry
+    const { summaryData, createdRequest, appliedAnalogue, selectedPriceByItem = {} } = entry
     if (!summaryData || !createdRequest) return
     setMenuOpenCardId(null)
     const partners = summaryData.counterparties.filter(isPartnerCounterparty)
@@ -186,27 +189,41 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     summaryData.items.forEach((item, idx) => {
       const itemKey = String(idx)
       const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-      let rowMin: number | null = null
-      partners.forEach((c) => {
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        const p = exact ?? applied ?? null
-        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-      })
-      partners.forEach((c) => {
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        const p = exact ?? applied ?? null
-        if (p != null && rowMin != null && Math.abs(p - rowMin) < 1e-6) sumByCounterparty[c.id] += p * qty
-      })
+      const s = selectedPriceByItem[itemKey]
+      if (s != null) {
+        const exact = item.offers[s]
+        const applied = appliedAnalogue[itemKey]?.[s]?.price
+        const p = exact ?? applied ?? 0
+        sumByCounterparty[s] += p * qty
+      } else {
+        let rowMin: number | null = null
+        partners.forEach((c) => {
+          const exact = item.offers[c.id]
+          const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+          const p = exact ?? applied ?? null
+          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+        })
+        partners.forEach((c) => {
+          const exact = item.offers[c.id]
+          const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+          const p = exact ?? applied ?? null
+          if (p != null && rowMin != null && Math.abs(p - rowMin) < 1e-6) sumByCounterparty[c.id] += p * qty
+        })
+      }
       if (item.offers[OWN_PRICE_ID] != null) {
-        const qtyNum = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-        sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qtyNum
+        sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qty
       }
     })
     const rowTotals = summaryData.items.map((item, idx) => {
       const itemKey = String(idx)
       const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+      const s = selectedPriceByItem[itemKey]
+      if (s != null) {
+        const exact = item.offers[s]
+        const applied = appliedAnalogue[itemKey]?.[s]?.price
+        const p = exact ?? applied ?? 0
+        return p * qty
+      }
       let rowMin: number | null = null
       partners.forEach((c) => {
         const exact = item.offers[c.id]
@@ -220,13 +237,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...summaryData.counterparties.map((c) => c.legalName), 'Итоговая сумма']
     const dataRows = summaryData.items.map((item, idx) => {
       const itemKey = String(idx)
-      const effectivePrices = summaryData.counterparties.map((c) => {
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        return exact ?? applied ?? null
-      })
-      const minPrice = effectivePrices.find((p) => p != null) != null ? Math.min(...(effectivePrices.filter((p): p is number => p != null))) : null
-      const rowTotalSum = minPrice != null ? minPrice * Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0) : 0
+      const rowTotalSum = rowTotals[idx] ?? 0
       return [
         idx + 1,
         item.name,
@@ -252,31 +263,12 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   }
 
   const downloadCounterpartyAsExcel = (entry: SummaryEntry, counterpartyId: string) => {
-    const { summaryData, createdRequest, appliedAnalogue } = entry
+    const { summaryData, createdRequest } = entry
     if (!summaryData || !createdRequest) return
     setMenuOpenCardId(null)
     const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
     if (!c) return
-    const partners = summaryData.counterparties.filter(isPartnerCounterparty)
-    const rowsForCounterparty = summaryData.items
-      .map((item, idx) => {
-        const itemKey = String(idx)
-        let rowMin: number | null = null
-        partners.forEach((cc) => {
-          const exact = item.offers[cc.id]
-          const applied = appliedAnalogue[itemKey]?.[cc.id]?.price
-          const p = exact ?? applied ?? null
-          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-        })
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        const price = exact ?? applied ?? null
-        const isMin = price != null && rowMin != null && Number.isFinite(price) && Math.abs(price - rowMin) < 1e-6
-        if (!isMin) return null
-        const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-        return { item, price, qty, sum: price * qty }
-      })
-      .filter((r): r is NonNullable<typeof r> => r != null)
+    const rowsForCounterparty = getRowsForCounterparty(entry, counterpartyId)
     const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена', 'Сумма']
     const dataRows = rowsForCounterparty.map((r, i) => [i + 1, r.item.name, r.item.quantity || '', r.item.unit || '', r.price, r.sum])
@@ -323,19 +315,36 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   }
 
   const getRowsForCounterparty = (entry: SummaryEntry, counterpartyId: string): { item: SummaryItem; price: number; qty: number; sum: number }[] => {
-    const { summaryData, appliedAnalogue } = entry
+    const { summaryData, appliedAnalogue, selectedPriceByItem = {} } = entry
     if (!summaryData) return []
     const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
     if (!c) return []
+    const partners = summaryData.counterparties.filter(isPartnerCounterparty)
     return summaryData.items
       .map((item, idx) => {
         const itemKey = String(idx)
+        const sel = selectedPriceByItem[itemKey]
         const exact = item.offers[c.id]
         const applied = appliedAnalogue[itemKey]?.[c.id]?.price
         const price = exact ?? applied ?? null
-        if (price == null || !Number.isFinite(price)) return null
         const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-        return { item, price, qty, sum: price * qty }
+        if (sel === counterpartyId) {
+          const p = price ?? 0
+          return { item, price: p, qty, sum: p * qty }
+        }
+        if (sel != null && sel !== counterpartyId) return null
+        if (price == null || !Number.isFinite(price)) return null
+        let rowMin: number | null = null
+        partners.forEach((cc) => {
+          const ex = item.offers[cc.id]
+          const app = appliedAnalogue[itemKey]?.[cc.id]?.price
+          const pp = ex ?? app ?? null
+          if (pp != null && (rowMin == null || pp < rowMin)) rowMin = pp
+        })
+        if (rowMin != null && Math.abs((price ?? 0) - rowMin) < 1e-6) {
+          return { item, price, qty, sum: price * qty }
+        }
+        return null
       })
       .filter((r): r is NonNullable<typeof r> => r != null)
   }
@@ -488,6 +497,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       const counterparties = data.counterparties || []
       setSummaryData({ items: data.items, counterparties })
       setAppliedAnalogue({})
+      setSelectedPriceByItem({})
       setUseForRequest(Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true])))
       setViewMode('summary')
     } catch (e: any) {
@@ -535,6 +545,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
         counterpartyCards: selected.map((c) => ({ id: c.id, legalName: c.legalName })),
       },
       appliedAnalogue: JSON.parse(JSON.stringify(appliedAnalogue)),
+      selectedPriceByItem: JSON.parse(JSON.stringify(selectedPriceByItem)),
     }
     setSummaries((prev) => [newEntry, ...prev])
     setSummaryData(null)
@@ -576,6 +587,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       if (items.length > 0 && counterparties.length > 0) {
         setSummaryData({ items, counterparties })
         setAppliedAnalogue({})
+        setSelectedPriceByItem({})
         setUseForRequest(Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true])))
         setViewSection('create')
         setViewMode('summary')
@@ -1112,7 +1124,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                               {menuOpenCardId === `${entry.id}-summary` && (
                                 <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                                   <button type="button" onClick={() => downloadSummaryAsExcel(entry)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
-                                  <button type="button" onClick={() => { setMenuOpenCardId(null); setSummaries((p) => p.filter((s) => s.id !== entry.id)); setSummaryData(entry.summaryData); setAppliedAnalogue(entry.appliedAnalogue); setUseForRequest(Object.fromEntries(entry.summaryData.counterparties.filter(isPartnerCounterparty).map((c) => [c.id, entry.createdRequest.counterpartyCards.some((cc) => cc.id === c.id)]))); setViewMode('summary'); setSelectedSummaryId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
+                                  <button type="button" onClick={() => { setMenuOpenCardId(null); setSummaries((p) => p.filter((s) => s.id !== entry.id)); setSummaryData(entry.summaryData); setAppliedAnalogue(entry.appliedAnalogue); setSelectedPriceByItem(entry.selectedPriceByItem ?? {}); setUseForRequest(Object.fromEntries(entry.summaryData.counterparties.filter(isPartnerCounterparty).map((c) => [c.id, entry.createdRequest.counterpartyCards.some((cc) => cc.id === c.id)]))); setViewMode('summary'); setSelectedSummaryId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
                                   <button type="button" onClick={(e) => handleSendAllRequests(e, entry)} disabled={sendingAll || sendingCounterpartyId != null} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: sendingAll ? 'wait' : 'pointer', fontSize: '0.875rem', color: sendingAll ? '#9ca3af' : '#6b7280' }}>{sendingAll ? 'Отправка...' : 'Отправить (сводная)'}</button>
                                   <button type="button" onClick={() => handleDeleteSummary(entry.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                                 </div>
@@ -1156,36 +1168,46 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   </div>
                 ) : (summaryData || getActiveSummary()) ? (() => {
                   const entry = summaryData
-                    ? { summaryData, appliedAnalogue, useForRequest: useForRequest }
+                    ? { summaryData, appliedAnalogue, useForRequest: useForRequest, selectedPriceByItem: selectedPriceByItem }
                     : (() => {
                         const e = getActiveSummary()!
                         return {
                           summaryData: e.summaryData,
                           appliedAnalogue: e.appliedAnalogue,
                           useForRequest: Object.fromEntries(e.summaryData.counterparties.filter(isPartnerCounterparty).map((c) => [c.id, e.createdRequest.counterpartyCards.some((cc) => cc.id === c.id)])),
+                          selectedPriceByItem: e.selectedPriceByItem ?? {},
                         }
                       })()
                   const partners = entry.summaryData.counterparties.filter(isPartnerCounterparty)
+                  const sel = entry.selectedPriceByItem ?? {}
                   const sumByCounterparty: Record<string, number> = {}
                   entry.summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
                   entry.summaryData.items.forEach((item, idx) => {
                     const itemKey = String(idx)
                     const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-                    let rowMin: number | null = null
-                    partners.forEach((c) => {
-                      const exact = item.offers[c.id]
-                      const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                      const p = exact ?? applied ?? null
-                      if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-                    })
-                    partners.forEach((c) => {
-                      const exact = item.offers[c.id]
-                      const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                      const p = exact ?? applied ?? null
-                      if (p != null && rowMin != null && p === rowMin) {
-                        sumByCounterparty[c.id] += p * qty
-                      }
-                    })
+                    const s = sel[itemKey]
+                    if (s != null) {
+                      const exact = item.offers[s]
+                      const applied = entry.appliedAnalogue[itemKey]?.[s]?.price
+                      const p = exact ?? applied ?? 0
+                      sumByCounterparty[s] += p * qty
+                    } else {
+                      let rowMin: number | null = null
+                      partners.forEach((c) => {
+                        const exact = item.offers[c.id]
+                        const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                        const p = exact ?? applied ?? null
+                        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+                      })
+                      partners.forEach((c) => {
+                        const exact = item.offers[c.id]
+                        const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                        const p = exact ?? applied ?? null
+                        if (p != null && rowMin != null && p === rowMin) {
+                          sumByCounterparty[c.id] += p * qty
+                        }
+                      })
+                    }
                     if (item.offers[OWN_PRICE_ID] != null) {
                       sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qty
                     }
@@ -1193,6 +1215,13 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   const rowTotals = entry.summaryData.items.map((item, idx) => {
                     const itemKey = String(idx)
                     const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                    const s = sel[itemKey]
+                    if (s != null) {
+                      const exact = item.offers[s]
+                      const applied = entry.appliedAnalogue[itemKey]?.[s]?.price
+                      const p = exact ?? applied ?? 0
+                      return p * qty
+                    }
                     let rowMin: number | null = null
                     partners.forEach((c) => {
                       const exact = item.offers[c.id]
@@ -1255,13 +1284,14 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                         {entry.summaryData.items.map((item, idx) => {
                           const itemKey = String(idx)
                           const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                          const selC = sel[itemKey]
                           const partnerPrices = partners.map((c) => {
                             const exact = item.offers[c.id]
                             const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
                             return exact ?? applied ?? null
                           }).filter((p): p is number => p != null)
                           const minPrice = partnerPrices.length > 0 ? Math.min(...partnerPrices) : null
-                          const rowTotalSum = minPrice != null ? minPrice * qty : 0
+                          const rowTotalSum = rowTotals[idx] ?? 0
                           return (
                             <tr key={idx}>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
@@ -1279,19 +1309,28 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                                 const exactPrice = item.offers[c.id]
                                 const appliedVal = entry.appliedAnalogue[itemKey]?.[c.id]
                                 const effectivePrice = exactPrice ?? appliedVal?.price ?? null
-                                const isMin = minPrice != null && effectivePrice === minPrice
+                                const isSelected = selC === c.id
+                                const isMin = selC == null && minPrice != null && effectivePrice === minPrice
+                                const isGreen = isSelected || isMin
                                 const analogues = item.analogues?.[c.id] || []
                                 const hasAnalogue = analogues.length > 0 && exactPrice == null && !appliedVal
+                                const isPartner = c.id !== OWN_PRICE_ID
+                                const canClick = !isViewOnly && isPartner
                                 return (
                                   <td
                                     key={c.id}
+                                    role={canClick ? 'button' : undefined}
+                                    tabIndex={canClick ? 0 : undefined}
+                                    onClick={canClick ? () => setSelectedPriceByItem((prev) => ({ ...prev, [itemKey]: prev[itemKey] === c.id ? null : c.id })) : undefined}
+                                    onKeyDown={canClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPriceByItem((prev) => ({ ...prev, [itemKey]: prev[itemKey] === c.id ? null : c.id })) } } : undefined}
                                     style={{
                                       padding: '0.75rem',
                                       border: '1px solid #e5e7eb',
                                       textAlign: 'right',
-                                      backgroundColor: isMin ? '#dcfce7' : 'white',
-                                      fontWeight: isMin ? 600 : 400,
+                                      backgroundColor: isGreen ? '#dcfce7' : 'white',
+                                      fontWeight: isGreen ? 600 : 400,
                                       verticalAlign: 'top',
+                                      cursor: canClick ? 'pointer' : 'default',
                                     }}
                                   >
                                     {effectivePrice != null ? (
@@ -1304,15 +1343,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                                             <span style={{ marginLeft: '0.35rem' }}>{formatPrice(a.price)}</span>
                                             <button
                                               type="button"
-                                              onClick={() => {
-                                                setAppliedAnalogue((prev) => ({
-                                                  ...prev,
-                                                  [itemKey]: {
-                                                    ...(prev[itemKey] || {}),
-                                                    [c.id]: { name: a.name, price: a.price },
-                                                  },
-                                                }))
-                                              }}
+                                              onClick={(e) => { e.stopPropagation(); setAppliedAnalogue((prev) => ({ ...prev, [itemKey]: { ...(prev[itemKey] || {}), [c.id]: { name: a.name, price: a.price } } })) }}
                                               style={{
                                                 marginLeft: '0.35rem',
                                                 padding: '0.2rem 0.5rem',
@@ -1330,7 +1361,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                                         ))}
                                       </div>
                                     ) : (
-                                      '—'
+                                      canClick ? (isSelected ? '✓ (в заявку)' : '—') : '—'
                                     )}
                                   </td>
                                 )
