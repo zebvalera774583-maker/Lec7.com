@@ -6,7 +6,7 @@ import { verifyToken } from '@/lib/auth'
 const SIDEBAR_ITEMS = [
   { label: 'AI-агент', href: '/admin' },
   { label: 'Бизнесы', href: '/admin/businesses' },
-  { label: 'Справочник бота', href: '/admin/bot-tools' },
+  { label: 'Мастер каталог', href: '/admin/bot-tools' },
 ] as const
 
 export default async function AdminLayout({

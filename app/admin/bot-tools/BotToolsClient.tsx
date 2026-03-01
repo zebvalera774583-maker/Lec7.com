@@ -82,7 +82,7 @@ export default function BotToolsClient() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '0.5rem', fontSize: '1.875rem', fontWeight: 700 }}>
-        Справочник бота
+        Мастер каталог
       </h1>
       <p style={{ margin: '0 0 1.5rem 0', color: '#6b7280', fontSize: '1rem' }}>
         Глобальный каталог товаров для распознавания ботом.
