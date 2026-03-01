@@ -1,8 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const UNIT_RU: Record<string, string> = { kg: 'кг', g: 'г', l: 'л', ml: 'мл', pcs: 'шт', pc: 'шт' }
+const SUMMARY_STORAGE_KEY = 'lec7_request_summary'
 
 function formatUnit(unit: string | undefined): string {
   if (!unit) return ''
@@ -22,16 +25,72 @@ export default function RequestDetailClient({
   descriptionFallback,
   commentsText,
 }: RequestDetailClientProps) {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const items = (Array.isArray(itemsJson) ? itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
+
+  const handleFormSummary = async () => {
+    const requestItems = items
+      .map((it) => ({
+        name: (it.title || '').trim(),
+        quantity: (it.qty ?? '').trim(),
+        unit: (it.unit ?? '').trim(),
+      }))
+      .filter((it) => it.name.length > 0)
+    if (requestItems.length === 0) {
+      setError('Нет позиций для сводной таблицы')
+      return
+    }
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/office/businesses/${businessId}/request-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ items: requestItems, category: 'Свежая плодоовощная продукция' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Ошибка загрузки')
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(data))
+      }
+      router.push(`/office/businesses/${businessId}/requests?section=create&fromSummary=1`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Ошибка')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <div style={{ marginBottom: '1.5rem' }}>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
         <Link href={`/office/businesses/${businessId}/partnership`} style={{ color: '#666', textDecoration: 'underline', fontSize: '0.9375rem' }}>
           ← Назад
         </Link>
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={handleFormSummary}
+            disabled={loading}
+            style={{
+              padding: '0.5rem 1rem',
+              background: loading ? '#9ca3af' : '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+            }}
+          >
+            {loading ? 'Загрузка...' : 'Сформировать сводную таблицу'}
+          </button>
+        )}
       </div>
-
+      {error && <p style={{ marginBottom: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>{error}</p>}
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
         {commentsText && commentsText.trim() && (
           <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.875rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>

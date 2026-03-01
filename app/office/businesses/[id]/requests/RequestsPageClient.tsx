@@ -2,7 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import * as XLSX from 'xlsx'
+
+const SUMMARY_STORAGE_KEY = 'lec7_request_summary'
 
 interface RequestsPageClientProps {
   businessId: string
@@ -129,6 +132,7 @@ function parseMaxRequestToRows(title: string, description: string): Row[] {
 }
 
 export default function RequestsPageClient({ businessId, initialSection, initialFromRequestTitle, initialFromRequestDescription }: RequestsPageClientProps) {
+  const searchParams = useSearchParams()
   const [showCreateBlock, setShowCreateBlock] = useState(true)
   const [viewMode, setViewMode] = useState<'form' | 'summary' | 'created' | 'requestDetail'>(
     initialSection === 'create' ? 'created' : 'form'
@@ -559,6 +563,29 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   useEffect(() => {
     if (viewSection === 'incoming') fetchIncomingRequests()
   }, [viewSection])
+
+  useEffect(() => {
+    if (searchParams.get('fromSummary') !== '1' || typeof sessionStorage === 'undefined') return
+    try {
+      const raw = sessionStorage.getItem(SUMMARY_STORAGE_KEY)
+      if (!raw) return
+      const data = JSON.parse(raw)
+      sessionStorage.removeItem(SUMMARY_STORAGE_KEY)
+      const counterparties = data.counterparties || []
+      const items = data.items || []
+      if (items.length > 0 && counterparties.length > 0) {
+        setSummaryData({ items, counterparties })
+        setAppliedAnalogue({})
+        setUseForRequest(Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true])))
+        setViewSection('create')
+        setViewMode('summary')
+        setShowCreateBlock(true)
+        window.history.replaceState(null, '', `/office/businesses/${businessId}/requests?section=create`)
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [searchParams, businessId])
 
   useEffect(() => {
     fetch('/api/version', { credentials: 'include' })
