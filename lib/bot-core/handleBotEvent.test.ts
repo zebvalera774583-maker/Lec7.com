@@ -150,6 +150,17 @@ describe('handleBotEvent', () => {
     expect(result.messages[0]).toContain('Принял')
   })
 
+  it('splitIntoItems: "Голубика 0,5 кг" stays one item (comma in 0,5 is decimal, not delimiter)', () => {
+    const items = splitIntoItems('Голубика 0,5 кг\nМиндаль 1 кг')
+    expect(items).toContain('Голубика 0,5 кг')
+    expect(items).toContain('Миндаль 1 кг')
+    const parsed = parseOneItem('Голубика 0,5 кг')
+    expect(parsed.name).toBe('Голубика')
+    expect(parsed.quantity).toBe('0.5')
+    expect(parsed.unit).toBe('кг')
+    expect(parsed.hasUnit).toBe(true)
+  })
+
   it('splitIntoItems: "Айсберг салат 3 шт" stays one item (not split by "г" in Айсберг)', () => {
     const items = splitIntoItems('Айсберг салат 3 шт')
     expect(items).toEqual(['Айсберг салат 3 шт'])

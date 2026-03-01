@@ -21,12 +21,12 @@ const NEED_FORMAT_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*([\p{L}.]+)?$/u
 const UNIT_PATTERN = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*([\p{L}.]{1,10})$/u
 
 /**
- * Split text into items. Delimiters: newline, comma, ";", " и ".
+ * Split text into items. Delimiters: newline, ";", " и ", comma (but NOT comma between digits, e.g. "0,5").
  * Within a segment: split by "number unit + space + start of next product" (e.g. "5 кг груши")
  * so "Айсберг салат 3 шт" stays as one item (unit must follow number; "г" in "Айсберг" is not a unit).
  */
 export function splitIntoItems(text: string): string[] {
-  const byDelim = text.split(/[\n,;]|\s+и\s+/i).map((s) => s.trim()).filter(Boolean)
+  const byDelim = text.split(/[\n;]|\s+и\s+|(?<!\d),(?!\d)/i).map((s) => s.trim()).filter(Boolean)
   const result: string[] = []
   for (const part of byDelim) {
     const items = part.split(UNIT_FOR_SPLIT).map((s) => s.trim()).filter(Boolean)
