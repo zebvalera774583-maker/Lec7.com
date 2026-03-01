@@ -813,23 +813,6 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                       type="button"
-                      onClick={handleRematch}
-                      disabled={rematchLoading}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: rematchLoading ? '#e5e7eb' : '#111827',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: rematchLoading ? 'not-allowed' : 'pointer',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {rematchLoading ? 'Пересопоставление…' : 'Пересопоставить прайсы'}
-                    </button>
-                    <button
-                      type="button"
                       onClick={handleAddRow}
                       style={{
                         padding: '0.5rem 1rem',
@@ -929,6 +912,23 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                         }}
                       >
                         Назад
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRematch}
+                        disabled={rematchLoading}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: rematchLoading ? '#e5e7eb' : '#111827',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: rematchLoading ? 'not-allowed' : 'pointer',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {rematchLoading ? 'Пересопоставление…' : 'Пересопоставить прайсы'}
                       </button>
                       <button
                         type="button"
