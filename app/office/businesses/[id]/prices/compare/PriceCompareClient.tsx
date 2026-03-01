@@ -20,6 +20,8 @@ interface Row {
   no: number
   title: string
   normTitle: string
+  isMapped: boolean
+  masterItemId: string | null
   offers: Record<string, Offer>
 }
 
@@ -326,6 +328,9 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
                       border: '1px solid #e5e7eb',
                     }}
                   >
+                    <span style={{ marginRight: '0.35rem', color: row.isMapped ? '#059669' : '#9ca3af' }}>
+                      {row.isMapped ? '✔' : '✖'}
+                    </span>
                     {row.title}
                   </td>
                   {visibleSuppliers.map((s) => {
