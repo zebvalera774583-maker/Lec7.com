@@ -248,6 +248,8 @@ model BotCatalogItem {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  priceListRows PriceListRow[]
+
   @@unique([scope, canonicalName])
   @@index([scope])
 }
@@ -734,13 +736,16 @@ model PriceListRow {
   priceWithVat   Decimal?  @db.Decimal(12, 2)
   priceWithoutVat Decimal? @db.Decimal(12, 2)
   extra          Json?     // Для добавленных колонок
+  masterItemId   String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  priceList PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  priceList   PriceList        @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  masterItem  BotCatalogItem?  @relation(fields: [masterItemId], references: [id])
 
   @@unique([priceListId, order])
   @@index([priceListId])
+  @@index([masterItemId])
 }
 
 model PriceAssignment {
