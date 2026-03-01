@@ -32,40 +32,33 @@ items AS (
     ap."supplierLegalName",
     ap."priceListId",
     ap."priceListUpdatedAt",
-    r.name AS "rawName",
+    r."masterItemId" AS "masterItemId",
+    b."canonicalName" AS "displayTitle",
     r.unit AS "unit",
-    COALESCE(r."priceWithVat", r."priceWithoutVat")::numeric AS "price",
-    lower(
-      trim(
-        regexp_replace(
-          regexp_replace(r.name, '[\\.,;:()\\[\\]{}"''\`]', '', 'g'),
-          '\\s+', ' ', 'g'
-        )
-      )
-    ) AS "normTitle"
+    COALESCE(r."priceWithVat", r."priceWithoutVat")::numeric AS "price"
   FROM accepted_prices ap
   JOIN "PriceListRow" r ON r."priceListId" = ap."priceListId"
+  JOIN "BotCatalogItem" b ON r."masterItemId" = b."id"
+  WHERE r."masterItemId" IS NOT NULL
 ),
 titles AS (
   SELECT
-    "normTitle",
-    MIN("rawName") AS "displayTitle"
+    "masterItemId",
+    MIN("displayTitle") AS "displayTitle"
   FROM items
-  WHERE "normTitle" <> '' AND "normTitle" IS NOT NULL
-  GROUP BY "normTitle"
+  GROUP BY "masterItemId"
 ),
 offers AS (
   SELECT
-    i."normTitle",
+    i."masterItemId",
     i."supplierBusinessId",
     MIN(i."price") AS "price",
     MIN(i."unit") AS "unit"
   FROM items i
-  WHERE i."normTitle" <> '' AND i."normTitle" IS NOT NULL
-  GROUP BY i."normTitle", i."supplierBusinessId"
+  GROUP BY i."masterItemId", i."supplierBusinessId"
 )
 SELECT
-  t."normTitle",
+  t."masterItemId" AS "normTitle",
   t."displayTitle",
   COALESCE(
     jsonb_object_agg(
@@ -76,9 +69,9 @@ SELECT
     '{}'::jsonb
   ) AS "offers"
 FROM titles t
-LEFT JOIN offers o ON o."normTitle" = t."normTitle"
-GROUP BY t."normTitle", t."displayTitle"
-ORDER BY t."normTitle" ASC
+LEFT JOIN offers o ON o."masterItemId" = t."masterItemId"
+GROUP BY t."masterItemId", t."displayTitle"
+ORDER BY t."displayTitle" ASC
 `
 
 type RowRaw = {
