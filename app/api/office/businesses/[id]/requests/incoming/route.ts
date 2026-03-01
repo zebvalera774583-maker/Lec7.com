@@ -60,6 +60,7 @@ export const GET = withBusinessAccess(async (req, user) => {
       total: number | null
       status: string
       createdAt: string
+      commentsText: string | null
       items: { id: string; name: string; quantity: string; unit: string; price: number; sum: number }[]
     }> = []
     for (const r of incomingList) {
@@ -81,6 +82,7 @@ export const GET = withBusinessAccess(async (req, user) => {
           total: null,
           status: r.status,
           createdAt: req.createdAt.toISOString(),
+          commentsText: r.commentsText ?? null,
           items: r.items.map((i) => ({
             id: i.id,
             name: i.name,
@@ -107,6 +109,7 @@ export const GET = withBusinessAccess(async (req, user) => {
           total: r.total != null ? Number(r.total) : null,
           status: r.status,
           createdAt: r.createdAt.toISOString(),
+          commentsText: r.commentsText ?? null,
           items: r.items.map((i) => ({
             id: i.id,
             name: i.name,
@@ -135,6 +138,7 @@ export const GET = withBusinessAccess(async (req, user) => {
       total: null,
       status: r.status,
       createdAt: r.createdAt.toISOString(),
+      commentsText: null,
       items: [{
         id: `${r.id}_item`,
         name: r.description || r.title,

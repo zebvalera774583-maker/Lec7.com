@@ -15,11 +15,12 @@ export interface BuildRequestXlsxParams {
   category: string | null
   total: number | null
   items: RequestExcelItem[]
+  commentsText?: string | null
   createdAt: Date
 }
 
 export async function buildRequestXlsx(params: BuildRequestXlsxParams): Promise<{ filename: string; buffer: Buffer }> {
-  const { senderName, senderSlug, recipientName, category, total, items, createdAt } = params
+  const { senderName, senderSlug, recipientName, category, total, items, commentsText, createdAt } = params
 
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Заявка', { views: [{ state: 'frozen', ySplit: 5 }] })
@@ -35,6 +36,10 @@ export async function buildRequestXlsx(params: BuildRequestXlsxParams): Promise<
   sheet.getCell('A3').value = dateStr
   if (recipientName || category) {
     sheet.getCell('A4').value = [recipientName, category].filter(Boolean).join(' · ') || ''
+  }
+  if (commentsText && commentsText.trim()) {
+    sheet.getCell('A5').value = `Комментарий: ${commentsText.trim()}`
+    sheet.getCell('A5').alignment = { wrapText: true }
   }
 
   const headerRow = 6

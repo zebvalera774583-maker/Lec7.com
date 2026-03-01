@@ -1,6 +1,7 @@
 import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
+import { getCatalogNormMap, matchToCatalogSync } from '@/lib/catalog-match'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
 const UNIT_ONLY_PATTERN = /^(кг|г|т|шт|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
@@ -172,8 +173,30 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
-    const items = splitIntoItems(needText)
-    const incomplete = getIncompleteItems(needText)
+    const rawItems = splitIntoItems(needText)
+    let normToId: Map<string, string>
+    try {
+      normToId = await getCatalogNormMap()
+    } catch (e) {
+      console.warn('[handleBotEvent] catalog load failed, treating all as items:', e)
+      normToId = new Map()
+    }
+
+    const mappedItems: string[] = []
+    const unmappedRaw: string[] = []
+    for (const raw of rawItems) {
+      const parsed = parseOneItem(raw)
+      if (!parsed.name) continue
+      const mapped = matchToCatalogSync(normToId, parsed.name)
+      if (mapped) {
+        mappedItems.push(raw)
+      } else {
+        unmappedRaw.push(raw)
+      }
+    }
+
+    const mappedNeedText = mappedItems.join(', ')
+    const incomplete = mappedItems.length > 0 ? getIncompleteItems(mappedNeedText) : []
 
     if (incomplete.length > 0) {
       const onlyUnit = incomplete.filter((i) => i.onlyUnitMissing).map((i) => i.displayName)
@@ -183,7 +206,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       if (needBoth.length > 0) parts.push(`Укажите вес и ед. изм. для: ${needBoth.join(', ')}`)
 
       const incompleteRaw = onlyUnit.length > 0
-        ? items.filter((raw) => {
+        ? mappedItems.filter((raw) => {
             const p = parseOneItem(raw)
             return p.name && !isItemComplete(p) && /\d/.test(raw)
           })
@@ -203,8 +226,8 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
-    if (!areAllItemsValid(needText)) {
-      const missing = getMissingNeedFields(needText)
+    if (mappedItems.length > 0 && !areAllItemsValid(mappedNeedText)) {
+      const missing = getMissingNeedFields(mappedNeedText)
       const missingStr = missing.length > 0 ? `Не указано: ${missing.join(', ')}. ` : ''
       return {
         messages: [
@@ -215,7 +238,8 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
     if (businessId && needText) {
       try {
-        const parsedItems = items.map((raw) => parseOneItem(raw))
+        const parsedItems = mappedItems.map((raw) => parseOneItem(raw))
+        const commentsText = unmappedRaw.length > 0 ? unmappedRaw.join('\n').trim() : null
         const { number } = await prisma.$transaction(async (tx) => {
           const num = await getNextRequestNumber(tx)
           const request = await tx.request.create({
@@ -235,6 +259,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
               recipientBusinessId: businessId,
               requestId: request.id,
               status: 'NEW',
+              commentsText,
               items: {
                 create: parsedItems.map((p, i) => ({
                   name: p.name,

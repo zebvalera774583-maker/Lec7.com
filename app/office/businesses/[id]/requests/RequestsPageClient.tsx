@@ -62,6 +62,7 @@ interface IncomingRequestRow {
   total: number | null
   status: string
   createdAt: string
+  commentsText?: string | null
   items: IncomingRequestItem[]
 }
 
@@ -686,6 +687,11 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   <div style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem' }}>{previewText}</div>
                   {clientInfo && <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>{clientInfo}</div>}
                   <div style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.5rem' }}>{req.createdAt ? formatRequestDate(new Date(req.createdAt)) : ''}</div>
+                  {req.commentsText && (
+                    <div style={{ padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.875rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
+                      <strong>Комментарий:</strong> {req.commentsText}
+                    </div>
+                  )}
                   <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                       <thead>

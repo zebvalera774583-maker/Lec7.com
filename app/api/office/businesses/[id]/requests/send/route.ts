@@ -37,6 +37,7 @@ export const POST = withBusinessAccess(async (req, user) => {
     const recipientBusinessId = body.recipientBusinessId
     const category = typeof body.category === 'string' ? body.category.trim() : null
     const total = body.total != null ? Number(body.total) : null
+    const commentsText = typeof body.commentsText === 'string' ? body.commentsText.trim() || null : null
     const items = Array.isArray(body.items) ? body.items : []
 
     if (!recipientBusinessId || typeof recipientBusinessId !== 'string') {
@@ -68,6 +69,7 @@ export const POST = withBusinessAccess(async (req, user) => {
         category: category || null,
         total: total != null && Number.isFinite(total) ? new Decimal(total) : null,
         status: 'NEW',
+        commentsText: commentsText || null,
         items: {
           create: requestItems.map((it) => ({
             name: it.name,
@@ -110,6 +112,7 @@ export const POST = withBusinessAccess(async (req, user) => {
           recipientName: recipientName || null,
           category,
           total: total != null && Number.isFinite(total) ? total : null,
+          commentsText: commentsText || null,
           items: requestItems.map((it) => ({
             name: it.name,
             quantity: it.quantity,
