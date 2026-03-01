@@ -33,6 +33,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
     include: { items: { orderBy: { sortOrder: 'asc' } } },
   })
   let itemsJson: unknown = null
+  const commentsText = incoming?.commentsText ?? null
   if (incoming?.items?.length) {
     itemsJson = incoming.items.map((it) => ({
       title: it.name,
@@ -52,6 +53,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
       businessId={params.id}
       itemsJson={itemsJson}
       descriptionFallback={request.description}
+      commentsText={commentsText}
     />
   )
 }

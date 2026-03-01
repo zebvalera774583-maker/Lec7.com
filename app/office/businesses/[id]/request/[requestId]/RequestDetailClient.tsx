@@ -13,12 +13,14 @@ interface RequestDetailClientProps {
   businessId: string
   itemsJson: unknown
   descriptionFallback?: string | null
+  commentsText?: string | null
 }
 
 export default function RequestDetailClient({
   businessId,
   itemsJson,
   descriptionFallback,
+  commentsText,
 }: RequestDetailClientProps) {
   const items = (Array.isArray(itemsJson) ? itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
 
@@ -31,6 +33,11 @@ export default function RequestDetailClient({
       </div>
 
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+        {commentsText && commentsText.trim() && (
+          <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.875rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
+            <strong>Комментарий:</strong> {commentsText.trim()}
+          </div>
+        )}
         {items.length === 0 ? (
           <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>
             {descriptionFallback ? (
