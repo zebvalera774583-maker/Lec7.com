@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
 
@@ -83,6 +83,20 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
   const [selectedCategory, setSelectedCategory] = useState<string>(FALLBACK_CATEGORY)
   const [onlyWith2Offers, setOnlyWith2Offers] = useState(false)
   const [hideEmptySuppliers, setHideEmptySuppliers] = useState(false)
+  const [rematchLoading, setRematchLoading] = useState(false)
+
+  const fetchData = useCallback(() => {
+    const categoryParam = encodeURIComponent(selectedCategory)
+    return fetch(
+      `/api/office/businesses/${businessId}/price-comparison?category=${categoryParam}`,
+      { credentials: 'include' }
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error(res.status === 403 ? 'Доступ запрещён' : 'Ошибка загрузки')
+        return res.json()
+      })
+      .then((d: ComparisonData) => setData(d))
+  }, [businessId, selectedCategory])
 
   useEffect(() => {
     fetch('/api/categories?type=PRICE', { credentials: 'include' })
@@ -101,17 +115,7 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
     let cancelled = false
     setLoading(true)
     setError(null)
-    const categoryParam = encodeURIComponent(selectedCategory)
-    fetch(`/api/office/businesses/${businessId}/price-comparison?category=${categoryParam}`, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error(res.status === 403 ? 'Доступ запрещён' : 'Ошибка загрузки')
-        return res.json()
-      })
-      .then((d: ComparisonData) => {
-        if (!cancelled) {
-          setData(d)
-        }
-      })
+    fetchData()
       .catch((e) => {
         if (!cancelled) setError(e.message || 'Ошибка')
       })
@@ -121,7 +125,27 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
     return () => {
       cancelled = true
     }
-  }, [businessId, selectedCategory])
+  }, [fetchData])
+
+  const handleRematch = async () => {
+    setRematchLoading(true)
+    try {
+      const categoryParam = encodeURIComponent(selectedCategory)
+      const res = await fetch(
+        `/api/office/businesses/${businessId}/price-comparison/rematch?category=${categoryParam}`,
+        { method: 'POST', credentials: 'include' }
+      )
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Ошибка пересопоставления')
+      await fetchData()
+      alert(`Сопоставлено: ${body.updated ?? 0}`)
+    } catch (e) {
+      console.error('Rematch error:', e)
+      alert(e instanceof Error ? e.message : 'Ошибка пересопоставления')
+    } finally {
+      setRematchLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -209,6 +233,23 @@ export default function PriceCompareClient({ businessId }: PriceCompareClientPro
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          onClick={handleRematch}
+          disabled={rematchLoading}
+          style={{
+            padding: '0.5rem 1rem',
+            background: rematchLoading ? '#d1d5db' : '#111827',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: rematchLoading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {rematchLoading ? 'Пересопоставление…' : 'Пересопоставить'}
+        </button>
         <button
           type="button"
           onClick={() => downloadComparisonAsExcel(filteredRows, visibleSuppliers, `Сводная прайсов — ${selectedCategory}`)}
