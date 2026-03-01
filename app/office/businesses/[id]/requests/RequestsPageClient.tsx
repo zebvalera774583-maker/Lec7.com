@@ -147,6 +147,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   const [sendStatus, setSendStatus] = useState<{ ok: boolean; message: string } | null>(null)
   const [sendingCounterpartyId, setSendingCounterpartyId] = useState<string | null>(null)
   const [sendingAll, setSendingAll] = useState(false)
+  const [rematchLoading, setRematchLoading] = useState(false)
   const [viewSection, setViewSection] = useState<'create' | 'incoming'>(initialSection === 'create' ? 'create' : 'incoming')
 
   useEffect(() => {
@@ -485,6 +486,26 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     }
   }
 
+  const handleRematch = async () => {
+    setRematchLoading(true)
+    try {
+      const categoryParam = encodeURIComponent(DEFAULT_CATEGORY)
+      const res = await fetch(
+        `/api/office/businesses/${businessId}/price-comparison/rematch?category=${categoryParam}`,
+        { method: 'POST', credentials: 'include' }
+      )
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Ошибка пересопоставления')
+      alert(`Сопоставлено: ${body.updated ?? 0}`)
+      window.location.reload()
+    } catch (e) {
+      console.error('Rematch error:', e)
+      alert(e instanceof Error ? e.message : 'Ошибка пересопоставления')
+    } finally {
+      setRematchLoading(false)
+    }
+  }
+
   const handleCreateRequest = () => {
     if (!summaryData) return
     const partners = summaryData.counterparties.filter(isPartnerCounterparty)
@@ -782,6 +803,23 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                 <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1rem', fontWeight: 500, color: '#111827' }}>Заявка</span>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleRematch}
+                      disabled={rematchLoading}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: rematchLoading ? '#e5e7eb' : '#111827',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: rematchLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {rematchLoading ? 'Пересопоставление…' : 'Пересопоставить прайсы'}
+                    </button>
                     <button
                       type="button"
                       onClick={handleAddRow}
