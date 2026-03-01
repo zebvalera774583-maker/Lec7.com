@@ -19,6 +19,8 @@ interface Row {
 
 interface SummaryItem {
   name: string
+  originalName?: string
+  masterItemId?: string | null
   quantity: string
   unit: string
   offers: Record<string, number>
@@ -468,7 +470,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, category: DEFAULT_CATEGORY }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -1193,7 +1195,14 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           return (
                             <tr key={idx}>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.name}</td>
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                                {item.name}
+                                {item.originalName && (
+                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.15rem' }}>
+                                    {item.originalName}
+                                  </div>
+                                )}
+                              </td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{item.quantity || '—'}</td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.unit || '—'}</td>
                               {summaryData.counterparties.map((c) => {
