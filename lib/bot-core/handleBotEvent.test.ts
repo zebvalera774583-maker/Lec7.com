@@ -16,16 +16,13 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 const mockGetCatalogNormMap = vi.fn()
-vi.mock('@/lib/catalog-match', () => ({
-  getCatalogNormMap: () => mockGetCatalogNormMap(),
-  matchToCatalogSync: (map: Map<string, string>, name: string) => {
-    const norm = (name || '').trim().toLowerCase().replace(/\s+/g, ' ')
-    if (!norm) return false
-    if (map.has(norm)) return true
-    const first = norm.split(/\s+/)[0]
-    return first ? map.has(first) : false
-  },
-}))
+vi.mock('@/lib/catalog-match', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/catalog-match')>()
+  return {
+    getCatalogNormMap: () => mockGetCatalogNormMap(),
+    matchToCatalogSync: actual.matchToCatalogSync,
+  }
+})
 
 describe('handleBotEvent', () => {
   const baseEvent = {
