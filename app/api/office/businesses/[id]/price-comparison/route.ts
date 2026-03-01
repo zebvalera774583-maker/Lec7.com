@@ -33,33 +33,49 @@ items AS (
     ap."priceListId",
     ap."priceListUpdatedAt",
     r."masterItemId" AS "masterItemId",
-    b."canonicalName" AS "displayTitle",
+    r.name AS "rawName",
     r.unit AS "unit",
-    COALESCE(r."priceWithVat", r."priceWithoutVat")::numeric AS "price"
+    COALESCE(r."priceWithVat", r."priceWithoutVat")::numeric AS "price",
+    lower(trim(regexp_replace(regexp_replace(r.name, '[\\.,;:()\\[\\]{}"''\`]', '', 'g'), '\\s+', ' ', 'g'))) AS "normTitle",
+    b."canonicalName" AS "canonicalName"
   FROM accepted_prices ap
   JOIN "PriceListRow" r ON r."priceListId" = ap."priceListId"
-  JOIN "BotCatalogItem" b ON r."masterItemId" = b."id"
-  WHERE r."masterItemId" IS NOT NULL
+  LEFT JOIN "BotCatalogItem" b ON r."masterItemId" = b."id"
+),
+items_with_key AS (
+  SELECT *,
+    CASE
+      WHEN "masterItemId" IS NOT NULL THEN 'm:' || "masterItemId"
+      ELSE 'u:' || COALESCE("normTitle", '')
+    END AS "groupKey"
+  FROM items
 ),
 titles AS (
   SELECT
-    "masterItemId",
-    MIN("displayTitle") AS "displayTitle"
-  FROM items
-  GROUP BY "masterItemId"
+    "groupKey",
+    CASE
+      WHEN bool_or("masterItemId" IS NOT NULL) THEN MIN("canonicalName")
+      ELSE MIN("rawName")
+    END AS "displayTitle",
+    bool_or("masterItemId" IS NOT NULL) AS "isMapped",
+    MAX("masterItemId") AS "masterItemId"
+  FROM items_with_key
+  GROUP BY "groupKey"
 ),
 offers AS (
   SELECT
-    i."masterItemId",
+    i."groupKey",
     i."supplierBusinessId",
     MIN(i."price") AS "price",
     MIN(i."unit") AS "unit"
-  FROM items i
-  GROUP BY i."masterItemId", i."supplierBusinessId"
+  FROM items_with_key i
+  GROUP BY i."groupKey", i."supplierBusinessId"
 )
 SELECT
-  t."masterItemId" AS "normTitle",
+  t."groupKey" AS "normTitle",
   t."displayTitle",
+  t."isMapped",
+  t."masterItemId",
   COALESCE(
     jsonb_object_agg(
       o."supplierBusinessId",
@@ -69,14 +85,16 @@ SELECT
     '{}'::jsonb
   ) AS "offers"
 FROM titles t
-LEFT JOIN offers o ON o."masterItemId" = t."masterItemId"
-GROUP BY t."masterItemId", t."displayTitle"
+LEFT JOIN offers o ON o."groupKey" = t."groupKey"
+GROUP BY t."groupKey", t."displayTitle", t."isMapped", t."masterItemId"
 ORDER BY t."displayTitle" ASC
 `
 
 type RowRaw = {
   normTitle: string
   displayTitle: string
+  isMapped: boolean
+  masterItemId: string | null
   offers: Record<string, { price: number | string | null; unit: string | null }>
 }
 
@@ -167,6 +185,8 @@ export const GET = withBusinessAccess(async (req, user) => {
       no: idx + 1,
       title: r.displayTitle,
       normTitle: r.normTitle,
+      isMapped: r.isMapped,
+      masterItemId: r.masterItemId,
       offers: Object.fromEntries(
         Object.entries(r.offers || {}).map(([k, v]) => [
           k,
