@@ -17,6 +17,12 @@ const TABLES_CATALOG = [
     location: '/admin/bot-tools',
     path: 'Админка → Мастер каталог',
   },
+  {
+    num: 4,
+    name: 'Сводная за период (Потребности)',
+    location: '/office/businesses/[id]/partnership',
+    path: 'Потребности → Сводная за период',
+  },
 ]
 
 const SAMPLE_SUMMARY_ROWS = [
@@ -189,6 +195,24 @@ export default function TechTablesPage() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '2rem' }}>
+        <h2 style={{ marginBottom: '0.75rem', fontSize: '1.125rem', fontWeight: 600 }}>
+          Таблица №4: Сводная за период (Потребности)
+        </h2>
+        <p style={{ margin: '0 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+          Логика как у таблицы №1. Отличие: данные — агрегация потребностей за выбранный период (сумма по masterItemId/названию и ед.).
+        </p>
+        <div style={{ padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+          <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №4</h3>
+          <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
+            <li><strong>Назначение:</strong> Сводная таблица по потребностям за период. Кнопка «Сводная за период» в шапке Потребностей → модалка выбора дат.</li>
+            <li><strong>Структура:</strong> Как таблица №1 (№, Наименование, Кол-во, Ед., поставщики, Итоговая сумма, подвал).</li>
+            <li><strong>Данные:</strong> Группировка по masterItemId (или названию), суммирование qty. Разные ед. — отдельные строки.</li>
+            <li><strong>Режим:</strong> Просмотр/отчёт на странице, без создания заявки.</li>
+          </ul>
         </div>
       </div>
     </div>

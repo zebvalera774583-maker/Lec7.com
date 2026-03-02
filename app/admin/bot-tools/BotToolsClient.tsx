@@ -376,7 +376,7 @@ export default function BotToolsClient() {
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>ID</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Каноническое название</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Ед. изм.</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Синонимы</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Кол-во синонимов</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Активен</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'right', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Действия</th>
                 </tr>
@@ -387,16 +387,16 @@ export default function BotToolsClient() {
                     <td style={{ padding: '0.75rem 1rem', color: '#6b7280', fontFamily: 'monospace', fontSize: '0.75rem' }}>
                       {item.id.slice(0, 8)}…
                     </td>
-                    <td style={{ padding: '0.75rem 1rem' }}>{item.canonicalName}</td>
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{item.canonicalName}</td>
                     <td style={{ padding: '0.75rem 1rem', color: '#6b7280' }}>{item.defaultUnit || '—'}</td>
                     <td style={{ padding: '0.75rem 1rem', color: '#6b7280' }}>
                       {Array.isArray(item.synonyms) ? item.synonyms.length : 0}
                     </td>
                     <td style={{ padding: '0.75rem 1rem' }}>
                       {item.isActive ? (
-                        <span style={{ color: '#059669' }}>Да</span>
+                        <span style={{ color: '#059669' }}>✔</span>
                       ) : (
-                        <span style={{ color: '#9ca3af' }}>Нет</span>
+                        <span style={{ color: '#9ca3af' }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
