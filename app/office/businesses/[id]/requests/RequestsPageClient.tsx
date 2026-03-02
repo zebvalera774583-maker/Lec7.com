@@ -234,6 +234,29 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       return rowMin != null ? rowMin * qty : 0
     })
     const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
+    const fullOrderBySupplier: Record<string, number> = {}
+    summaryData.counterparties.forEach((c) => { fullOrderBySupplier[c.id] = 0 })
+    summaryData.items.forEach((item, idx) => {
+      const itemKey = String(idx)
+      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+      summaryData.counterparties.forEach((c) => {
+        const exact = item.offers[c.id]
+        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+        let p = exact ?? applied ?? null
+        if (p == null && c.id !== OWN_PRICE_ID) {
+          const others = partners.filter((x) => x.id !== c.id)
+          let minOther: number | null = null
+          others.forEach((o) => {
+            const op = item.offers[o.id] ?? appliedAnalogue[itemKey]?.[o.id]?.price ?? null
+            if (op != null && (minOther == null || op < minOther)) minOther = op
+          })
+          p = minOther ?? 0
+        } else if (p == null) {
+          p = 0
+        }
+        fullOrderBySupplier[c.id] += p * qty
+      })
+    })
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...summaryData.counterparties.map((c) => c.legalName), 'Итоговая сумма']
     const dataRows = summaryData.items.map((item, idx) => {
       const itemKey = String(idx)
@@ -252,8 +275,13 @@ export default function RequestsPageClient({ businessId, initialSection, initial
         rowTotalSum > 0 ? rowTotalSum : '',
       ]
     })
-    const footerRow = ['Итого', '', '', '', ...summaryData.counterparties.map((c) => sumByCounterparty[c.id] > 0 ? sumByCounterparty[c.id] : ''), totalMinSum > 0 ? totalMinSum : '']
-    const aoa = [headerRow, ...dataRows, footerRow]
+    const footerRow1 = ['Итого (по выбранным позициям)', '', '', '', ...summaryData.counterparties.map((c) => sumByCounterparty[c.id] > 0 ? sumByCounterparty[c.id] : ''), totalMinSum > 0 ? totalMinSum : '']
+    const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...summaryData.counterparties.map((c) => fullOrderBySupplier[c.id] > 0 ? fullOrderBySupplier[c.id] : ''), '']
+    const footerRow3 = ['Экономия', '', '', '', ...summaryData.counterparties.map((c) => {
+      const saving = totalMinSum - fullOrderBySupplier[c.id]
+      return saving !== 0 ? Math.abs(saving) : 0
+    }), '']
+    const aoa = [headerRow, ...dataRows, footerRow1, footerRow2, footerRow3]
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, ...summaryData.counterparties.map(() => ({ wch: 14 })), { wch: 14 }]
     const wb = XLSX.utils.book_new()
