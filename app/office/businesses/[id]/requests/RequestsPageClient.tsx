@@ -1274,6 +1274,18 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                     return rowMin != null ? rowMin * qty : 0
                   })
                   const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
+                  const fullOrderBySupplier: Record<string, number> = {}
+                  entry.summaryData.counterparties.forEach((c) => { fullOrderBySupplier[c.id] = 0 })
+                  entry.summaryData.items.forEach((item, idx) => {
+                    const itemKey = String(idx)
+                    const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                    entry.summaryData.counterparties.forEach((c) => {
+                      const exact = item.offers[c.id]
+                      const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                      const p = exact ?? applied ?? 0
+                      fullOrderBySupplier[c.id] += p * qty
+                    })
+                  })
                   const isViewOnly = !summaryData
                   return (
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
@@ -1478,7 +1490,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           </tr>
                         )}
                         <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
-                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
                           {entry.summaryData.counterparties.map((c) => (
                             <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
                               {sumByCounterparty[c.id] > 0 ? formatPrice(sumByCounterparty[c.id]) : '—'}
@@ -1487,6 +1499,38 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
                             {totalMinSum > 0 ? formatPrice(totalMinSum) : '—'}
                           </td>
+                        </tr>
+                        <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                          {entry.summaryData.counterparties.map((c) => (
+                            <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                              {fullOrderBySupplier[c.id] > 0 ? formatPrice(fullOrderBySupplier[c.id]) : '—'}
+                            </td>
+                          ))}
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                        </tr>
+                        <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                          {entry.summaryData.counterparties.map((c) => {
+                            const saving = totalMinSum - fullOrderBySupplier[c.id]
+                            const isPositive = saving > 0
+                            const isNegative = saving < 0
+                            return (
+                              <td
+                                key={c.id}
+                                style={{
+                                  padding: '0.75rem',
+                                  border: '1px solid #e5e7eb',
+                                  textAlign: 'right',
+                                  color: isPositive ? '#15803d' : isNegative ? '#dc2626' : '#6b7280',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {saving !== 0 ? formatPrice(Math.abs(saving)) : '0'}
+                              </td>
+                            )
+                          })}
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
                         </tr>
                       </tfoot>
                     </table>

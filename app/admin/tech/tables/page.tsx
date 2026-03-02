@@ -40,6 +40,19 @@ export default function TechTablesPage() {
     const qty = parseFloat(r.qty) || 0
     return a + (rowMin != null ? rowMin * qty : 0)
   }, 0)
+  const fullOrderPiliev = SAMPLE_SUMMARY_ROWS.reduce((a, r) => a + ((r.piliev ?? 0) * (parseFloat(r.qty) || 0)), 0)
+  const fullOrderNep = SAMPLE_SUMMARY_ROWS.reduce((a, r) => a + ((r.nep ?? 0) * (parseFloat(r.qty) || 0)), 0)
+  const sumByPiliev = SAMPLE_SUMMARY_ROWS.reduce((a, r) => {
+    const piliev = r.piliev ?? null
+    const nep = r.nep ?? null
+    const min = [piliev, nep].filter((p): p is number => p != null)
+    const rowMin = min.length > 0 ? Math.min(...min) : null
+    const qty = parseFloat(r.qty) || 0
+    return a + (rowMin != null && piliev === rowMin ? piliev * qty : 0)
+  }, 0)
+  const sumByNep = totalSum - sumByPiliev
+  const savingPiliev = totalSum - fullOrderPiliev
+  const savingNep = totalSum - fullOrderNep
   const suppliers = [
     { id: 'piliev', name: 'ИП Пилиев Г.З.' },
     { id: 'nep', name: 'ООО «НЭП»' },
@@ -96,6 +109,7 @@ export default function TechTablesPage() {
             <li><strong>Выбор цены:</strong> Клик по ячейке — ручной выбор поставщика для позиции (зелёный фон). Позиции без цены можно включать в заявку (цена 0).</li>
             <li><strong>Редактирование:</strong> Наименование, Кол-во, Ед. — редактируемые. Добавление и удаление строк.</li>
             <li><strong>Кнопки:</strong> Назад, Пересопоставить прайсы, Сформировать заявку.</li>
+            <li><strong>Подвал:</strong> Итого (по выбранным позициям), Сумма заказа у поставщика (полный заказ у каждого), Экономия (зелёный — выгода, красный — переплата).</li>
           </ul>
         </div>
 
@@ -144,11 +158,26 @@ export default function TechTablesPage() {
             </tbody>
             <tfoot>
               <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
-                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
-                {suppliers.map((s) => (
-                  <td key={s.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
-                ))}
+                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{sumByPiliev > 0 ? formatPrice(sumByPiliev) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{sumByNep > 0 ? formatPrice(sumByNep) : '—'}</td>
                 <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(totalSum)}</td>
+              </tr>
+              <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fullOrderPiliev > 0 ? formatPrice(fullOrderPiliev) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fullOrderNep > 0 ? formatPrice(fullOrderNep) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+              </tr>
+              <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: savingPiliev > 0 ? '#15803d' : savingPiliev < 0 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                  {savingPiliev !== 0 ? formatPrice(Math.abs(savingPiliev)) : '0'}
+                </td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: savingNep > 0 ? '#15803d' : savingNep < 0 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                  {savingNep !== 0 ? formatPrice(Math.abs(savingNep)) : '0'}
+                </td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
               </tr>
             </tfoot>
           </table>
