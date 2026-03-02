@@ -86,6 +86,19 @@ export default function TechTablesPage() {
         <p style={{ margin: '0 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
           Только просмотр, без редактирования.
         </p>
+
+        <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+          <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №1</h3>
+          <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
+            <li><strong>Назначение:</strong> Сводное сравнение цен поставщиков по позициям заявки и формирование заявки.</li>
+            <li><strong>Колонки:</strong> №, Наименование, Кол-во, Ед., колонки поставщиков (с чекбоксом «В заявку»), Итоговая сумма.</li>
+            <li><strong>Поставщики:</strong> Все подключённые контрагенты с активными прайсами в категории.</li>
+            <li><strong>Выбор цены:</strong> Клик по ячейке — ручной выбор поставщика для позиции (зелёный фон). Позиции без цены можно включать в заявку (цена 0).</li>
+            <li><strong>Редактирование:</strong> Наименование, Кол-во, Ед. — редактируемые. Добавление и удаление строк.</li>
+            <li><strong>Кнопки:</strong> Назад, Пересопоставить прайсы, Сформировать заявку.</li>
+          </ul>
+        </div>
+
         <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
