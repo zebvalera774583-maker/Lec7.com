@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import BusinessSidebar from './BusinessSidebar'
+import BusinessLayoutClient from './BusinessLayoutClient'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -37,17 +37,14 @@ export default async function BusinessLayout({ children, params }: LayoutProps) 
   ]
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: '#f5f5f5' }}>
-      <Suspense fallback={<div style={{ width: 288, flexShrink: 0, background: '#f9fafb', borderRight: '1px solid #e5e7eb', minHeight: 'calc(100vh - 60px)' }} />}>
-        <BusinessSidebar
-          businessId={business.id}
-          businessName={business.name}
-          navItems={navItems}
-        />
-      </Suspense>
-      <main style={{ flex: 1, overflow: 'auto' }}>
+    <Suspense fallback={<div style={{ minHeight: 'calc(100vh - 60px)', background: '#f5f5f5' }} />}>
+      <BusinessLayoutClient
+        businessId={business.id}
+        businessName={business.name}
+        navItems={navItems}
+      >
         {children}
-      </main>
-    </div>
+      </BusinessLayoutClient>
+    </Suspense>
   )
 }

@@ -67,3 +67,10 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* Мобильный сайдбар: отступ для кнопки меню */
+@media (max-width: 768px) {
+  .admin-main {
+    padding-left: 3.5rem !important;
+  }
+}

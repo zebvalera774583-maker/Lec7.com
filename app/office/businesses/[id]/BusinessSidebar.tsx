@@ -12,9 +12,12 @@ interface BusinessSidebarProps {
   businessId: string
   businessName: string
   navItems: NavItem[]
+  onNavigate?: () => void
+  showCloseButton?: boolean
+  onClose?: () => void
 }
 
-export default function BusinessSidebar({ businessId, businessName, navItems }: BusinessSidebarProps) {
+export default function BusinessSidebar({ businessId, businessName, navItems, onNavigate, showCloseButton, onClose }: BusinessSidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
@@ -45,8 +48,28 @@ export default function BusinessSidebar({ businessId, businessName, navItems }: 
         overflowY: 'auto',
       }}
     >
+      {showCloseButton && onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            marginBottom: '0.5rem',
+            padding: '0.5rem',
+            background: 'none',
+            border: 'none',
+            fontSize: '1.5rem',
+            cursor: 'pointer',
+            color: '#6b7280',
+            lineHeight: 1,
+          }}
+          aria-label="Закрыть меню"
+        >
+          ×
+        </button>
+      )}
       <Link
         href="/office"
+        onClick={onNavigate}
         style={{
           display: 'block',
           fontSize: '0.875rem',
@@ -87,6 +110,7 @@ export default function BusinessSidebar({ businessId, businessName, navItems }: 
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               style={{
                 display: 'block',
                 borderRadius: '6px',

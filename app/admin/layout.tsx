@@ -1,20 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { verifyToken } from '@/lib/auth'
-
-const SIDEBAR_ITEMS: (
-  | { label: string; href: string }
-  | { label: string; children: { label: string; href: string }[] }
-)[] = [
-  { label: 'AI-агент', href: '/admin' },
-  { label: 'Бизнесы', href: '/admin/businesses' },
-  { label: 'Мастер каталог', href: '/admin/bot-tools' },
-  {
-    label: 'Техничка',
-    children: [{ label: 'Таблицы', href: '/admin/tech/tables' }],
-  },
-]
+import AdminSidebarClient from './AdminSidebarClient'
 
 export default async function AdminLayout({
   children,
@@ -57,65 +44,8 @@ export default async function AdminLayout({
         </div>
       </nav>
       <div style={{ display: 'flex', maxWidth: '1200px', margin: '0 auto' }}>
-        <aside
-          style={{
-            minWidth: '200px',
-            padding: '2rem 0 2rem 2rem',
-            borderRight: '1px solid #e5e7eb',
-          }}
-        >
-          {SIDEBAR_ITEMS.map((item) => {
-            if ('href' in item) {
-              const { href } = item
-              const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href))
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  style={{
-                    display: 'block',
-                    padding: '0.75rem 1.5rem',
-                    color: isActive ? '#111827' : '#6b7280',
-                    fontWeight: isActive ? 600 : 500,
-                    textDecoration: 'none',
-                    borderLeft: isActive ? '2px solid #111827' : '2px solid transparent',
-                    marginLeft: isActive ? '-2px' : 0,
-                  }}
-                >
-                  {item.label}
-                </Link>
-              )
-            }
-            return (
-              <div key={item.label} style={{ marginBottom: '0.5rem' }}>
-                <div style={{ padding: '0.5rem 1.5rem', fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>
-                  {item.label}
-                </div>
-                {item.children.map((child) => {
-                  const isActive = pathname === child.href || pathname.startsWith(child.href + '/')
-                  return (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      style={{
-                        display: 'block',
-                        padding: '0.5rem 1.5rem 0.5rem 2rem',
-                        color: isActive ? '#111827' : '#6b7280',
-                        fontWeight: isActive ? 600 : 500,
-                        textDecoration: 'none',
-                        borderLeft: isActive ? '2px solid #111827' : '2px solid transparent',
-                        marginLeft: isActive ? '-2px' : 0,
-                      }}
-                    >
-                      {child.label}
-                    </Link>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </aside>
-        <main style={{ flex: 1, padding: '2rem' }}>{children}</main>
+        <AdminSidebarClient pathname={pathname} />
+        <main className="admin-main" style={{ flex: 1, padding: '2rem', minWidth: 0 }}>{children}</main>
       </div>
     </div>
   )
