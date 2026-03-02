@@ -554,6 +554,48 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     setViewMode('created')
   }
 
+  const updateSummaryItem = (idx: number, updates: Partial<SummaryItem>) => {
+    setSummaryData((prev) => {
+      if (!prev) return prev
+      const items = prev.items.map((item, i) => (i === idx ? { ...item, ...updates } : item))
+      return { ...prev, items }
+    })
+  }
+
+  const removeSummaryItem = (idx: number) => {
+    setSummaryData((prev) => {
+      if (!prev || prev.items.length <= 1) return prev
+      const items = prev.items.filter((_, i) => i !== idx)
+      return { ...prev, items }
+    })
+    setSelectedPriceByItem((prev) => {
+      const next: Record<string, string | null> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const i = Number(k)
+        if (i < idx) next[k] = v
+        else if (i > idx) next[String(i - 1)] = v
+      })
+      return next
+    })
+    setAppliedAnalogue((prev) => {
+      const next: Record<string, Record<string, { name: string; price: number }>> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const i = Number(k)
+        if (i < idx) next[k] = v
+        else if (i > idx) next[String(i - 1)] = v
+      })
+      return next
+    })
+  }
+
+  const addSummaryItem = () => {
+    setSummaryData((prev) => {
+      if (!prev) return prev
+      const newItem: SummaryItem = { name: '', quantity: '1', unit: 'кг', offers: {} }
+      return { ...prev, items: [...prev.items, newItem] }
+    })
+  }
+
   // Reload resets summaries (no persistence)
 
   useEffect(() => {
@@ -1294,17 +1336,64 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                           const rowTotalSum = rowTotals[idx] ?? 0
                           return (
                             <tr key={idx}>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb', verticalAlign: 'middle' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                                  {!isViewOnly && entry.summaryData.items.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSummaryItem(idx)}
+                                      aria-label="Удалить строку"
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: '#9ca3af', fontSize: '1rem' }}
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                  <span>{idx + 1}</span>
+                                </div>
+                              </td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                                {item.name}
-                                {item.originalName && (
-                                  <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.15rem' }}>
-                                    {item.originalName}
-                                  </div>
+                                {isViewOnly ? (
+                                  <>
+                                    {item.name}
+                                    {item.originalName && (
+                                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.15rem' }}>
+                                        {item.originalName}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <input
+                                    value={item.name}
+                                    onChange={(e) => updateSummaryItem(idx, { name: e.target.value })}
+                                    style={{ width: '100%', minWidth: '120px', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem' }}
+                                  />
                                 )}
                               </td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{item.quantity || '—'}</td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.unit || '—'}</td>
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>
+                                {isViewOnly ? (
+                                  item.quantity || '—'
+                                ) : (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={item.quantity}
+                                    onChange={(e) => updateSummaryItem(idx, { quantity: e.target.value })}
+                                    style={{ width: '4em', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem', textAlign: 'center' }}
+                                  />
+                                )}
+                              </td>
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                                {isViewOnly ? (
+                                  item.unit || '—'
+                                ) : (
+                                  <input
+                                    value={item.unit}
+                                    onChange={(e) => updateSummaryItem(idx, { unit: e.target.value })}
+                                    placeholder="кг"
+                                    style={{ width: '3.5em', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem' }}
+                                  />
+                                )}
+                              </td>
                               {entry.summaryData.counterparties.map((c) => {
                                 const exactPrice = item.offers[c.id]
                                 const appliedVal = entry.appliedAnalogue[itemKey]?.[c.id]
@@ -1374,6 +1463,20 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                         })}
                       </tbody>
                       <tfoot>
+                        {!isViewOnly && (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '0.5rem', border: '1px solid #e5e7eb' }}>
+                              <button
+                                type="button"
+                                onClick={addSummaryItem}
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8125rem', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '4px', cursor: 'pointer' }}
+                              >
+                                + Добавить позицию
+                              </button>
+                            </td>
+                            <td colSpan={entry.summaryData.counterparties.length + 1} style={{ padding: '0.5rem', border: '1px solid #e5e7eb' }} />
+                          </tr>
+                        )}
                         <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
                           <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
                           {entry.summaryData.counterparties.map((c) => (
