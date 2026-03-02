@@ -1282,7 +1282,18 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                     entry.summaryData.counterparties.forEach((c) => {
                       const exact = item.offers[c.id]
                       const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                      const p = exact ?? applied ?? 0
+                      let p = exact ?? applied ?? null
+                      if (p == null && c.id !== OWN_PRICE_ID) {
+                        const others = partners.filter((x) => x.id !== c.id)
+                        let minOther: number | null = null
+                        others.forEach((o) => {
+                          const op = item.offers[o.id] ?? entry.appliedAnalogue[itemKey]?.[o.id]?.price ?? null
+                          if (op != null && (minOther == null || op < minOther)) minOther = op
+                        })
+                        p = minOther ?? 0
+                      } else if (p == null) {
+                        p = 0
+                      }
                       fullOrderBySupplier[c.id] += p * qty
                     })
                   })

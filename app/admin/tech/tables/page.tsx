@@ -40,8 +40,16 @@ export default function TechTablesPage() {
     const qty = parseFloat(r.qty) || 0
     return a + (rowMin != null ? rowMin * qty : 0)
   }, 0)
-  const fullOrderPiliev = SAMPLE_SUMMARY_ROWS.reduce((a, r) => a + ((r.piliev ?? 0) * (parseFloat(r.qty) || 0)), 0)
-  const fullOrderNep = SAMPLE_SUMMARY_ROWS.reduce((a, r) => a + ((r.nep ?? 0) * (parseFloat(r.qty) || 0)), 0)
+  const fullOrderPiliev = SAMPLE_SUMMARY_ROWS.reduce((a, r) => {
+    const qty = parseFloat(r.qty) || 0
+    const p = r.piliev ?? (r.nep ?? 0)
+    return a + p * qty
+  }, 0)
+  const fullOrderNep = SAMPLE_SUMMARY_ROWS.reduce((a, r) => {
+    const qty = parseFloat(r.qty) || 0
+    const p = r.nep ?? (r.piliev ?? 0)
+    return a + p * qty
+  }, 0)
   const sumByPiliev = SAMPLE_SUMMARY_ROWS.reduce((a, r) => {
     const piliev = r.piliev ?? null
     const nep = r.nep ?? null
