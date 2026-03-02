@@ -183,6 +183,69 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
     XLSX.writeFile(wb, `${safeName}.xlsx`)
   }
 
+  const downloadPeriodSummaryAsExcel = (
+    data: { items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[]; counterparties: { id: string; legalName: string }[] },
+    dateFrom: string,
+    dateTo: string
+  ) => {
+    const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+    const totalSum = data.items.reduce((a, r) => {
+      const prices = data.counterparties.map((c) => r.offers[c.id] ?? null)
+      const minP = prices.filter((x): x is number => x != null)
+      const rowMin = minP.length > 0 ? Math.min(...minP) : null
+      const qty = parseFloat(r.quantity) || 0
+      return a + (rowMin != null ? rowMin * qty : 0)
+    }, 0)
+    const sumByCounterparty = data.counterparties.map((c) =>
+      data.items.reduce((a, r) => {
+        const p = r.offers[c.id] ?? null
+        const prices = data.counterparties.map((cc) => r.offers[cc.id] ?? null)
+        const minP = prices.filter((x): x is number => x != null)
+        const rowMin = minP.length > 0 ? Math.min(...minP) : null
+        const qty = parseFloat(r.quantity) || 0
+        if (rowMin != null && p != null && p === rowMin) return a + p * qty
+        return a
+      }, 0)
+    )
+    const fullOrderByCounterparty = data.counterparties.map((c) =>
+      data.items.reduce((a, r) => {
+        const p = r.offers[c.id] ?? null
+        const qty = parseFloat(r.quantity) || 0
+        return a + (p != null ? p * qty : 0)
+      }, 0)
+    )
+    const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...data.counterparties.map((c) => c.legalName), 'Итоговая сумма']
+    const dataRows = data.items.map((r, idx) => {
+      const prices = data.counterparties.map((c) => r.offers[c.id] ?? null)
+      const minP = prices.filter((x): x is number => x != null)
+      const rowMin = minP.length > 0 ? Math.min(...minP) : null
+      const qty = parseFloat(r.quantity) || 0
+      const rowSum = rowMin != null ? rowMin * qty : null
+      return [
+        idx + 1,
+        r.name,
+        r.quantity || '',
+        r.unit || '',
+        ...data.counterparties.map((c) => (r.offers[c.id] != null ? r.offers[c.id] : '')),
+        rowSum != null ? rowSum : '',
+      ]
+    })
+    const footerRow1 = ['Итого (по выбранным позициям)', '', '', '', ...sumByCounterparty.map((s) => (s > 0 ? s : '')), totalSum > 0 ? totalSum : '']
+    const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...fullOrderByCounterparty.map((s) => (s > 0 ? s : '')), '']
+    const footerRow3 = ['Экономия', '', '', '', ...fullOrderByCounterparty.map((s) => {
+      const saving = totalSum - s
+      if (saving === 0) return 0
+      return saving > 0 ? `+${fmt(saving)}` : `-${fmt(Math.abs(saving))}`
+    }), '']
+    const aoa = [headerRow, ...dataRows, footerRow1, footerRow2, footerRow3]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, ...data.counterparties.map(() => ({ wch: 14 })), { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Сводная')
+    const safeName = `Сводная_за_период_${dateFrom}_${dateTo}`.replace(/[^\w\s\u0400-\u04FF-]/g, '_').trim() || 'Сводная_за_период'
+    XLSX.writeFile(wb, `${safeName}.xlsx`)
+  }
+
   const handleDownloadPrice = async (priceId: string, priceName: string) => {
     setMenuOpenPriceId(null)
     try {
@@ -2460,6 +2523,23 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
               >
                 {periodSummaryLoading ? 'Загрузка...' : 'Показать'}
               </button>
+              {periodSummaryData && periodSummaryData.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => downloadPeriodSummaryAsExcel(periodSummaryData, periodDateFrom, periodDateTo)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#059669',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Скачать (Excel)
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsPeriodSummaryOpen(false)}
