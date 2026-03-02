@@ -205,7 +205,7 @@ export default function TechTablesPage() {
         <p style={{ margin: '0 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
           Логика как у таблицы №1. Отличие: данные — агрегация потребностей за выбранный период (сумма по masterItemId/названию и ед.).
         </p>
-        <div style={{ padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+        <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
           <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №4</h3>
           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
             <li><strong>Назначение:</strong> Сводная таблица по потребностям за период. Кнопка «Сводная за период» в шапке Потребностей → модалка выбора дат.</li>
@@ -213,6 +213,76 @@ export default function TechTablesPage() {
             <li><strong>Данные:</strong> Группировка по masterItemId (или названию), суммирование qty. Разные ед. — отдельные строки.</li>
             <li><strong>Режим:</strong> Просмотр/отчёт на странице, без создания заявки.</li>
           </ul>
+        </div>
+
+        <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '48px' }}>№</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '140px' }}>Наименование</th>
+                <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '80px' }}>Кол-во</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '60px' }}>Ед.</th>
+                {suppliers.map((s) => (
+                  <th key={s.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>{s.name}</th>
+                ))}
+                <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>Итоговая сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SAMPLE_SUMMARY_ROWS.map((r, idx) => {
+                const pilievPrice = r.piliev ?? null
+                const nepPrice = r.nep ?? null
+                const minPrice = [pilievPrice, nepPrice].filter((p): p is number => p != null)
+                const rowMin = minPrice.length > 0 ? Math.min(...minPrice) : null
+                const isPilievMin = pilievPrice != null && pilievPrice === rowMin
+                const isNepMin = nepPrice != null && nepPrice === rowMin
+                const qty = parseFloat(r.qty) || 0
+                const rowSum = rowMin != null ? rowMin * qty : null
+                return (
+                  <tr key={idx}>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.qty}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: isPilievMin ? '#dcfce7' : 'white' }}>
+                      {pilievPrice != null ? formatPrice(pilievPrice) : '—'}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: isNepMin ? '#dcfce7' : 'white' }}>
+                      {nepPrice != null ? formatPrice(nepPrice) : '—'}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: (rowSum ?? 0) > 0 ? 600 : 400 }}>
+                      {rowSum != null ? formatPrice(rowSum) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{sumByPiliev > 0 ? formatPrice(sumByPiliev) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{sumByNep > 0 ? formatPrice(sumByNep) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(totalSum)}</td>
+              </tr>
+              <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fullOrderPiliev > 0 ? formatPrice(fullOrderPiliev) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fullOrderNep > 0 ? formatPrice(fullOrderNep) : '—'}</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+              </tr>
+              <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: savingPiliev > 0 ? '#15803d' : savingPiliev < 0 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                  {savingPiliev !== 0 ? (savingPiliev > 0 ? `+${formatPrice(savingPiliev)}` : `-${formatPrice(Math.abs(savingPiliev))}`) : '0'}
+                </td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: savingNep > 0 ? '#15803d' : savingNep < 0 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                  {savingNep !== 0 ? (savingNep > 0 ? `+${formatPrice(savingNep)}` : `-${formatPrice(Math.abs(savingNep))}`) : '0'}
+                </td>
+                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>

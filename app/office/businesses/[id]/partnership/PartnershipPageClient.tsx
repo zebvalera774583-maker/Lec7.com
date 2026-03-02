@@ -134,6 +134,14 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
   const [removingCounterpartyId, setRemovingCounterpartyId] = useState<string | null>(null)
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
 
+  // Сводная за период (таблица №4)
+  const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
+  const [periodDateFrom, setPeriodDateFrom] = useState('')
+  const [periodDateTo, setPeriodDateTo] = useState('')
+  const [periodSummaryData, setPeriodSummaryData] = useState<{ items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[]; counterparties: { id: string; legalName: string }[] } | null>(null)
+  const [periodSummaryLoading, setPeriodSummaryLoading] = useState(false)
+  const [periodSummaryError, setPeriodSummaryError] = useState<string | null>(null)
+
   // Назначить исполнителя: панель справа
   const [assignPerformerOpen, setAssignPerformerOpen] = useState(false)
   const [assignRole, setAssignRole] = useState<'PICKER' | 'RECEIVER' | ''>('')
@@ -1249,7 +1257,34 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
       {/* Потребности — таблица потребностей + мои прайсы */}
       {onlyNeedsView && (
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <h2 style={{ marginBottom: '0.75rem', fontSize: '1.25rem', fontWeight: 600 }}>Потребности</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <h2 style={{ marginBottom: 0, fontSize: '1.25rem', fontWeight: 600 }}>Потребности</h2>
+            <button
+              type="button"
+              onClick={() => {
+                const today = new Date()
+                const weekAgo = new Date(today)
+                weekAgo.setDate(weekAgo.getDate() - 7)
+                setPeriodDateFrom(weekAgo.toISOString().slice(0, 10))
+                setPeriodDateTo(today.toISOString().slice(0, 10))
+                setPeriodSummaryData(null)
+                setPeriodSummaryError(null)
+                setIsPeriodSummaryOpen(true)
+              }}
+              style={{
+                padding: '0.35rem 0.75rem',
+                background: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+              }}
+            >
+              Сводная за период
+            </button>
+          </div>
             {loadingPartnership ? (
               <div style={{ padding: '2rem', textAlign: 'center' }}>Загрузка...</div>
             ) : (() => {
@@ -2339,6 +2374,202 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
         onAssign={handleCounterpartyAssign}
         onRemove={handleCounterpartyRemove}
       />
+
+      {/* Модалка «Сводная за период» */}
+      {isPeriodSummaryOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)',
+          }}
+          onClick={() => setIsPeriodSummaryOpen(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              maxWidth: '95vw',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              padding: '1.5rem',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 600 }}>Сводная за период</h3>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.875rem', minWidth: '4rem' }}>С:</span>
+                <input
+                  type="date"
+                  value={periodDateFrom}
+                  onChange={(e) => setPeriodDateFrom(e.target.value)}
+                  style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                />
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.875rem', minWidth: '4rem' }}>По:</span>
+                <input
+                  type="date"
+                  value={periodDateTo}
+                  onChange={(e) => setPeriodDateTo(e.target.value)}
+                  style={{ padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem' }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!periodDateFrom || !periodDateTo) {
+                    setPeriodSummaryError('Укажите даты')
+                    return
+                  }
+                  setPeriodSummaryError(null)
+                  setPeriodSummaryLoading(true)
+                  try {
+                    const res = await fetch(
+                      `/api/office/businesses/${businessId}/partnership/period-summary?dateFrom=${periodDateFrom}&dateTo=${periodDateTo}`,
+                      { credentials: 'include' }
+                    )
+                    const data = await res.json()
+                    if (!res.ok) throw new Error(data.error || 'Ошибка загрузки')
+                    setPeriodSummaryData(data)
+                  } catch (e) {
+                    setPeriodSummaryError(e instanceof Error ? e.message : 'Ошибка')
+                  } finally {
+                    setPeriodSummaryLoading(false)
+                  }
+                }}
+                disabled={periodSummaryLoading}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: periodSummaryLoading ? '#9ca3af' : '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: periodSummaryLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {periodSummaryLoading ? 'Загрузка...' : 'Показать'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPeriodSummaryOpen(false)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#f3f4f6',
+                  color: '#111827',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Закрыть
+              </button>
+            </div>
+            {periodSummaryError && (
+              <p style={{ margin: '0 0 1rem 0', color: '#dc2626', fontSize: '0.875rem' }}>{periodSummaryError}</p>
+            )}
+            {periodSummaryData && (
+              <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f9fafb' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Наименование</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 500 }}>Кол-во</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Ед.</th>
+                      {periodSummaryData.counterparties.map((c) => (
+                        <th key={c.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 500 }}>{c.legalName}</th>
+                      ))}
+                      <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 500 }}>Итоговая сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periodSummaryData.items.map((r, idx) => {
+                      const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
+                      const minPrice = prices.filter((p): p is number => p != null)
+                      const rowMin = minPrice.length > 0 ? Math.min(...minPrice) : null
+                      const qty = parseFloat(r.quantity) || 0
+                      const rowSum = rowMin != null ? rowMin * qty : null
+                      return (
+                        <tr key={idx}>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{idx + 1}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.quantity}</td>
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
+                          {periodSummaryData.counterparties.map((c) => {
+                            const p = r.offers[c.id] ?? null
+                            const isMin = p != null && rowMin != null && p === rowMin
+                            return (
+                              <td
+                                key={c.id}
+                                style={{
+                                  padding: '0.75rem',
+                                  border: '1px solid #e5e7eb',
+                                  textAlign: 'right',
+                                  backgroundColor: isMin ? '#dcfce7' : 'white',
+                                }}
+                              >
+                                {p != null ? p.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                              </td>
+                            )
+                          })}
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: (rowSum ?? 0) > 0 ? 600 : 400 }}>
+                            {rowSum != null ? rowSum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                      <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                      {periodSummaryData.counterparties.map((c) => {
+                        const sum = periodSummaryData.items.reduce((a, r) => {
+                          const p = r.offers[c.id] ?? null
+                          const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
+                          const minP = prices.filter((x): x is number => x != null)
+                          const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                          const qty = parseFloat(r.quantity) || 0
+                          if (rowMin != null && p != null && p === rowMin) return a + p * qty
+                          return a
+                        }, 0)
+                        return (
+                          <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                            {sum > 0 ? sum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                          </td>
+                        )
+                      })}
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                        {periodSummaryData.items.reduce((a, r) => {
+                          const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
+                          const minP = prices.filter((x): x is number => x != null)
+                          const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                          const qty = parseFloat(r.quantity) || 0
+                          return a + (rowMin != null ? rowMin * qty : 0)
+                        }, 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            {periodSummaryData?.items?.length === 0 && !periodSummaryLoading && (
+              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Нет потребностей за выбранный период</p>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }
