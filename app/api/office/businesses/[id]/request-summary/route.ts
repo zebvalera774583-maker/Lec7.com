@@ -5,7 +5,11 @@ import { withBusinessAccess } from '@/lib/access'
 const DEFAULT_CATEGORY = 'Свежая плодоовощная продукция'
 
 function normalizeForMatch(s: string): string {
-  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  return (s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.,;:()\[\]{}"'`]/g, '')
+    .replace(/\s+/g, ' ')
 }
 
 export const POST = withBusinessAccess(async (req, user) => {

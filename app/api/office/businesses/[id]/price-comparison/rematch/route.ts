@@ -17,11 +17,11 @@ WITH accepted_prices AS (
     AND (pl.category = $2 OR pl.category IS NULL)
 ),
 cat AS (
-  SELECT id, lower(regexp_replace(trim("canonicalName"), '\\s+', ' ', 'g')) AS norm
+  SELECT id, lower(regexp_replace(regexp_replace(trim("canonicalName"), '[\\.,;:()\\[\\]{}"''`]', '', 'g'), '\\s+', ' ', 'g')) AS norm
   FROM "BotCatalogItem"
   WHERE scope = 'GLOBAL'
   UNION ALL
-  SELECT b.id, lower(regexp_replace(trim(s), '\\s+', ' ', 'g')) AS norm
+  SELECT b.id, lower(regexp_replace(regexp_replace(trim(s), '[\\.,;:()\\[\\]{}"''`]', '', 'g'), '\\s+', ' ', 'g')) AS norm
   FROM "BotCatalogItem" b, unnest(b.synonyms) AS s
   WHERE b.scope = 'GLOBAL'
 ),
@@ -33,7 +33,7 @@ map AS (
   HAVING count(DISTINCT id) = 1
 ),
 candidate_rows AS (
-  SELECT r.id, lower(regexp_replace(trim(r.name), '\\s+', ' ', 'g')) AS norm
+  SELECT r.id, lower(regexp_replace(regexp_replace(trim(r.name), '[\\.,;:()\\[\\]{}"''`]', '', 'g'), '\\s+', ' ', 'g')) AS norm
   FROM "PriceListRow" r
   JOIN accepted_prices ap ON ap."priceListId" = r."priceListId"
   WHERE r."masterItemId" IS NULL
