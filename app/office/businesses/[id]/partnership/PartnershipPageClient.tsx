@@ -2532,10 +2532,16 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                     })}
                   </tbody>
                   <tfoot>
-                    <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
-                      <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
-                      {periodSummaryData.counterparties.map((c) => {
-                        const sum = periodSummaryData.items.reduce((a, r) => {
+                    {(() => {
+                      const totalSum = periodSummaryData.items.reduce((a, r) => {
+                        const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
+                        const minP = prices.filter((x): x is number => x != null)
+                        const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                        const qty = parseFloat(r.quantity) || 0
+                        return a + (rowMin != null ? rowMin * qty : 0)
+                      }, 0)
+                      const sumByCounterparty = periodSummaryData.counterparties.map((c) =>
+                        periodSummaryData.items.reduce((a, r) => {
                           const p = r.offers[c.id] ?? null
                           const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
                           const minP = prices.filter((x): x is number => x != null)
@@ -2544,22 +2550,51 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                           if (rowMin != null && p != null && p === rowMin) return a + p * qty
                           return a
                         }, 0)
-                        return (
-                          <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                            {sum > 0 ? sum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
-                          </td>
-                        )
-                      })}
-                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                        {periodSummaryData.items.reduce((a, r) => {
-                          const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
-                          const minP = prices.filter((x): x is number => x != null)
-                          const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                      )
+                      const fullOrderByCounterparty = periodSummaryData.counterparties.map((c) =>
+                        periodSummaryData.items.reduce((a, r) => {
+                          const p = r.offers[c.id] ?? null
                           const qty = parseFloat(r.quantity) || 0
-                          return a + (rowMin != null ? rowMin * qty : 0)
-                        }, 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
+                          return a + (p != null ? p * qty : 0)
+                        }, 0)
+                      )
+                      const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                      return (
+                        <>
+                          <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                            <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                            {sumByCounterparty.map((sum, i) => (
+                              <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                {sum > 0 ? fmt(sum) : '—'}
+                              </td>
+                            ))}
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fmt(totalSum)}</td>
+                          </tr>
+                          <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                            <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                            {fullOrderByCounterparty.map((sum, i) => (
+                              <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                {sum > 0 ? fmt(sum) : '—'}
+                              </td>
+                            ))}
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                          </tr>
+                          <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                            <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                            {fullOrderByCounterparty.map((sum, i) => {
+                              const saving = totalSum - sum
+                              const color = saving > 0 ? '#15803d' : saving < 0 ? '#dc2626' : '#6b7280'
+                              return (
+                                <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color, fontWeight: 600 }}>
+                                  {saving !== 0 ? (saving > 0 ? `+${fmt(saving)}` : `-${fmt(Math.abs(saving))}`) : '0'}
+                                </td>
+                              )
+                            })}
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                          </tr>
+                        </>
+                      )
+                    })()}
                   </tfoot>
                 </table>
               </div>
