@@ -101,6 +101,13 @@ export const POST = withBusinessAccess(async (req, user) => {
     const masterToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
     const counterpartySet = new Map<string, string>()
 
+    // Сначала добавляем ВСЕХ подключённых поставщиков (как в price-comparison), чтобы ИП Пилиев и др. отображались даже без совпадающих цен
+    for (const a of assignments) {
+      const supplierId = a.priceList.business.id
+      const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
+      counterpartySet.set(supplierId, legalName)
+    }
+
     const addOffer = (masterItemId: string, supplierId: string, legalName: string, price: number) => {
       let bySupplier = masterToOffers.get(masterItemId)
       if (!bySupplier) {

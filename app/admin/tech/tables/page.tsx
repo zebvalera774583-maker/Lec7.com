@@ -20,11 +20,11 @@ const TABLES_CATALOG = [
 ]
 
 const SAMPLE_SUMMARY_ROWS = [
-  { name: 'Грибы шампиньоны', qty: '1', unit: 'кг', price: 290, sum: 290 },
-  { name: 'Перец красный-болгарский', qty: '1', unit: 'кг', price: 455, sum: 455 },
-  { name: 'Помидоры розовые', qty: '2', unit: 'кг', price: null, sum: null },
-  { name: 'Лист салата', qty: '1', unit: 'кг', price: 664, sum: 664 },
-  { name: 'Картофель очищенный', qty: '2', unit: 'кг', price: 129, sum: 258 },
+  { name: 'Грибы шампиньоны', qty: '1', unit: 'кг', piliev: null, nep: 290, sum: 290 },
+  { name: 'Перец красный-болгарский', qty: '1', unit: 'кг', piliev: 315, nep: 455, sum: 315 },
+  { name: 'Помидоры розовые', qty: '2', unit: 'кг', piliev: null, nep: null, sum: null },
+  { name: 'Лист салата', qty: '1', unit: 'кг', piliev: null, nep: 664, sum: 664 },
+  { name: 'Картофель очищенный', qty: '2', unit: 'кг', piliev: null, nep: 129, sum: 258 },
 ]
 
 function formatPrice(n: number): string {
@@ -32,7 +32,18 @@ function formatPrice(n: number): string {
 }
 
 export default function TechTablesPage() {
-  const totalSum = SAMPLE_SUMMARY_ROWS.reduce((a, r) => a + (r.sum ?? 0), 0)
+  const totalSum = SAMPLE_SUMMARY_ROWS.reduce((a, r) => {
+    const piliev = r.piliev ?? null
+    const nep = r.nep ?? null
+    const min = [piliev, nep].filter((p): p is number => p != null)
+    const rowMin = min.length > 0 ? Math.min(...min) : null
+    const qty = parseFloat(r.qty) || 0
+    return a + (rowMin != null ? rowMin * qty : 0)
+  }, 0)
+  const suppliers = [
+    { id: 'piliev', name: 'ИП Пилиев Г.З.' },
+    { id: 'nep', name: 'ООО «НЭП»' },
+  ]
   return (
     <div style={{ width: '100%' }}>
       <h1 style={{ marginBottom: '0.5rem', fontSize: '1.875rem', fontWeight: 700 }}>
@@ -83,30 +94,47 @@ export default function TechTablesPage() {
                 <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '140px' }}>Наименование</th>
                 <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '80px' }}>Кол-во</th>
                 <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '60px' }}>Ед.</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>ООО «НЭП»</th>
+                {suppliers.map((s) => (
+                  <th key={s.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>{s.name}</th>
+                ))}
                 <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, minWidth: '100px' }}>Итоговая сумма</th>
               </tr>
             </thead>
             <tbody>
-              {SAMPLE_SUMMARY_ROWS.map((r, idx) => (
-                <tr key={idx}>
-                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
-                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
-                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.qty}</td>
-                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
-                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: r.price != null ? '#dcfce7' : 'white' }}>
-                    {r.price != null ? formatPrice(r.price) : '—'}
-                  </td>
-                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: (r.sum ?? 0) > 0 ? 600 : 400 }}>
-                    {r.sum != null ? formatPrice(r.sum) : '—'}
-                  </td>
-                </tr>
-              ))}
+              {SAMPLE_SUMMARY_ROWS.map((r, idx) => {
+                const pilievPrice = r.piliev ?? null
+                const nepPrice = r.nep ?? null
+                const minPrice = [pilievPrice, nepPrice].filter((p): p is number => p != null)
+                const rowMin = minPrice.length > 0 ? Math.min(...minPrice) : null
+                const isPilievMin = pilievPrice != null && pilievPrice === rowMin
+                const isNepMin = nepPrice != null && nepPrice === rowMin
+                const qty = parseFloat(r.qty) || 0
+                const rowSum = rowMin != null ? rowMin * qty : null
+                return (
+                  <tr key={idx}>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{idx + 1}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.qty}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: isPilievMin ? '#dcfce7' : 'white' }}>
+                      {pilievPrice != null ? formatPrice(pilievPrice) : '—'}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: isNepMin ? '#dcfce7' : 'white' }}>
+                      {nepPrice != null ? formatPrice(nepPrice) : '—'}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: (rowSum ?? 0) > 0 ? 600 : 400 }}>
+                      {rowSum != null ? formatPrice(rowSum) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
             <tfoot>
               <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
                 <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
-                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(totalSum)}</td>
+                {suppliers.map((s) => (
+                  <td key={s.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                ))}
                 <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(totalSum)}</td>
               </tr>
             </tfoot>
