@@ -279,7 +279,8 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...summaryData.counterparties.map((c) => fullOrderBySupplier[c.id] > 0 ? fullOrderBySupplier[c.id] : ''), '']
     const footerRow3 = ['Экономия', '', '', '', ...summaryData.counterparties.map((c) => {
       const saving = totalMinSum - fullOrderBySupplier[c.id]
-      return saving !== 0 ? Math.abs(saving) : 0
+      if (saving === 0) return 0
+      return saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`
     }), '']
     const aoa = [headerRow, ...dataRows, footerRow1, footerRow2, footerRow3]
     const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -1565,7 +1566,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                                   fontWeight: 600,
                                 }}
                               >
-                                {saving !== 0 ? formatPrice(Math.abs(saving)) : '0'}
+                                {saving !== 0 ? (saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`) : '0'}
                               </td>
                             )
                           })}

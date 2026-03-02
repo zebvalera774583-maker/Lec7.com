@@ -180,10 +180,10 @@ export default function TechTablesPage() {
               <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
                 <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
                 <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: savingPiliev > 0 ? '#15803d' : savingPiliev < 0 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
-                  {savingPiliev !== 0 ? formatPrice(Math.abs(savingPiliev)) : '0'}
+                  {savingPiliev !== 0 ? (savingPiliev > 0 ? `+${formatPrice(savingPiliev)}` : `-${formatPrice(Math.abs(savingPiliev))}`) : '0'}
                 </td>
                 <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: savingNep > 0 ? '#15803d' : savingNep < 0 ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
-                  {savingNep !== 0 ? formatPrice(Math.abs(savingNep)) : '0'}
+                  {savingNep !== 0 ? (savingNep > 0 ? `+${formatPrice(savingNep)}` : `-${formatPrice(Math.abs(savingNep))}`) : '0'}
                 </td>
                 <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
               </tr>
