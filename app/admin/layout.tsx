@@ -3,11 +3,18 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { verifyToken } from '@/lib/auth'
 
-const SIDEBAR_ITEMS = [
+const SIDEBAR_ITEMS: (
+  | { label: string; href: string }
+  | { label: string; children: { label: string; href: string }[] }
+)[] = [
   { label: 'AI-агент', href: '/admin' },
   { label: 'Бизнесы', href: '/admin/businesses' },
   { label: 'Мастер каталог', href: '/admin/bot-tools' },
-] as const
+  {
+    label: 'Техничка',
+    children: [{ label: 'Таблицы', href: '/admin/tech/tables' }],
+  },
+]
 
 export default async function AdminLayout({
   children,
@@ -57,24 +64,54 @@ export default async function AdminLayout({
             borderRight: '1px solid #e5e7eb',
           }}
         >
-          {SIDEBAR_ITEMS.map(({ label, href }) => {
-            const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href))
+          {SIDEBAR_ITEMS.map((item) => {
+            if ('href' in item) {
+              const { href } = item
+              const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href))
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  style={{
+                    display: 'block',
+                    padding: '0.75rem 1.5rem',
+                    color: isActive ? '#111827' : '#6b7280',
+                    fontWeight: isActive ? 600 : 500,
+                    textDecoration: 'none',
+                    borderLeft: isActive ? '2px solid #111827' : '2px solid transparent',
+                    marginLeft: isActive ? '-2px' : 0,
+                  }}
+                >
+                  {item.label}
+                </Link>
+              )
+            }
             return (
-              <Link
-                key={href}
-                href={href}
-                style={{
-                  display: 'block',
-                  padding: '0.75rem 1.5rem',
-                  color: isActive ? '#111827' : '#6b7280',
-                  fontWeight: isActive ? 600 : 500,
-                  textDecoration: 'none',
-                  borderLeft: isActive ? '2px solid #111827' : '2px solid transparent',
-                  marginLeft: isActive ? '-2px' : 0,
-                }}
-              >
-                {label}
-              </Link>
+              <div key={item.label} style={{ marginBottom: '0.5rem' }}>
+                <div style={{ padding: '0.5rem 1.5rem', fontSize: '0.75rem', color: '#9ca3af', fontWeight: 600 }}>
+                  {item.label}
+                </div>
+                {item.children.map((child) => {
+                  const isActive = pathname === child.href || pathname.startsWith(child.href + '/')
+                  return (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      style={{
+                        display: 'block',
+                        padding: '0.5rem 1.5rem 0.5rem 2rem',
+                        color: isActive ? '#111827' : '#6b7280',
+                        fontWeight: isActive ? 600 : 500,
+                        textDecoration: 'none',
+                        borderLeft: isActive ? '2px solid #111827' : '2px solid transparent',
+                        marginLeft: isActive ? '-2px' : 0,
+                      }}
+                    >
+                      {child.label}
+                    </Link>
+                  )
+                })}
+              </div>
             )
           })}
         </aside>
