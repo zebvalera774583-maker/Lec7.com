@@ -138,7 +138,10 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
   const [isPeriodSummaryOpen, setIsPeriodSummaryOpen] = useState(false)
   const [periodDateFrom, setPeriodDateFrom] = useState('')
   const [periodDateTo, setPeriodDateTo] = useState('')
-  const [periodSummaryData, setPeriodSummaryData] = useState<{ items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[]; counterparties: { id: string; legalName: string }[] } | null>(null)
+  const [periodSummaryData, setPeriodSummaryData] = useState<{
+    sections: { department: string; departmentLabel: string; date: string; requestNumbers: number[]; items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[] }[]
+    counterparties: { id: string; legalName: string }[]
+  } | null>(null)
   const [periodSummaryLoading, setPeriodSummaryLoading] = useState(false)
   const [periodSummaryError, setPeriodSummaryError] = useState<string | null>(null)
 
@@ -184,69 +187,80 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
   }
 
   const downloadPeriodSummaryAsExcel = (
-    data: { items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[]; counterparties: { id: string; legalName: string }[] },
+    data: {
+      sections: { departmentLabel: string; date: string; requestNumbers: number[]; items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[] }[]
+      counterparties: { id: string; legalName: string }[]
+    },
     dateFrom: string,
     dateTo: string
   ) => {
     const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-    const totalSum = data.items.reduce((a, r) => {
-      const prices = data.counterparties.map((c) => r.offers[c.id] ?? null)
-      const minP = prices.filter((x): x is number => x != null)
-      const rowMin = minP.length > 0 ? Math.min(...minP) : null
-      const qty = parseFloat(r.quantity) || 0
-      return a + (rowMin != null ? rowMin * qty : 0)
-    }, 0)
-    const sumByCounterparty = data.counterparties.map((c) =>
-      data.items.reduce((a, r) => {
-        const p = r.offers[c.id] ?? null
-        const prices = data.counterparties.map((cc) => r.offers[cc.id] ?? null)
+    const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...data.counterparties.map((c) => c.legalName), 'Итоговая сумма']
+    const aoa: (string | number)[][] = []
+    for (const section of data.sections) {
+      const mergedLabel = section.requestNumbers.length > 1
+        ? `${section.departmentLabel} — ${section.date} (объединено из №${section.requestNumbers.join(', №')})`
+        : `${section.departmentLabel} — ${section.date}${section.requestNumbers.length ? ` (№${section.requestNumbers[0]})` : ''}`
+      aoa.push([mergedLabel], [])
+      aoa.push(headerRow)
+      const totalSum = section.items.reduce((a, r) => {
+        const prices = data.counterparties.map((c) => r.offers[c.id] ?? null)
         const minP = prices.filter((x): x is number => x != null)
         const rowMin = minP.length > 0 ? Math.min(...minP) : null
         const qty = parseFloat(r.quantity) || 0
-        if (rowMin != null && p != null && p === rowMin) return a + p * qty
-        return a
+        return a + (rowMin != null ? rowMin * qty : 0)
       }, 0)
-    )
-    const fullOrderByCounterparty = data.counterparties.map((c) =>
-      data.items.reduce((a, r) => {
-        let p = r.offers[c.id] ?? null
-        if (p == null) {
-          const others = data.counterparties.filter((cc) => cc.id !== c.id)
-          let minOther: number | null = null
-          others.forEach((o) => {
-            const op = r.offers[o.id] ?? null
-            if (op != null && (minOther == null || op < minOther)) minOther = op
-          })
-          p = minOther ?? 0
-        }
+      const sumByCounterparty = data.counterparties.map((c) =>
+        section.items.reduce((a, r) => {
+          const p = r.offers[c.id] ?? null
+          const prices = data.counterparties.map((cc) => r.offers[cc.id] ?? null)
+          const minP = prices.filter((x): x is number => x != null)
+          const rowMin = minP.length > 0 ? Math.min(...minP) : null
+          const qty = parseFloat(r.quantity) || 0
+          if (rowMin != null && p != null && p === rowMin) return a + p * qty
+          return a
+        }, 0)
+      )
+      const fullOrderByCounterparty = data.counterparties.map((c) =>
+        section.items.reduce((a, r) => {
+          let p = r.offers[c.id] ?? null
+          if (p == null) {
+            const others = data.counterparties.filter((cc) => cc.id !== c.id)
+            let minOther: number | null = null
+            others.forEach((o) => {
+              const op = r.offers[o.id] ?? null
+              if (op != null && (minOther == null || op < minOther)) minOther = op
+            })
+            p = minOther ?? 0
+          }
+          const qty = parseFloat(r.quantity) || 0
+          return a + p * qty
+        }, 0)
+      )
+      const dataRows = section.items.map((r, idx) => {
+        const prices = data.counterparties.map((c) => r.offers[c.id] ?? null)
+        const minP = prices.filter((x): x is number => x != null)
+        const rowMin = minP.length > 0 ? Math.min(...minP) : null
         const qty = parseFloat(r.quantity) || 0
-        return a + p * qty
-      }, 0)
-    )
-    const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...data.counterparties.map((c) => c.legalName), 'Итоговая сумма']
-    const dataRows = data.items.map((r, idx) => {
-      const prices = data.counterparties.map((c) => r.offers[c.id] ?? null)
-      const minP = prices.filter((x): x is number => x != null)
-      const rowMin = minP.length > 0 ? Math.min(...minP) : null
-      const qty = parseFloat(r.quantity) || 0
-      const rowSum = rowMin != null ? rowMin * qty : null
-      return [
-        idx + 1,
-        r.name,
-        r.quantity || '',
-        r.unit || '',
-        ...data.counterparties.map((c) => (r.offers[c.id] != null ? r.offers[c.id] : '')),
-        rowSum != null ? rowSum : '',
-      ]
-    })
-    const footerRow1 = ['Итого (по выбранным позициям)', '', '', '', ...sumByCounterparty.map((s) => (s > 0 ? s : '')), totalSum > 0 ? totalSum : '']
-    const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...fullOrderByCounterparty.map((s) => (s > 0 ? s : '')), '']
-    const footerRow3 = ['Экономия', '', '', '', ...fullOrderByCounterparty.map((s) => {
-      const saving = totalSum - s
-      if (saving === 0) return 0
-      return saving > 0 ? `+${fmt(saving)}` : `-${fmt(Math.abs(saving))}`
-    }), '']
-    const aoa = [headerRow, ...dataRows, footerRow1, footerRow2, footerRow3]
+        const rowSum = rowMin != null ? rowMin * qty : null
+        return [
+          idx + 1,
+          r.name,
+          r.quantity || '',
+          r.unit || '',
+          ...data.counterparties.map((c) => (r.offers[c.id] != null ? r.offers[c.id] : '')),
+          rowSum != null ? rowSum : '',
+        ]
+      })
+      const footerRow1 = ['Итого (по выбранным позициям)', '', '', '', ...sumByCounterparty.map((s) => (s > 0 ? s : '')), totalSum > 0 ? totalSum : '']
+      const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...fullOrderByCounterparty.map((s) => (s > 0 ? s : '')), '']
+      const footerRow3 = ['Экономия', '', '', '', ...fullOrderByCounterparty.map((s) => {
+        const saving = totalSum - s
+        if (saving === 0) return 0
+        return saving > 0 ? `+${fmt(saving)}` : `-${fmt(Math.abs(saving))}`
+      }), '']
+      aoa.push(...dataRows, footerRow1, footerRow2, footerRow3, [])
+    }
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, ...data.counterparties.map(() => ({ wch: 14 })), { wch: 14 }]
     const wb = XLSX.utils.book_new()
@@ -2556,7 +2570,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
               >
                 {periodSummaryLoading ? 'Загрузка...' : 'Показать'}
               </button>
-              {periodSummaryData && periodSummaryData.items.length > 0 && (
+              {periodSummaryData && periodSummaryData.sections.some((s) => s.items.length > 0) && (
                 <button
                   type="button"
                   onClick={() => downloadPeriodSummaryAsExcel(periodSummaryData, periodDateFrom, periodDateTo)}
@@ -2593,135 +2607,149 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
               <p style={{ margin: '0 0 1rem 0', color: '#dc2626', fontSize: '0.875rem' }}>{periodSummaryError}</p>
             )}
             {periodSummaryData && (
-              <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                  <thead>
-                    <tr style={{ background: '#f9fafb' }}>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Наименование</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 500 }}>Кол-во</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Ед.</th>
-                      {periodSummaryData.counterparties.map((c) => (
-                        <th key={c.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 500 }}>{c.legalName}</th>
-                      ))}
-                      <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 500 }}>Итоговая сумма</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {periodSummaryData.items.map((r, idx) => {
-                      const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
-                      const minPrice = prices.filter((p): p is number => p != null)
-                      const rowMin = minPrice.length > 0 ? Math.min(...minPrice) : null
-                      const qty = parseFloat(r.quantity) || 0
-                      const rowSum = rowMin != null ? rowMin * qty : null
-                      return (
-                        <tr key={idx}>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{idx + 1}</td>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.quantity}</td>
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
-                          {periodSummaryData.counterparties.map((c) => {
-                            const p = r.offers[c.id] ?? null
-                            const isMin = p != null && rowMin != null && p === rowMin
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {periodSummaryData.sections.map((section, sectionIdx) => (
+                  <div key={sectionIdx}>
+                    <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>
+                      {section.departmentLabel} — {section.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3.$2.$1')}
+                      {section.requestNumbers.length > 1
+                        ? ` (объединено из №${section.requestNumbers.join(', №')})`
+                        : section.requestNumbers.length === 1
+                          ? ` (№${section.requestNumbers[0]})`
+                          : ''}
+                    </div>
+                    <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                        <thead>
+                          <tr style={{ background: '#f9fafb' }}>
+                            <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Наименование</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', fontWeight: 500 }}>Кол-во</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Ед.</th>
+                            {periodSummaryData.counterparties.map((c) => (
+                              <th key={c.id} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 500 }}>{c.legalName}</th>
+                            ))}
+                            <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 500 }}>Итоговая сумма</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {section.items.map((r, idx) => {
+                            const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
+                            const minPrice = prices.filter((p): p is number => p != null)
+                            const rowMin = minPrice.length > 0 ? Math.min(...minPrice) : null
+                            const qty = parseFloat(r.quantity) || 0
+                            const rowSum = rowMin != null ? rowMin * qty : null
                             return (
-                              <td
-                                key={c.id}
-                                style={{
-                                  padding: '0.75rem',
-                                  border: '1px solid #e5e7eb',
-                                  textAlign: 'right',
-                                  backgroundColor: isMin ? '#dcfce7' : 'white',
-                                }}
-                              >
-                                {p != null ? p.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
-                              </td>
+                              <tr key={idx}>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{idx + 1}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.quantity}</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
+                                {periodSummaryData.counterparties.map((c) => {
+                                  const p = r.offers[c.id] ?? null
+                                  const isMin = p != null && rowMin != null && p === rowMin
+                                  return (
+                                    <td
+                                      key={c.id}
+                                      style={{
+                                        padding: '0.75rem',
+                                        border: '1px solid #e5e7eb',
+                                        textAlign: 'right',
+                                        backgroundColor: isMin ? '#dcfce7' : 'white',
+                                      }}
+                                    >
+                                      {p != null ? p.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                                    </td>
+                                  )
+                                })}
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: (rowSum ?? 0) > 0 ? 600 : 400 }}>
+                                  {rowSum != null ? rowSum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                                </td>
+                              </tr>
                             )
                           })}
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: (rowSum ?? 0) > 0 ? 600 : 400 }}>
-                            {rowSum != null ? rowSum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  <tfoot>
-                    {(() => {
-                      const totalSum = periodSummaryData.items.reduce((a, r) => {
-                        const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
-                        const minP = prices.filter((x): x is number => x != null)
-                        const rowMin = minP.length > 0 ? Math.min(...minP) : null
-                        const qty = parseFloat(r.quantity) || 0
-                        return a + (rowMin != null ? rowMin * qty : 0)
-                      }, 0)
-                      const sumByCounterparty = periodSummaryData.counterparties.map((c) =>
-                        periodSummaryData.items.reduce((a, r) => {
-                          const p = r.offers[c.id] ?? null
-                          const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
-                          const minP = prices.filter((x): x is number => x != null)
-                          const rowMin = minP.length > 0 ? Math.min(...minP) : null
-                          const qty = parseFloat(r.quantity) || 0
-                          if (rowMin != null && p != null && p === rowMin) return a + p * qty
-                          return a
-                        }, 0)
-                      )
-                      const fullOrderByCounterparty = periodSummaryData.counterparties.map((c) =>
-                        periodSummaryData.items.reduce((a, r) => {
-                          let p = r.offers[c.id] ?? null
-                          if (p == null) {
-                            const others = periodSummaryData.counterparties.filter((cc) => cc.id !== c.id)
-                            let minOther: number | null = null
-                            others.forEach((o) => {
-                              const op = r.offers[o.id] ?? null
-                              if (op != null && (minOther == null || op < minOther)) minOther = op
-                            })
-                            p = minOther ?? 0
-                          }
-                          const qty = parseFloat(r.quantity) || 0
-                          return a + p * qty
-                        }, 0)
-                      )
-                      const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-                      return (
-                        <>
-                          <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
-                            <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
-                            {sumByCounterparty.map((sum, i) => (
-                              <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                                {sum > 0 ? fmt(sum) : '—'}
-                              </td>
-                            ))}
-                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fmt(totalSum)}</td>
-                          </tr>
-                          <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
-                            <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
-                            {fullOrderByCounterparty.map((sum, i) => (
-                              <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                                {sum > 0 ? fmt(sum) : '—'}
-                              </td>
-                            ))}
-                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
-                          </tr>
-                          <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
-                            <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
-                            {fullOrderByCounterparty.map((sum, i) => {
-                              const saving = totalSum - sum
-                              const color = saving > 0 ? '#15803d' : saving < 0 ? '#dc2626' : '#6b7280'
-                              return (
-                                <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color, fontWeight: 600 }}>
-                                  {saving !== 0 ? (saving > 0 ? `+${fmt(saving)}` : `-${fmt(Math.abs(saving))}`) : '0'}
-                                </td>
-                              )
-                            })}
-                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
-                          </tr>
-                        </>
-                      )
-                    })()}
-                  </tfoot>
-                </table>
+                        </tbody>
+                        <tfoot>
+                          {(() => {
+                            const totalSum = section.items.reduce((a, r) => {
+                              const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
+                              const minP = prices.filter((x): x is number => x != null)
+                              const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                              const qty = parseFloat(r.quantity) || 0
+                              return a + (rowMin != null ? rowMin * qty : 0)
+                            }, 0)
+                            const sumByCounterparty = periodSummaryData.counterparties.map((c) =>
+                              section.items.reduce((a, r) => {
+                                const p = r.offers[c.id] ?? null
+                                const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
+                                const minP = prices.filter((x): x is number => x != null)
+                                const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                                const qty = parseFloat(r.quantity) || 0
+                                if (rowMin != null && p != null && p === rowMin) return a + p * qty
+                                return a
+                              }, 0)
+                            )
+                            const fullOrderByCounterparty = periodSummaryData.counterparties.map((c) =>
+                              section.items.reduce((a, r) => {
+                                let p = r.offers[c.id] ?? null
+                                if (p == null) {
+                                  const others = periodSummaryData.counterparties.filter((cc) => cc.id !== c.id)
+                                  let minOther: number | null = null
+                                  others.forEach((o) => {
+                                    const op = r.offers[o.id] ?? null
+                                    if (op != null && (minOther == null || op < minOther)) minOther = op
+                                  })
+                                  p = minOther ?? 0
+                                }
+                                const qty = parseFloat(r.quantity) || 0
+                                return a + p * qty
+                              }, 0)
+                            )
+                            const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                            return (
+                              <>
+                                <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                                  <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                                  {sumByCounterparty.map((sum, i) => (
+                                    <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                      {sum > 0 ? fmt(sum) : '—'}
+                                    </td>
+                                  ))}
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fmt(totalSum)}</td>
+                                </tr>
+                                <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                                  <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                                  {fullOrderByCounterparty.map((sum, i) => (
+                                    <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                      {sum > 0 ? fmt(sum) : '—'}
+                                    </td>
+                                  ))}
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                                </tr>
+                                <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                                  <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                                  {fullOrderByCounterparty.map((sum, i) => {
+                                    const saving = totalSum - sum
+                                    const color = saving > 0 ? '#15803d' : saving < 0 ? '#dc2626' : '#6b7280'
+                                    return (
+                                      <td key={periodSummaryData.counterparties[i].id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color, fontWeight: 600 }}>
+                                        {saving !== 0 ? (saving > 0 ? `+${fmt(saving)}` : `-${fmt(Math.abs(saving))}`) : '0'}
+                                      </td>
+                                    )
+                                  })}
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                                </tr>
+                              </>
+                            )
+                          })()}
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-            {periodSummaryData?.items?.length === 0 && !periodSummaryLoading && (
+            {periodSummaryData && periodSummaryData.sections.length === 0 && !periodSummaryLoading && (
               <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Нет потребностей за выбранный период</p>
             )}
           </div>

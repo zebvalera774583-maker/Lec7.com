@@ -57,6 +57,16 @@ export const GET = withBusinessAccess(async (req) => {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
+    const DEPT_ORDER = ['voikovo_kitchen', 'voikovo_bar', 'navaginskaya_kitchen', 'navaginskaya_bar', 'moremall_kitchen', 'moremall_bar'] as const
+    const DEPT_LABELS: Record<string, string> = {
+      voikovo_kitchen: 'Войково кухня',
+      voikovo_bar: 'Войково бар',
+      navaginskaya_kitchen: 'Навагинская кухня',
+      navaginskaya_bar: 'Навагинская бар',
+      moremall_kitchen: 'МореМолл кухня',
+      moremall_bar: 'МореМолл бар',
+    }
+
     const requests = await prisma.request.findMany({
       where: {
         businessId,
@@ -66,43 +76,112 @@ export const GET = withBusinessAccess(async (req) => {
           gte: fromDate,
           lte: new Date(toDate.getTime() + 86400000),
         },
+        incomingRequest: { is: { department: { not: null } } },
       },
-      select: { title: true, description: true },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        description: true,
+        createdAt: true,
+        incomingRequest: { select: { department: true, items: { orderBy: { sortOrder: 'asc' }, select: { name: true, quantity: true, unit: true } } } },
+      },
     })
 
-    const agg = new Map<string, { name: string; quantity: number; unit: string }>()
+    type GroupKey = string
+    const groups = new Map<GroupKey, { department: string; date: string; requestNumbers: number[]; agg: Map<string, { name: string; quantity: number; unit: string }> }>()
+
+    function getRowsFromRequest(r: (typeof requests)[0]): { name: string; quantity: string; unit: string }[] {
+      const ir = r.incomingRequest
+      if (ir?.items?.length) {
+        return ir.items.map((it) => ({ name: it.name, quantity: it.quantity, unit: it.unit }))
+      }
+      return parseMaxRequestToRows(r.title || '', r.description || '')
+    }
+
     for (const r of requests) {
-      const rows = parseMaxRequestToRows(r.title || '', r.description || '')
+      const dept = r.incomingRequest?.department
+      if (!dept || typeof dept !== 'string' || !dept.trim()) continue
+
+      const dateStr = r.createdAt.toISOString().slice(0, 10)
+      const groupKey = `${dateStr}|${dept}`
+
+      let group = groups.get(groupKey)
+      if (!group) {
+        group = { department: dept, date: dateStr, requestNumbers: [], agg: new Map() }
+        groups.set(groupKey, group)
+      }
+
+      if (r.number != null) group.requestNumbers.push(r.number)
+
+      const rows = getRowsFromRequest(r)
       for (const row of rows) {
         const key = `${row.name.toLowerCase().trim()}|${row.unit}`
         const qty = parseFloat(row.quantity) || 0
-        const existing = agg.get(key)
+        const existing = group.agg.get(key)
         if (existing) {
           existing.quantity += qty
         } else {
-          agg.set(key, { name: row.name.trim(), quantity: qty, unit: row.unit })
+          group.agg.set(key, { name: row.name.trim(), quantity: qty, unit: row.unit })
         }
       }
     }
 
-    const requestItems = Array.from(agg.values())
-      .filter((it) => it.name.length > 0 && it.quantity > 0)
-      .map((it) => ({
-        name: it.name,
-        quantity: String(it.quantity),
-        unit: it.unit,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    const sortedGroups = Array.from(groups.values()).sort((a, b) => {
+      const orderA = DEPT_ORDER.indexOf(a.department as (typeof DEPT_ORDER)[number])
+      const orderB = DEPT_ORDER.indexOf(b.department as (typeof DEPT_ORDER)[number])
+      const idxA = orderA === -1 ? 999 : orderA
+      const idxB = orderB === -1 ? 999 : orderB
+      if (idxA !== idxB) return idxA - idxB
+      return a.date.localeCompare(b.date)
+    })
 
-    if (requestItems.length === 0) {
+    if (sortedGroups.length === 0) {
       return NextResponse.json({
-        items: [],
+        sections: [],
         counterparties: [],
         message: 'Нет потребностей за выбранный период',
       })
     }
 
     const categoryFilter = { OR: [{ category: DEFAULT_CATEGORY }, { category: null }] }
+
+    const processGroupToResultItems = (
+      requestItems: { name: string; quantity: string; unit: string }[],
+      normToId: Map<string, string>,
+      normToCanonical: Map<string, string>,
+      masterToCanonical: Map<string, string>,
+      masterToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
+      normTitleToOffers: Map<string, Map<string, { price: number; legalName: string }>>
+    ) => {
+      const resultItems: { name: string; originalName?: string; masterItemId: string | null; quantity: string; unit: string; offers: Record<string, number> }[] = []
+      for (const it of requestItems) {
+        const norm = normalizeForMatch(it.name)
+        const masterItemId = norm ? (normToId.get(norm) ?? null) : null
+        if (!masterItemId) continue
+        const canonicalName = masterToCanonical.get(masterItemId) ?? it.name
+        const offers: Record<string, number> = {}
+        const bySupplier = masterToOffers.get(masterItemId)
+        if (bySupplier) {
+          for (const [sid, { price }] of bySupplier) offers[sid] = price
+        }
+        if (Object.keys(offers).length === 0 && norm) {
+          const byNorm = normTitleToOffers.get(norm)
+          if (byNorm) {
+            for (const [sid, { price }] of byNorm) offers[sid] = price
+          }
+        }
+        resultItems.push({
+          name: canonicalName,
+          ...(canonicalName !== it.name && { originalName: it.name }),
+          masterItemId,
+          quantity: it.quantity,
+          unit: it.unit,
+          offers,
+        })
+      }
+      return resultItems
+    }
 
     const catalogItems = await prisma.botCatalogItem.findMany({
       where: { scope: 'GLOBAL' },
@@ -237,53 +316,32 @@ export const GET = withBusinessAccess(async (req) => {
       masterToCanonical.set(item.id, item.canonicalName)
     }
 
-    const resultItems: {
-      name: string
-      originalName?: string
-      masterItemId: string | null
-      quantity: string
-      unit: string
-      offers: Record<string, number>
-      analogues?: Record<string, { name: string; price: number }[]>
-    }[] = []
+    const sections = sortedGroups.map((group) => {
+      const requestItems = Array.from(group.agg.values())
+        .filter((it) => it.name.length > 0 && it.quantity > 0)
+        .map((it) => ({ name: it.name, quantity: String(it.quantity), unit: it.unit }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 
-    for (const it of requestItems) {
-      const norm = normalizeForMatch(it.name)
-      const masterItemId = norm ? (normToId.get(norm) ?? null) : null
-      // Только позиции номенклатуры: пропускаем комментарии (Бар Банан, Войкова, КММ кухня и т.д.)
-      if (!masterItemId) continue
+      const items = processGroupToResultItems(
+        requestItems,
+        normToId,
+        normToCanonical,
+        masterToCanonical,
+        masterToOffers,
+        normTitleToOffers
+      )
 
-      const canonicalName = masterToCanonical.get(masterItemId) ?? it.name
-
-      const offers: Record<string, number> = {}
-      const bySupplier = masterToOffers.get(masterItemId)
-      if (bySupplier) {
-        for (const [sid, { price }] of bySupplier) {
-          offers[sid] = price
-        }
+      return {
+        department: group.department,
+        departmentLabel: DEPT_LABELS[group.department] ?? group.department,
+        date: group.date,
+        requestNumbers: [...new Set(group.requestNumbers)].sort((a, b) => a - b),
+        items,
       }
-      if (Object.keys(offers).length === 0 && norm) {
-        const byNorm = normTitleToOffers.get(norm)
-        if (byNorm) {
-          for (const [sid, { price }] of byNorm) {
-            offers[sid] = price
-          }
-        }
-      }
-
-      resultItems.push({
-        name: canonicalName,
-        ...(canonicalName !== it.name && { originalName: it.name }),
-        masterItemId,
-        quantity: it.quantity,
-        unit: it.unit,
-        offers,
-        analogues: {},
-      })
-    }
+    }).filter((s) => s.items.length > 0)
 
     return NextResponse.json({
-      items: resultItems,
+      sections,
       counterparties,
     })
   } catch (error) {
