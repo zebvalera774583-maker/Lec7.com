@@ -250,31 +250,30 @@ export const GET = withBusinessAccess(async (req) => {
     for (const it of requestItems) {
       const norm = normalizeForMatch(it.name)
       const masterItemId = norm ? (normToId.get(norm) ?? null) : null
-      const canonicalName = masterItemId ? (masterToCanonical.get(masterItemId) ?? it.name) : null
+      // Только позиции номенклатуры: пропускаем комментарии (Бар Банан, Войкова, КММ кухня и т.д.)
+      if (!masterItemId) continue
+
+      const canonicalName = masterToCanonical.get(masterItemId) ?? it.name
 
       const offers: Record<string, number> = {}
-      // 1) Сначала по masterItemId (каталог)
-      if (masterItemId) {
-        const bySupplier = masterToOffers.get(masterItemId)
-        if (bySupplier) {
-          for (const [sid, { price }] of bySupplier) {
-            offers[sid] = price
-          }
+      const bySupplier = masterToOffers.get(masterItemId)
+      if (bySupplier) {
+        for (const [sid, { price }] of bySupplier) {
+          offers[sid] = price
         }
       }
-      // 2) Если нет цен — по названию из прайсов (как в таблице 3)
       if (Object.keys(offers).length === 0 && norm) {
-        const bySupplier = normTitleToOffers.get(norm)
-        if (bySupplier) {
-          for (const [sid, { price }] of bySupplier) {
+        const byNorm = normTitleToOffers.get(norm)
+        if (byNorm) {
+          for (const [sid, { price }] of byNorm) {
             offers[sid] = price
           }
         }
       }
 
       resultItems.push({
-        name: canonicalName ?? it.name,
-        ...(canonicalName && canonicalName !== it.name && { originalName: it.name }),
+        name: canonicalName,
+        ...(canonicalName !== it.name && { originalName: it.name }),
         masterItemId,
         quantity: it.quantity,
         unit: it.unit,
