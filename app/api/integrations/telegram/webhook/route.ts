@@ -89,7 +89,9 @@ export async function POST(req: NextRequest) {
     const isSetDept = typeof callbackData === 'string' && callbackData.startsWith('set_department|')
     if (!isYesNo && !isSetDept) return NextResponse.json({ ok: true })
 
-    await answerCallbackQuery(callbackQueryId)
+    if (callbackQueryId) {
+      await answerCallbackQuery(callbackQueryId)
+    }
     const event = {
       channel: 'telegram' as const,
       chatId: String(chatId),
