@@ -23,6 +23,12 @@ const TABLES_CATALOG = [
     location: '/office/businesses/[id]/partnership',
     path: 'Потребности → Сводная за период',
   },
+  {
+    num: 5,
+    name: 'Просмотр заявки (MAX/Telegram)',
+    location: '/office/businesses/[id]/request/[requestId]',
+    path: 'Потребности → [заявка] → Просмотр',
+  },
 ]
 
 const SAMPLE_SUMMARY_ROWS = [
@@ -283,6 +289,56 @@ export default function TechTablesPage() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '2rem' }}>
+        <h2 style={{ marginBottom: '0.75rem', fontSize: '1.125rem', fontWeight: 600 }}>
+          Таблица №5: Просмотр заявки (MAX/Telegram)
+        </h2>
+        <p style={{ margin: '0 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
+          Блок «Комментарий» + таблица позиций (Наименование, Вес). Данные из заявки MAX/Telegram.
+        </p>
+        <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
+          <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №5</h3>
+          <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
+            <li><strong>Назначение:</strong> Просмотр заявки из MAX/Telegram. Блок «Комментарий» — не сопоставленные с каталогом строки (адрес, заведение и т.п.).</li>
+            <li><strong>Таблица:</strong> Колонки Наименование, Вес (или Кол-во + Ед.).</li>
+            <li><strong>Кнопка:</strong> «Сформировать сводную таблицу» — переход к созданию заявки с подбором цен.</li>
+          </ul>
+        </div>
+
+        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '1rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '0.875rem' }}>
+            <strong>Комментарий:</strong>
+            <div style={{ marginTop: '0.5rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
+              ООО блины юга
+              Новая заря 7
+              МКММ кухня
+              !!!!
+              Картофель 6 кг
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Наименование</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>Вес</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <td style={{ padding: '0.75rem 1rem' }}>морковь</td>
+                  <td style={{ padding: '0.75rem 1rem' }}>3 кг</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <td style={{ padding: '0.75rem 1rem' }}>помидор розовый</td>
+                  <td style={{ padding: '0.75rem 1rem' }}>4 кг</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
