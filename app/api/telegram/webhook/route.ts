@@ -32,6 +32,12 @@ async function sendTelegramMessage(
     const body: { chat_id: string; text: string; reply_markup?: object } = { chat_id: chatId, text }
     if (removeKeyboard) {
       body.reply_markup = { remove_keyboard: true }
+    } else if (replyInlineKeyboard?.rows?.length) {
+      body.reply_markup = {
+        inline_keyboard: replyInlineKeyboard.rows.map((row) =>
+          row.map((b) => ({ text: b.text, callback_data: b.callback_data }))
+        ),
+      }
     } else if (replyInlineKeyboard?.buttons?.length) {
       body.reply_markup = {
         inline_keyboard: [replyInlineKeyboard.buttons.map((b) => ({ text: b.text, callback_data: b.callback_data }))],
@@ -64,9 +70,10 @@ export async function POST(req: NextRequest) {
       const from = callbackQuery.from
       const callbackQueryId = callbackQuery.id
 
-      if (!chatId || (callbackData !== 'YES' && callbackData !== 'NO')) {
-        return NextResponse.json({ ok: true })
-      }
+      if (!chatId) return NextResponse.json({ ok: true })
+      const isYesNo = callbackData === 'YES' || callbackData === 'NO'
+      const isSetDept = typeof callbackData === 'string' && callbackData.startsWith('set_department|')
+      if (!isYesNo && !isSetDept) return NextResponse.json({ ok: true })
 
       await answerCallbackQuery(callbackQueryId)
 
@@ -76,7 +83,7 @@ export async function POST(req: NextRequest) {
         userId: from?.id != null ? String(from.id) : undefined,
         username: from?.username,
         text: '',
-        choice: callbackData as 'YES' | 'NO',
+        choice: callbackData,
         raw: body,
       }
 

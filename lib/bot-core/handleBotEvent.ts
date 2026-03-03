@@ -106,17 +106,27 @@ export interface BotEvent {
   username?: string
   text: string
   raw?: unknown
-  /** Выбор из InlineKeyboard (callback): "YES" | "NO" */
-  choice?: 'YES' | 'NO'
+  /** Выбор из InlineKeyboard (callback): "YES" | "NO" | "set_department|<slug>" */
+  choice?: string
 }
 
 export interface HandleBotEventResult {
   messages: string[]
-  replyInlineKeyboard?: { buttons: { text: string; callback_data: string }[] }
+  /** Плоский массив кнопок (1 ряд) или rows для нескольких рядов */
+  replyInlineKeyboard?: { buttons?: { text: string; callback_data: string }[]; rows?: { text: string; callback_data: string }[][] }
   removeKeyboard?: boolean
 }
 
 const COMPANY_NAME = process.env.BOT_COMPANY_NAME || 'Блины Юга'
+
+const DEPARTMENTS = [
+  { slug: 'voikovo_kitchen', label: 'Войково кухня' },
+  { slug: 'voikovo_bar', label: 'Войково бар' },
+  { slug: 'navaginskaya_kitchen', label: 'Навагинская кухня' },
+  { slug: 'navaginskaya_bar', label: 'Навагинская бар' },
+  { slug: 'moremall_kitchen', label: 'МореМолл кухня' },
+  { slug: 'moremall_bar', label: 'МореМолл бар' },
+] as const
 
 export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventResult> {
   const { channel, chatId } = event
@@ -129,7 +139,78 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     where: { channel_chatId: { channel, chatId } },
   })
 
-  const stateData = state?.stateJson as { type?: string; pendingUnit?: { needText: string; incompleteRaw: string[] } } | null
+  const stateData = state?.stateJson as {
+    type?: string
+    pendingUnit?: { needText: string; incompleteRaw: string[] }
+    pendingItems?: { needText: string; parsedItems: { name: string; quantity: string; unit: string }[]; commentsText: string | null }
+  } | null
+
+  // Обработка выбора подразделения (callback set_department|<slug>)
+  const setDeptMatch = typeof choice === 'string' ? choice.match(/^set_department\|([a-z_]+)$/) : null
+  if (setDeptMatch && stateData?.type === 'awaiting_department' && stateData?.pendingItems) {
+    const slug = setDeptMatch[1]
+    const dept = DEPARTMENTS.find((d) => d.slug === slug)
+    if (!dept) {
+      return { messages: ['Неизвестное подразделение. Выберите из списка.'] }
+    }
+    const { needText, parsedItems, commentsText } = stateData.pendingItems
+    const businessId = process.env.BOT_BUSINESS_ID?.trim()
+    if (!businessId) {
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: { stateJson: { type: 'confirmed' } },
+      })
+      return { messages: ['Ошибка: BOT_BUSINESS_ID не настроен'], removeKeyboard: true }
+    }
+    try {
+      const { number } = await prisma.$transaction(async (tx) => {
+        const num = await getNextRequestNumber(tx)
+        const request = await tx.request.create({
+          data: {
+            businessId,
+            number: num,
+            title: `Заявка из MAX: ${needText.slice(0, 80) || 'Новое сообщение'}`,
+            description: needText,
+            source: 'max_integration',
+            status: 'NEW',
+          },
+        })
+        const incoming = await tx.incomingRequest.create({
+          data: {
+            senderBusinessId: businessId,
+            recipientBusinessId: businessId,
+            requestId: request.id,
+            status: 'NEW',
+            commentsText,
+            department: slug,
+            items: {
+              create: parsedItems.map((p, i) => ({
+                name: p.name,
+                quantity: p.quantity,
+                unit: p.unit,
+                price: new Decimal(0),
+                sum: new Decimal(0),
+                sortOrder: i,
+              })),
+            },
+          },
+          include: { items: true },
+        })
+        return { number: num }
+      })
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: { stateJson: { type: 'confirmed' } },
+      })
+      return {
+        messages: [`Ок, подразделение: ${dept.label}. Заявка принята. Номер заявки: ${number}`],
+        removeKeyboard: true,
+      }
+    } catch (e) {
+      console.error('[handleBotEvent] create request (department) error:', e)
+      return { messages: ['Ошибка при создании заявки. Попробуйте ещё раз.'], removeKeyboard: true }
+    }
+  }
 
   // Ожидание подтверждения компании
   if (stateData?.type === 'awaiting_company_confirm') {
@@ -248,56 +329,40 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     if (businessId && needText) {
-      try {
-        const parsedItems = mappedItems.map(({ raw, canonical }) => {
-          const p = parseOneItem(raw)
-          return { ...p, name: canonical }
-        })
-        const commentsText =
-          unmappedRaw.length > 0 ? unmappedRaw.map((s) => s.trim()).filter(Boolean).join('\n') : null
-        const { number } = await prisma.$transaction(async (tx) => {
-          const num = await getNextRequestNumber(tx)
-          const request = await tx.request.create({
-            data: {
-              businessId,
-              number: num,
-              title: `Заявка из MAX: ${needText.slice(0, 80) || 'Новое сообщение'}`,
-              description: needText,
-              source: 'max_integration',
-              status: 'NEW',
-            },
-          })
+      const parsedItems = mappedItems.map(({ raw, canonical }) => {
+        const p = parseOneItem(raw)
+        return { ...p, name: canonical }
+      })
+      const commentsText =
+        unmappedRaw.length > 0 ? unmappedRaw.map((s) => s.trim()).filter(Boolean).join('\n') : null
 
-          const incoming = await tx.incomingRequest.create({
-            data: {
-              senderBusinessId: businessId,
-              recipientBusinessId: businessId,
-              requestId: request.id,
-              status: 'NEW',
-              commentsText,
-              items: {
-                create: parsedItems.map((p, i) => ({
-                  name: p.name,
-                  quantity: p.quantity,
-                  unit: p.unit,
-                  price: new Decimal(0),
-                  sum: new Decimal(0),
-                  sortOrder: i,
-                })),
-              },
-            },
-            include: { items: true },
-          })
-          console.log(
-            `[handleBotEvent] Request+IncomingRequest+Items created: requestId=${request.id} incomingId=${incoming.id} items=${incoming.items.length}`
-          )
-          return { number: num }
-        })
-        return {
-          messages: [`Заявка принята. Номер заявки: ${number}`],
-        }
-      } catch (e) {
-        console.error('[handleBotEvent] create request error:', e)
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            type: 'awaiting_department',
+            pendingItems: { needText, parsedItems, commentsText },
+          },
+        },
+      })
+      return {
+        messages: ['Выберите подразделение:'],
+        replyInlineKeyboard: {
+          rows: [
+            [
+              { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
+              { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
+            ],
+            [
+              { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
+              { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
+            ],
+            [
+              { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
+              { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
+            ],
+          ],
+        },
       }
     }
 

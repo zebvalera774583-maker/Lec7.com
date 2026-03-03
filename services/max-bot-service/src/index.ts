@@ -28,14 +28,17 @@ const bot = new Bot(MAX_BOT_TOKEN)
 
 type WebhookResponse = {
   replyText?: string
-  replyInlineKeyboard?: { buttons: { text: string; callback_data: string }[] }
+  replyInlineKeyboard?: {
+    buttons?: { text: string; callback_data: string }[]
+    rows?: { text: string; callback_data: string }[][]
+  }
 }
 
 async function forwardToWebhook(
   chatId: string | number,
   userId: string | number | undefined,
   text: string,
-  choice?: 'YES' | 'NO',
+  choice?: string,
   messageId?: string,
   ts?: string
 ) {
@@ -54,6 +57,15 @@ async function forwardToWebhook(
 }
 
 function sendReply(ctx: any, replyText: string, replyInlineKeyboard?: WebhookResponse['replyInlineKeyboard']) {
+  if (replyInlineKeyboard?.rows?.length) {
+    return ctx.reply(replyText, {
+      reply_markup: {
+        inline_keyboard: replyInlineKeyboard.rows.map((row) =>
+          row.map((btn) => ({ text: btn.text, callback_data: btn.callback_data }))
+        ),
+      },
+    })
+  }
   if (replyInlineKeyboard?.buttons?.length) {
     return ctx.reply(replyText, {
       reply_markup: {
@@ -89,7 +101,7 @@ bot.on('message_callback', async (ctx: any) => {
       String(chatId),
       userId != null ? String(userId) : undefined,
       '',
-      payload === 'YES' || payload === 'NO' ? payload : undefined,
+      payload,
       undefined,
       undefined
     )

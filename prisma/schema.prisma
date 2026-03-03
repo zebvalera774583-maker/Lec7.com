@@ -172,6 +172,7 @@ model MaxRequestLink {
   requestId          String?              // null when NEED_DETAILS (no Request yet)
   status             MaxRequestLinkStatus @default(DRAFT)
   itemsJson          Json?                // [{title, qty, unit?}]
+  department         String?              // подразделение: voikovo_kitchen, voikovo_bar, navaginskaya_kitchen, navaginskaya_bar, moremall_kitchen, moremall_bar
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -450,6 +451,7 @@ model IncomingRequest {
   total               Decimal?  @db.Decimal(12, 2)
   status              String    @default("NEW") // NEW | READ | ACCEPTED | REJECTED | ARCHIVED
   commentsText        String?   // не сопоставленные с каталогом строки (комментарий к заявке)
+  department          String?   // подразделение: voikovo_kitchen, voikovo_bar, navaginskaya_kitchen, navaginskaya_bar, moremall_kitchen, moremall_bar
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
