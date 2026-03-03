@@ -56,26 +56,26 @@ async function forwardToWebhook(
   return data
 }
 
+// MAX API format: attachments with type inline_keyboard, payload.buttons (not reply_markup)
 function sendReply(ctx: any, replyText: string, replyInlineKeyboard?: WebhookResponse['replyInlineKeyboard']) {
   if (replyInlineKeyboard?.rows?.length) {
+    const buttons = replyInlineKeyboard.rows.map((row) =>
+      row.map((btn) => ({ type: 'callback' as const, text: btn.text, payload: btn.callback_data }))
+    )
     return ctx.reply(replyText, {
-      reply_markup: {
-        inline_keyboard: replyInlineKeyboard.rows.map((row) =>
-          row.map((btn) => ({ text: btn.text, callback_data: btn.callback_data }))
-        ),
-      },
+      attachments: [{ type: 'inline_keyboard', payload: { buttons } }],
     })
   }
   if (replyInlineKeyboard?.buttons?.length) {
+    const buttons = [
+      replyInlineKeyboard.buttons.map((btn) => ({
+        type: 'callback' as const,
+        text: btn.text,
+        payload: btn.callback_data,
+      })),
+    ]
     return ctx.reply(replyText, {
-      reply_markup: {
-        inline_keyboard: [
-          replyInlineKeyboard.buttons.map((btn) => ({
-            text: btn.text,
-            callback_data: btn.callback_data,
-          })),
-        ],
-      },
+      attachments: [{ type: 'inline_keyboard', payload: { buttons } }],
     })
   }
   return ctx.reply(replyText)
