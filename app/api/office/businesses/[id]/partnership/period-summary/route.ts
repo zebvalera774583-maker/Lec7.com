@@ -131,6 +131,7 @@ export const GET = withBusinessAccess(async (req) => {
       normToCanonical.delete(k)
     }
 
+    // Загружаем ВСЕ строки прайсов (с masterItemId и без) — как в таблице 3 (price-comparison)
     const [assignments, ownPriceLists] = await Promise.all([
       prisma.priceAssignment.findMany({
         where: {
@@ -142,7 +143,7 @@ export const GET = withBusinessAccess(async (req) => {
           priceList: {
             include: {
               business: { select: { id: true, legalName: true, name: true } },
-              rows: { where: { masterItemId: { not: null } }, select: { masterItemId: true, priceWithVat: true, priceWithoutVat: true } },
+              rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
             },
           },
         },
@@ -150,12 +151,13 @@ export const GET = withBusinessAccess(async (req) => {
       prisma.priceList.findMany({
         where: { businessId, kind: 'BASE', ...categoryFilter },
         include: {
-          rows: { where: { masterItemId: { not: null } }, select: { masterItemId: true, priceWithVat: true, priceWithoutVat: true } },
+          rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
         },
       }),
     ])
 
     const masterToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
+    const normTitleToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
     const counterpartySet = new Map<string, string>()
 
     for (const a of assignments) {
@@ -164,11 +166,17 @@ export const GET = withBusinessAccess(async (req) => {
       counterpartySet.set(supplierId, legalName)
     }
 
-    const addOffer = (masterItemId: string, supplierId: string, legalName: string, price: number) => {
-      let bySupplier = masterToOffers.get(masterItemId)
+    const addOfferToMap = (
+      map: Map<string, Map<string, { price: number; legalName: string }>>,
+      key: string,
+      supplierId: string,
+      legalName: string,
+      price: number
+    ) => {
+      let bySupplier = map.get(key)
       if (!bySupplier) {
         bySupplier = new Map()
-        masterToOffers.set(masterItemId, bySupplier)
+        map.set(key, bySupplier)
       }
       const existing = bySupplier.get(supplierId)
       if (existing == null || price < existing.price) {
@@ -181,14 +189,18 @@ export const GET = withBusinessAccess(async (req) => {
       const supplierId = a.priceList.business.id
       const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
       for (const row of a.priceList.rows) {
-        if (!row.masterItemId) continue
         const price = row.priceWithVat != null
           ? Number(row.priceWithVat)
           : row.priceWithoutVat != null
             ? Number(row.priceWithoutVat)
             : null
         if (price == null || Number.isNaN(price)) continue
-        addOffer(row.masterItemId, supplierId, legalName, price)
+        if (row.masterItemId) {
+          addOfferToMap(masterToOffers, row.masterItemId, supplierId, legalName, price)
+        } else {
+          const norm = normalizeForMatch(row.name)
+          if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
+        }
       }
     }
 
@@ -197,14 +209,18 @@ export const GET = withBusinessAccess(async (req) => {
       const supplierId = '__OWN_PRICE__'
       const legalName = 'Мой прайс'
       for (const row of pl.rows) {
-        if (!row.masterItemId) continue
         const price = row.priceWithVat != null
           ? Number(row.priceWithVat)
           : row.priceWithoutVat != null
             ? Number(row.priceWithoutVat)
             : null
         if (price == null || Number.isNaN(price)) continue
-        addOffer(row.masterItemId, supplierId, legalName, price)
+        if (row.masterItemId) {
+          addOfferToMap(masterToOffers, row.masterItemId, supplierId, legalName, price)
+        } else {
+          const norm = normalizeForMatch(row.name)
+          if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
+        }
       }
     }
 
@@ -237,8 +253,18 @@ export const GET = withBusinessAccess(async (req) => {
       const canonicalName = masterItemId ? (masterToCanonical.get(masterItemId) ?? it.name) : null
 
       const offers: Record<string, number> = {}
+      // 1) Сначала по masterItemId (каталог)
       if (masterItemId) {
         const bySupplier = masterToOffers.get(masterItemId)
+        if (bySupplier) {
+          for (const [sid, { price }] of bySupplier) {
+            offers[sid] = price
+          }
+        }
+      }
+      // 2) Если нет цен — по названию из прайсов (как в таблице 3)
+      if (Object.keys(offers).length === 0 && norm) {
+        const bySupplier = normTitleToOffers.get(norm)
         if (bySupplier) {
           for (const [sid, { price }] of bySupplier) {
             offers[sid] = price

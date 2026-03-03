@@ -76,7 +76,7 @@ export const POST = withBusinessAccess(async (req, user) => {
       normToCanonical.delete(k)
     }
 
-    // 2) Load accepted prices (same logic as price-comparison)
+    // 2) Load ALL price rows (with and without masterItemId) — same logic as table 3 (price-comparison)
     const [assignments, ownPriceLists] = await Promise.all([
       prisma.priceAssignment.findMany({
         where: {
@@ -88,7 +88,7 @@ export const POST = withBusinessAccess(async (req, user) => {
           priceList: {
             include: {
               business: { select: { id: true, legalName: true, name: true } },
-              rows: { where: { masterItemId: { not: null } }, select: { masterItemId: true, priceWithVat: true, priceWithoutVat: true } },
+              rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
             },
           },
         },
@@ -96,27 +96,33 @@ export const POST = withBusinessAccess(async (req, user) => {
       prisma.priceList.findMany({
         where: { businessId, kind: 'BASE', ...categoryFilter },
         include: {
-          rows: { where: { masterItemId: { not: null } }, select: { masterItemId: true, priceWithVat: true, priceWithoutVat: true } },
+          rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
         },
       }),
     ])
 
-    // 3) Build masterItemId -> { supplierId -> minPrice }
+    // 3) Build masterItemId -> offers and normTitle -> offers (for rows without masterItemId)
     const masterToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
+    const normTitleToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
     const counterpartySet = new Map<string, string>()
 
-    // Сначала добавляем ВСЕХ подключённых поставщиков (как в price-comparison), чтобы ИП Пилиев и др. отображались даже без совпадающих цен
     for (const a of assignments) {
       const supplierId = a.priceList.business.id
       const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
       counterpartySet.set(supplierId, legalName)
     }
 
-    const addOffer = (masterItemId: string, supplierId: string, legalName: string, price: number) => {
-      let bySupplier = masterToOffers.get(masterItemId)
+    const addOfferToMap = (
+      map: Map<string, Map<string, { price: number; legalName: string }>>,
+      key: string,
+      supplierId: string,
+      legalName: string,
+      price: number
+    ) => {
+      let bySupplier = map.get(key)
       if (!bySupplier) {
         bySupplier = new Map()
-        masterToOffers.set(masterItemId, bySupplier)
+        map.set(key, bySupplier)
       }
       const existing = bySupplier.get(supplierId)
       if (existing == null || price < existing.price) {
@@ -129,14 +135,18 @@ export const POST = withBusinessAccess(async (req, user) => {
       const supplierId = a.priceList.business.id
       const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
       for (const row of a.priceList.rows) {
-        if (!row.masterItemId) continue
         const price = row.priceWithVat != null
           ? Number(row.priceWithVat)
           : row.priceWithoutVat != null
             ? Number(row.priceWithoutVat)
             : null
         if (price == null || Number.isNaN(price)) continue
-        addOffer(row.masterItemId, supplierId, legalName, price)
+        if (row.masterItemId) {
+          addOfferToMap(masterToOffers, row.masterItemId, supplierId, legalName, price)
+        } else {
+          const norm = normalizeForMatch(row.name)
+          if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
+        }
       }
     }
 
@@ -145,14 +155,18 @@ export const POST = withBusinessAccess(async (req, user) => {
       const supplierId = '__OWN_PRICE__'
       const legalName = 'Мой прайс'
       for (const row of pl.rows) {
-        if (!row.masterItemId) continue
         const price = row.priceWithVat != null
           ? Number(row.priceWithVat)
           : row.priceWithoutVat != null
             ? Number(row.priceWithoutVat)
             : null
         if (price == null || Number.isNaN(price)) continue
-        addOffer(row.masterItemId, supplierId, legalName, price)
+        if (row.masterItemId) {
+          addOfferToMap(masterToOffers, row.masterItemId, supplierId, legalName, price)
+        } else {
+          const norm = normalizeForMatch(row.name)
+          if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
+        }
       }
     }
 
@@ -187,8 +201,18 @@ export const POST = withBusinessAccess(async (req, user) => {
       const canonicalName = masterItemId ? (masterToCanonical.get(masterItemId) ?? it.name) : null
 
       const offers: Record<string, number> = {}
+      // 1) First by masterItemId (catalog)
       if (masterItemId) {
         const bySupplier = masterToOffers.get(masterItemId)
+        if (bySupplier) {
+          for (const [sid, { price }] of bySupplier) {
+            offers[sid] = price
+          }
+        }
+      }
+      // 2) If no prices — by name from price lists (same as table 3)
+      if (Object.keys(offers).length === 0 && norm) {
+        const bySupplier = normTitleToOffers.get(norm)
         if (bySupplier) {
           for (const [sid, { price }] of bySupplier) {
             offers[sid] = price
