@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { getAuthUserFromContext } from '@/lib/middleware'
 import { headers, cookies } from 'next/headers'
+import { parseMaxRequestToRows } from '@/lib/parseMaxRequest'
 import RequestDetailClient from './RequestDetailClient'
 
 interface PageProps {
@@ -46,6 +47,13 @@ export default async function RequestDetailPage({ params }: PageProps) {
       select: { itemsJson: true },
     })
     itemsJson = link?.itemsJson ?? null
+  }
+  // Если нет распарсенных позиций — парсим description (поддержка дефиса: Картофель-5кг)
+  if ((!itemsJson || (Array.isArray(itemsJson) && itemsJson.length === 0)) && request.description) {
+    const parsed = parseMaxRequestToRows(request.title || '', request.description)
+    if (parsed.length > 0) {
+      itemsJson = parsed.map((r) => ({ title: r.name, qty: r.quantity, unit: r.unit }))
+    }
   }
 
   return (
