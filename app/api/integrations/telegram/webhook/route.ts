@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   if (secret) {
     const incoming = req.headers.get(SECRET_HEADER)
     if (incoming !== secret) {
-      console.warn('Telegram webhook: secret mismatch')
+      console.warn('[tg] webhook: secret mismatch (expected header x-telegram-bot-api-secret-token)')
       return NextResponse.json({ ok: false }, { status: 401 })
     }
   }
@@ -76,6 +76,12 @@ export async function POST(req: NextRequest) {
     body = await req.json()
   } catch {
     return NextResponse.json({ ok: true })
+  }
+
+  const hasCallback = !!body?.callback_query
+  const hasMessage = !!body?.message?.text
+  if (hasCallback || hasMessage) {
+    console.log('[tg] webhook received:', hasCallback ? 'callback' : 'message', hasMessage ? body?.message?.text?.slice(0, 50) : '')
   }
 
   // 1) Callback (кнопки Да/Нет, подразделение)

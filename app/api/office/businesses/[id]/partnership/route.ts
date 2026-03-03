@@ -158,8 +158,18 @@ export const GET = withBusinessAccess(async (req, user) => {
         title: true,
         description: true,
         createdAt: true,
+        incomingRequest: { select: { department: true } },
       },
     })
+
+    const DEPT_LABELS: Record<string, string> = {
+      voikovo_kitchen: 'Войково кухня',
+      voikovo_bar: 'Войково бар',
+      navaginskaya_kitchen: 'Навагинская кухня',
+      navaginskaya_bar: 'Навагинская бар',
+      moremall_kitchen: 'МореМолл кухня',
+      moremall_bar: 'МореМолл бар',
+    }
 
     return NextResponse.json({
       activeCounterparties: Array.from(activeCounterpartiesMap.values()),
@@ -170,6 +180,9 @@ export const GET = withBusinessAccess(async (req, user) => {
         title: r.title,
         description: r.description,
         createdAt: r.createdAt.toISOString(),
+        department: r.incomingRequest?.department
+          ? DEPT_LABELS[r.incomingRequest.department] ?? r.incomingRequest.department
+          : null,
       })),
     })
   } catch (error) {

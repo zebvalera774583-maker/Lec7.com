@@ -1241,6 +1241,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Подразделение</th>
                     <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                   </tr>
                 </thead>
@@ -1253,6 +1254,9 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                       </td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                         {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                      </td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                        {item.type === 'max' && 'department' in item ? (item.department ?? '—') : '—'}
                       </td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                         {item.type === 'counterparty' ? (
@@ -1374,6 +1378,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Подразделение</th>
                       <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                     </tr>
                   </thead>
@@ -1386,6 +1391,9 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                         </td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                           {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                        </td>
+                        <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                          {item.type === 'max' && 'department' in item ? (item.department ?? '—') : '—'}
                         </td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                           {item.type === 'counterparty' ? (
@@ -1669,6 +1677,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Подразделение</th>
                           <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                         </tr>
                       </thead>
@@ -1681,6 +1690,9 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                             </td>
                             <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                               {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                            </td>
+                            <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                              {item.type === 'max' && 'department' in item ? (item.department ?? '—') : '—'}
                             </td>
                             <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                               {item.type === 'counterparty' ? (
