@@ -17,6 +17,7 @@ interface RequestDetailClientProps {
   itemsJson: unknown
   descriptionFallback?: string | null
   commentsText?: string | null
+  department?: string | null
 }
 
 export default function RequestDetailClient({
@@ -24,6 +25,7 @@ export default function RequestDetailClient({
   itemsJson,
   descriptionFallback,
   commentsText,
+  department,
 }: RequestDetailClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -92,6 +94,11 @@ export default function RequestDetailClient({
       </div>
       {error && <p style={{ marginBottom: '0.5rem', color: '#dc2626', fontSize: '0.875rem' }}>{error}</p>}
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+        {department && typeof department === 'string' && department.trim() && (
+          <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.875rem', color: '#4b5563' }}>
+            <strong>Подразделение:</strong> {department.trim()}
+          </div>
+        )}
         {commentsText && commentsText.trim() && (
           <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '0.875rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>
             <strong>Комментарий:</strong> {commentsText.trim()}

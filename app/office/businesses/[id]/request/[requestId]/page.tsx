@@ -35,6 +35,16 @@ export default async function RequestDetailPage({ params }: PageProps) {
   })
   let itemsJson: unknown = null
   const commentsText = incoming?.commentsText ?? null
+  const departmentSlug = incoming?.department ?? null
+  const DEPT_LABELS: Record<string, string> = {
+    voikovo_kitchen: 'Войково кухня',
+    voikovo_bar: 'Войково бар',
+    navaginskaya_kitchen: 'Навагинская кухня',
+    navaginskaya_bar: 'Навагинская бар',
+    moremall_kitchen: 'МореМолл кухня',
+    moremall_bar: 'МореМолл бар',
+  }
+  const department = departmentSlug ? (DEPT_LABELS[departmentSlug] ?? departmentSlug) : null
   if (incoming?.items?.length) {
     itemsJson = incoming.items.map((it) => ({
       title: it.name,
@@ -76,6 +86,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
       itemsJson={itemsJson}
       descriptionFallback={request.description}
       commentsText={commentsText}
+      department={department}
     />
   )
 }

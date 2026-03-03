@@ -28,6 +28,7 @@ interface MaxRequest {
   title: string
   description: string
   createdAt: string
+  department?: string | null
 }
 
 interface NeedsData {
@@ -232,6 +233,7 @@ function ZakupContent() {
                   <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>№</th>
                   <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Название / Описание</th>
                   <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Дата</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Подразделение</th>
                   <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: 500 }}>Действия</th>
                 </tr>
               </thead>
@@ -242,6 +244,13 @@ function ZakupContent() {
                     <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{businessName}</td>
                     <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                       {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                    </td>
+                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                      {item.type === 'max'
+                        ? (typeof (item as { department?: string | null }).department === 'string' && (item as { department?: string | null }).department?.trim()
+                            ? (item as { department?: string | null }).department
+                            : '—')
+                        : '—'}
                     </td>
                     <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                       {item.type === 'counterparty' ? (
