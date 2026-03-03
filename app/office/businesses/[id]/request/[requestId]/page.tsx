@@ -58,7 +58,7 @@ export default async function RequestDetailPage({ params }: PageProps) {
   // Позиции из комментария (не сопоставленные с каталогом при создании, напр. реган 0,05 кг) — добавляем в таблицу
   if (commentsText && commentsText.trim()) {
     const fromComments = parseMaxRequestToRows('', commentsText)
-    const existing = (Array.isArray(itemsJson) ? itemsJson : []) as { title?: string }[]
+    const existing = (Array.isArray(itemsJson) ? itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
     const existingNames = new Set(existing.map((it) => (it.title || '').toLowerCase().trim()))
     for (const r of fromComments) {
       const nameNorm = r.name.toLowerCase().trim()
