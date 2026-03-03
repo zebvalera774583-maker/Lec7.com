@@ -15,7 +15,7 @@ interface BusinessLayoutClientProps {
   children: React.ReactNode
 }
 
-const MOBILE_QUERY = '(max-width: 768px)'
+const MOBILE_QUERY = '(max-width: 1024px)'
 
 function subscribe(cb: () => void) {
   const mq = window.matchMedia(MOBILE_QUERY)

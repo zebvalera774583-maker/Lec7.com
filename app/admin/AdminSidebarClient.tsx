@@ -16,7 +16,7 @@ const SIDEBAR_ITEMS: (
   },
 ]
 
-const MOBILE_BREAKPOINT = 768
+const MOBILE_BREAKPOINT = 1024
 
 interface AdminSidebarClientProps {
   pathname: string
