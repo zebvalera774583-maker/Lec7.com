@@ -124,6 +124,7 @@ export default function TechTablesPage() {
           <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №1</h3>
           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
             <li><strong>Назначение:</strong> Сводное сравнение цен поставщиков по позициям заявки и формирование заявки.</li>
+            <li><strong>Подразделение:</strong> Отображается над таблицей при заявке из MAX/Telegram (Навагинская кухня, Войково бар и т.п.).</li>
             <li><strong>Колонки:</strong> №, Наименование, Кол-во, Ед., колонки поставщиков (с чекбоксом «В заявку»), Итоговая сумма.</li>
             <li><strong>Поставщики:</strong> Все подключённые контрагенты с активными прайсами в категории.</li>
             <li><strong>Выбор цены:</strong> Клик по ячейке — ручной выбор поставщика для позиции (зелёный фон). Позиции без цены можно включать в заявку (цена 0).</li>
@@ -134,6 +135,9 @@ export default function TechTablesPage() {
           </ul>
         </div>
 
+        <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#4b5563' }}>
+          <strong>Подразделение:</strong> МореМолл кухня
+        </div>
         <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>

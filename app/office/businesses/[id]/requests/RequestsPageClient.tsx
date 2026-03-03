@@ -36,7 +36,7 @@ interface Counterparty {
 interface SummaryEntry {
   id: string
   summaryData: { items: SummaryItem[]; counterparties: Counterparty[] }
-  createdRequest: { category: string; createdAt: Date; counterpartyCards: { id: string; legalName: string }[] }
+  createdRequest: { category: string; createdAt: Date; counterpartyCards: { id: string; legalName: string }[]; department?: string | null }
   appliedAnalogue: Record<string, Record<string, { name: string; price: number }>>
   /** Ручной выбор поставщика по позиции: itemKey -> counterpartyId. null = авто (мин. цена). Позволяет включать позиции без цены (цена 0). */
   selectedPriceByItem?: Record<string, string | null>
@@ -164,6 +164,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
   const [rematchLoading, setRematchLoading] = useState(false)
   const [viewSection, setViewSection] = useState<'create' | 'incoming'>(initialSection === 'create' ? 'create' : 'incoming')
   const [version, setVersion] = useState<{ gitSha: string | null; buildTime: string } | null>(null)
+  const [summaryDepartment, setSummaryDepartment] = useState<string | null>(null)
 
   useEffect(() => {
     setViewSection(initialSection === 'create' ? 'create' : 'incoming')
@@ -525,6 +526,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       const data = await res.json()
       const counterparties = data.counterparties || []
       setSummaryData({ items: data.items, counterparties })
+      setSummaryDepartment(null)
       setAppliedAnalogue({})
       setSelectedPriceByItem({})
       setUseForRequest(Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true])))
@@ -572,6 +574,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
         category: DEFAULT_CATEGORY,
         createdAt: new Date(),
         counterpartyCards: selected.map((c) => ({ id: c.id, legalName: c.legalName })),
+        department: summaryDepartment,
       },
       appliedAnalogue: JSON.parse(JSON.stringify(appliedAnalogue)),
       selectedPriceByItem: JSON.parse(JSON.stringify(selectedPriceByItem)),
@@ -657,6 +660,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       const items = data.items || []
       if (items.length > 0 && counterparties.length > 0) {
         setSummaryData({ items, counterparties })
+        setSummaryDepartment(typeof data.department === 'string' && data.department.trim() ? data.department.trim() : null)
         setAppliedAnalogue({})
         setSelectedPriceByItem({})
         setUseForRequest(Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true])))
@@ -1081,6 +1085,15 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                       )}
                     </div>
                   </div>
+                  {(() => {
+                    const dept = summaryData ? summaryDepartment : getActiveSummary()?.createdRequest?.department
+                    if (!dept || typeof dept !== 'string' || !dept.trim()) return null
+                    return (
+                      <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#4b5563' }}>
+                        <strong>Подразделение:</strong> {dept.trim()}
+                      </div>
+                    )
+                  })()}
                   {summaryError && (
                     <p style={{ marginBottom: '0.75rem', color: '#dc2626', fontSize: '0.875rem' }}>{summaryError}</p>
                   )}
@@ -1195,7 +1208,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                               {menuOpenCardId === `${entry.id}-summary` && (
                                 <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '2px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, minWidth: '160px', padding: '0.25rem 0' }}>
                                   <button type="button" onClick={() => downloadSummaryAsExcel(entry)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Скачать (Excel)</button>
-                                  <button type="button" onClick={() => { setMenuOpenCardId(null); setSummaries((p) => p.filter((s) => s.id !== entry.id)); setSummaryData(entry.summaryData); setAppliedAnalogue(entry.appliedAnalogue); setSelectedPriceByItem(entry.selectedPriceByItem ?? {}); setUseForRequest(Object.fromEntries(entry.summaryData.counterparties.filter(isPartnerCounterparty).map((c) => [c.id, entry.createdRequest.counterpartyCards.some((cc) => cc.id === c.id)]))); setViewMode('summary'); setSelectedSummaryId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
+                                  <button type="button" onClick={() => { setMenuOpenCardId(null); setSummaries((p) => p.filter((s) => s.id !== entry.id)); setSummaryData(entry.summaryData); setSummaryDepartment(entry.createdRequest.department ?? null); setAppliedAnalogue(entry.appliedAnalogue); setSelectedPriceByItem(entry.selectedPriceByItem ?? {}); setUseForRequest(Object.fromEntries(entry.summaryData.counterparties.filter(isPartnerCounterparty).map((c) => [c.id, entry.createdRequest.counterpartyCards.some((cc) => cc.id === c.id)]))); setViewMode('summary'); setSelectedSummaryId(null) }} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Редактировать</button>
                                   <button type="button" onClick={(e) => handleSendAllRequests(e, entry)} disabled={sendingAll || sendingCounterpartyId != null} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: sendingAll ? 'wait' : 'pointer', fontSize: '0.875rem', color: sendingAll ? '#9ca3af' : '#6b7280' }}>{sendingAll ? 'Отправка...' : 'Отправить (сводная)'}</button>
                                   <button type="button" onClick={() => handleDeleteSummary(entry.id)} style={{ display: 'block', width: '100%', padding: '0.5rem 1rem', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: '#dc2626' }}>Удалить</button>
                                 </div>

@@ -56,7 +56,7 @@ export default function RequestDetailClient({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Ошибка загрузки')
       if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(data))
+        sessionStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify({ ...data, department: department && typeof department === 'string' && department.trim() ? department.trim() : null }))
       }
       router.push(`/office/businesses/${businessId}/requests?section=create&fromSummary=1`)
     } catch (e: unknown) {
