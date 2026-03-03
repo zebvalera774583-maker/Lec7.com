@@ -19,7 +19,7 @@ function parseMaxRequestToRows(title: string, description: string): { name: stri
   const cleanTitle = (title || '').replace(/^Заявка из MAX:\s*/i, '').trim()
   const src = description || cleanTitle || text
   const rows: { name: string; quantity: string; unit: string }[] = []
-  const re = /([^\d]+?)\s+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед)?/gi
+  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед)?/gi
   let m: RegExpExecArray | null
   while ((m = re.exec(src)) !== null) {
     const name = m[1].trim()
