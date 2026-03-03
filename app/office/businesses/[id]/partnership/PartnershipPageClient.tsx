@@ -1256,7 +1256,11 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                         {new Date(item.createdAt).toLocaleDateString('ru-RU')}
                       </td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                        {item.type === 'max' && 'department' in item ? (item.department ?? '—') : '—'}
+                        {item.type === 'max'
+  ? (typeof (item as any).department === 'string' && (item as any).department.trim()
+      ? (item as any).department
+      : '—')
+  : '—'}
                       </td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                         {item.type === 'counterparty' ? (
@@ -1393,7 +1397,11 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                           {new Date(item.createdAt).toLocaleDateString('ru-RU')}
                         </td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                          {item.type === 'max' && 'department' in item ? (item.department ?? '—') : '—'}
+                          {item.type === 'max'
+  ? (typeof (item as any).department === 'string' && (item as any).department.trim()
+      ? (item as any).department
+      : '—')
+  : '—'}
                         </td>
                         <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                           {item.type === 'counterparty' ? (
@@ -1692,7 +1700,11 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                               {new Date(item.createdAt).toLocaleDateString('ru-RU')}
                             </td>
                             <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                              {item.type === 'max' && 'department' in item ? (item.department ?? '—') : '—'}
+                              {item.type === 'max'
+  ? (typeof (item as any).department === 'string' && (item as any).department.trim()
+      ? (item as any).department
+      : '—')
+  : '—'}
                             </td>
                             <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
                               {item.type === 'counterparty' ? (
