@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import BusinessSidebar from './BusinessSidebar'
 
 interface NavItem {
@@ -15,36 +15,42 @@ interface BusinessLayoutClientProps {
   children: React.ReactNode
 }
 
-const MOBILE_BREAKPOINT = 768
+const MOBILE_QUERY = '(max-width: 768px)'
+
+function subscribe(cb: () => void) {
+  const mq = window.matchMedia(MOBILE_QUERY)
+  mq.addEventListener('change', cb)
+  return () => mq.removeEventListener('change', cb)
+}
+
+function getSnapshot() {
+  return window.matchMedia(MOBILE_QUERY).matches
+}
+
+function getServerSnapshot() {
+  return false
+}
 
 export default function BusinessLayoutClient({ businessId, businessName, navItems, children }: BusinessLayoutClientProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
-    const handler = () => {
-      const mobile = mq.matches
-      setIsMobile(mobile)
-      if (!mobile) setSidebarOpen(false)
-    }
-    handler()
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
+    if (!isMobile) setSidebarOpen(false)
+  }, [isMobile])
 
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 60px)', background: '#f5f5f5', position: 'relative' }}>
-      {/* Кнопка меню на мобильных */}
+      {/* Кнопка гамбургера на мобильных — открывает/закрывает сайдбар */}
       {isMobile && (
         <button
           type="button"
-          onClick={() => setSidebarOpen(true)}
+          onClick={() => setSidebarOpen((o) => !o)}
           style={{
             position: 'fixed',
             top: '72px',
             left: '0.75rem',
-            zIndex: 900,
+            zIndex: 1000,
             width: '44px',
             height: '44px',
             display: 'flex',
@@ -55,11 +61,12 @@ export default function BusinessLayoutClient({ businessId, businessName, navItem
             borderRadius: '8px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             cursor: 'pointer',
-            fontSize: '1.25rem',
+            fontSize: sidebarOpen ? '1.5rem' : '1.25rem',
+            lineHeight: 1,
           }}
-          aria-label="Открыть меню"
+          aria-label={sidebarOpen ? 'Закрыть меню' : 'Открыть меню'}
         >
-          ☰
+          {sidebarOpen ? '×' : '☰'}
         </button>
       )}
 
