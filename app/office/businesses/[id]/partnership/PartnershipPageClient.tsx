@@ -209,9 +209,18 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
     )
     const fullOrderByCounterparty = data.counterparties.map((c) =>
       data.items.reduce((a, r) => {
-        const p = r.offers[c.id] ?? null
+        let p = r.offers[c.id] ?? null
+        if (p == null) {
+          const others = data.counterparties.filter((cc) => cc.id !== c.id)
+          let minOther: number | null = null
+          others.forEach((o) => {
+            const op = r.offers[o.id] ?? null
+            if (op != null && (minOther == null || op < minOther)) minOther = op
+          })
+          p = minOther ?? 0
+        }
         const qty = parseFloat(r.quantity) || 0
-        return a + (p != null ? p * qty : 0)
+        return a + p * qty
       }, 0)
     )
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...data.counterparties.map((c) => c.legalName), 'Итоговая сумма']
@@ -2633,9 +2642,18 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                       )
                       const fullOrderByCounterparty = periodSummaryData.counterparties.map((c) =>
                         periodSummaryData.items.reduce((a, r) => {
-                          const p = r.offers[c.id] ?? null
+                          let p = r.offers[c.id] ?? null
+                          if (p == null) {
+                            const others = periodSummaryData.counterparties.filter((cc) => cc.id !== c.id)
+                            let minOther: number | null = null
+                            others.forEach((o) => {
+                              const op = r.offers[o.id] ?? null
+                              if (op != null && (minOther == null || op < minOther)) minOther = op
+                            })
+                            p = minOther ?? 0
+                          }
                           const qty = parseFloat(r.quantity) || 0
-                          return a + (p != null ? p * qty : 0)
+                          return a + p * qty
                         }, 0)
                       )
                       const fmt = (n: number) => n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
