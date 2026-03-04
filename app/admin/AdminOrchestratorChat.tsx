@@ -2,21 +2,67 @@
 
 import { useState, useEffect, useRef } from 'react'
 
+type Step = 'idle' | 'parsed' | 'need_date' | 'catalog_choice' | 'ready_for_draft'
+
+interface DraftItem {
+  name: string
+  quantity: string
+  unit: string
+  canonicalName?: string
+  catalogItemId?: string | null
+  needsUserChoice?: boolean
+}
+
+interface SessionState {
+  step: Step
+  draft: {
+    items: DraftItem[]
+    plannedForDate?: string
+    resolvedChoiceIndices: number[]
+  } | null
+}
+
 interface Message {
   id: string
   role: 'USER' | 'ASSISTANT'
   content: string
 }
 
+const btnStyle = {
+  padding: '0.5rem 1rem',
+  marginRight: '0.5rem',
+  marginTop: '0.5rem',
+  background: '#0070f3',
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: 0,
+  fontSize: '0.875rem',
+  cursor: 'pointer' as const,
+}
+
 export default function AdminOrchestratorChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionState, setSessionState] = useState<SessionState>({
+    step: 'idle',
+    draft: null,
+  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, sessionState])
+
+  const addBotMessage = (content: string) => {
+    setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'ASSISTANT', content }])
+  }
+
+  const getProblematicIndices = (items: DraftItem[]): number[] => {
+    return items
+      .map((item, idx) => (item.needsUserChoice || !item.catalogItemId ? idx : -1))
+      .filter((i) => i >= 0)
+  }
 
   const handleSend = async () => {
     const text = input.trim()
@@ -24,6 +70,7 @@ export default function AdminOrchestratorChat() {
 
     setInput('')
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'USER', content: text }])
+    setSessionState({ step: 'idle', draft: null })
     setLoading(true)
 
     try {
@@ -35,37 +82,91 @@ export default function AdminOrchestratorChat() {
       })
 
       if (!res.ok) {
-        setMessages((prev) => [
-          ...prev,
-          { id: `a-${Date.now()}`, role: 'ASSISTANT', content: 'Ошибка связи, попробуйте ещё раз.' },
-        ])
+        addBotMessage('Ошибка связи, попробуйте ещё раз.')
         return
       }
 
       const data = (await res.json()) as {
         intent?: string
         message?: string
-        items?: Array<{ name: string; quantity: string; unit: string; canonicalName?: string }>
+        items?: DraftItem[]
       }
 
-      let content: string
       if (data.intent === 'create_needs' && data.items?.length) {
-        content =
-          'Распознанные позиции:\n' +
-          data.items.map((i) => `• ${i.canonicalName || i.name} — ${i.quantity} ${i.unit}`).join('\n')
+        const items = data.items
+        addBotMessage(
+          'Распознал позиции. На какую дату закуп: Сегодня / Завтра?\n\n' +
+            items.map((i) => `• ${i.canonicalName || i.name} — ${i.quantity} ${i.unit}`).join('\n')
+        )
+        setSessionState({
+          step: 'need_date',
+          draft: { items, resolvedChoiceIndices: [] },
+        })
       } else {
-        content = data.message ?? 'AI Orchestrator MVP active'
+        addBotMessage(data.message ?? 'AI Orchestrator MVP active')
       }
-
-      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'ASSISTANT', content }])
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { id: `a-${Date.now()}`, role: 'ASSISTANT', content: 'Ошибка связи, попробуйте ещё раз.' },
-      ])
+      addBotMessage('Ошибка связи, попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDateChoice = (plannedForDate: string) => {
+    const draft = sessionState.draft
+    if (!draft || sessionState.step !== 'need_date') return
+
+    const problematic = getProblematicIndices(draft.items)
+
+    if (problematic.length === 0) {
+      addBotMessage('Ок. Создать черновик потребности?')
+      setSessionState({
+        step: 'ready_for_draft',
+        draft: { ...draft, plannedForDate },
+      })
+    } else {
+      const firstIdx = problematic[0]
+      const item = draft.items[firstIdx]
+      addBotMessage(`Что вы имели в виду под «${item.name}»?`)
+      setSessionState({
+        step: 'catalog_choice',
+        draft: { ...draft, plannedForDate },
+      })
+    }
+  }
+
+  const handleCatalogChoice = (_choice: 'keep') => {
+    const draft = sessionState.draft
+    if (!draft || sessionState.step !== 'catalog_choice') return
+
+    const problematic = getProblematicIndices(draft.items)
+    const resolvedSet = new Set(draft.resolvedChoiceIndices)
+    const currentUnresolved = problematic.find((i) => !resolvedSet.has(i))
+    if (currentUnresolved === undefined) return
+
+    const resolved = [...draft.resolvedChoiceIndices, currentUnresolved]
+    const stillUnresolved = problematic.filter((i) => !resolved.includes(i))
+
+    if (stillUnresolved.length > 0) {
+      const nextIdx = stillUnresolved[0]
+      const item = draft.items[nextIdx]
+      addBotMessage(`Что вы имели в виду под «${item.name}»?`)
+      setSessionState({
+        step: 'catalog_choice',
+        draft: { ...draft, resolvedChoiceIndices: resolved },
+      })
+    } else {
+      addBotMessage('Ок. Создать черновик потребности?')
+      setSessionState({
+        step: 'ready_for_draft',
+        draft: { ...draft, resolvedChoiceIndices: resolved },
+      })
+    }
+  }
+
+  const handleCreateDraft = () => {
+    addBotMessage('(Черновик пока не создаётся — только диалог)')
+    setSessionState({ step: 'idle', draft: null })
   }
 
   return (
@@ -125,6 +226,34 @@ export default function AdminOrchestratorChat() {
                 </div>
               </div>
             ))}
+
+            {sessionState.step === 'need_date' && (
+              <div style={{ marginBottom: '1.5rem', marginLeft: 0 }}>
+                <button style={btnStyle} onClick={() => handleDateChoice('today')}>
+                  Сегодня
+                </button>
+                <button style={btnStyle} onClick={() => handleDateChoice('tomorrow')}>
+                  Завтра
+                </button>
+              </div>
+            )}
+
+            {sessionState.step === 'catalog_choice' && (
+              <div style={{ marginBottom: '1.5rem', marginLeft: 0 }}>
+                <button style={btnStyle} onClick={() => handleCatalogChoice('keep')}>
+                  Оставить как есть
+                </button>
+              </div>
+            )}
+
+            {sessionState.step === 'ready_for_draft' && (
+              <div style={{ marginBottom: '1.5rem', marginLeft: 0 }}>
+                <button style={btnStyle} onClick={handleCreateDraft}>
+                  Создать черновик
+                </button>
+              </div>
+            )}
+
             {loading && (
               <div style={{ padding: '0 1rem', color: '#9ca3af', fontSize: '0.9375rem' }}>
                 Агент печатает...
