@@ -9,7 +9,7 @@ import { parseMaxRequestToRows } from '@/lib/parseMaxRequest'
  * - Требует авторизацию (auth_token)
  * - businessId из сессии (user.businessId), не из body
  * - Принимает { message: string }
- * - Если message содержит числа + единицы (кг, шт, л и т.д.) — парсит через parseMaxRequestToRows
+ * - Если message содержит числа + единицы (кг, шт, л, упак и т.д.) — парсит через parseMaxRequestToRows
  */
 export async function POST(request: NextRequest) {
   const user = getAuthUser(request)
