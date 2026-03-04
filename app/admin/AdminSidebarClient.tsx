@@ -12,7 +12,10 @@ const SIDEBAR_ITEMS: (
   { label: 'Мастер каталог', href: '/admin/bot-tools' },
   {
     label: 'Техничка',
-    children: [{ label: 'Таблицы', href: '/admin/tech/tables' }],
+    children: [
+      { label: 'Таблицы', href: '/admin/tech/tables' },
+      { label: 'ТЗ AI агента', href: '/admin/tech/ai-spec' },
+    ],
   },
 ]
 
