@@ -1,6 +1,6 @@
 'use client'
 
-import AgentLayout from '@/components/agent/AgentLayout'
+import AdminOrchestratorChat from './AdminOrchestratorChat'
 
 export default function AdminDashboardClient() {
   return (
@@ -8,7 +8,7 @@ export default function AdminDashboardClient() {
       <h1 style={{ marginBottom: '2rem', fontSize: '1.875rem', fontWeight: 700 }}>
         AI-агент
       </h1>
-      <AgentLayout />
+      <AdminOrchestratorChat />
     </div>
   )
 }
