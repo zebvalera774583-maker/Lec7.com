@@ -117,8 +117,6 @@ export interface HandleBotEventResult {
   removeKeyboard?: boolean
 }
 
-const COMPANY_NAME = process.env.BOT_COMPANY_NAME || 'Блины Юга'
-
 const DEPARTMENTS = [
   { slug: 'voikovo_kitchen', label: 'Войково кухня' },
   { slug: 'voikovo_bar', label: 'Войково бар' },
@@ -132,14 +130,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
   const { channel, chatId } = event
   const text = event.text.trim().toLowerCase()
   const choice = event.choice
-  const isYes = choice === 'YES' || text === 'да'
-  const isNo = choice === 'NO' || text === 'нет'
 
   const state = await prisma.botChatState.findUnique({
     where: { channel_chatId: { channel, chatId } },
   })
 
-  const stateData = state?.stateJson as {
+  let stateData = state?.stateJson as {
     type?: string
     pendingUnit?: { needText: string; incompleteRaw: string[] }
     pendingItems?: { needText: string; parsedItems: { name: string; quantity: string; unit: string }[]; commentsText: string | null }
@@ -212,30 +208,26 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
   }
 
-  // Ожидание подтверждения компании
+  // Миграция: бывший awaiting_company_confirm — сразу в confirmed, обрабатываем текст как потребность
   if (stateData?.type === 'awaiting_company_confirm') {
-    if (isYes) {
-      await prisma.botChatState.update({
-        where: { channel_chatId: { channel, chatId } },
-        data: { stateJson: { type: 'confirmed' } },
-      })
-      return {
-        messages: ['Принято. Напишите потребность одним сообщением.'],
-        removeKeyboard: true,
-      }
-    }
-    if (isNo) {
-      return {
-        messages: ['Обратитесь к администратору для смены компании.'],
-        removeKeyboard: true,
-      }
-    }
-    return {
-      messages: ['Нажмите Да или Нет'],
-    }
+    await prisma.botChatState.update({
+      where: { channel_chatId: { channel, chatId } },
+      data: { stateJson: { type: 'confirmed' } },
+    })
+    stateData = { type: 'confirmed' } as typeof stateData
   }
 
-  // Уже подтвердил — принимаем текст как потребность
+  // Нет состояния — создаём confirmed, чтобы сразу принять потребность (без "Вы делаете заявки в компании X" Да/Нет)
+  if (!state) {
+    await prisma.botChatState.upsert({
+      where: { channel_chatId: { channel, chatId } },
+      create: { channel, chatId, stateJson: { type: 'confirmed' } },
+      update: {},
+    })
+    stateData = { type: 'confirmed' } as typeof stateData
+  }
+
+  // Уже подтвердил (или только что создали) — принимаем текст как потребность
   if (stateData?.type === 'confirmed') {
     let needText = event.text.trim()
     const businessId = process.env.BOT_BUSINESS_ID?.trim()
@@ -371,27 +363,30 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
   }
 
-  // Первое сообщение — показать подтверждение компании
-  const companyMessage = `Вы делаете заявки в компании ${COMPANY_NAME}`
-  await prisma.botChatState.upsert({
-    where: { channel_chatId: { channel, chatId } },
-    create: {
-      channel,
-      chatId,
-      stateJson: { type: 'awaiting_company_confirm' },
-    },
-    update: {
-      stateJson: { type: 'awaiting_company_confirm' },
-    },
-  })
+  // awaiting_department + текст вместо callback — напомнить выбрать подразделение
+  if (stateData?.type === 'awaiting_department') {
+    return {
+      messages: ['Выберите подразделение из кнопок выше.'],
+      replyInlineKeyboard: {
+        rows: [
+          [
+            { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
+            { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
+          ],
+          [
+            { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
+            { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
+          ],
+          [
+            { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
+            { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
+          ],
+        ],
+      },
+    }
+  }
 
   return {
-    messages: [companyMessage],
-    replyInlineKeyboard: {
-      buttons: [
-        { text: 'Да', callback_data: 'YES' },
-        { text: 'Нет', callback_data: 'NO' },
-      ],
-    },
+    messages: ['Напишите потребность, например: яблоки 10 кг, огурцы 5 кг'],
   }
 }

@@ -35,7 +35,7 @@ describe('handleBotEvent', () => {
     vi.clearAllMocks()
   })
 
-  it('first message shows company confirmation with Да/Нет', async () => {
+  it('first message (no state): привет → подсказка формата, без Да/Нет', async () => {
     mockFindUnique.mockResolvedValue(null)
 
     const result = await handleBotEvent({
@@ -43,16 +43,11 @@ describe('handleBotEvent', () => {
       text: 'привет',
     })
 
-    expect(result.messages).toEqual(['Вы делаете заявки в компании Блины Юга'])
-    expect(result.replyInlineKeyboard).toEqual({
-      buttons: [
-        { text: 'Да', callback_data: 'YES' },
-        { text: 'Нет', callback_data: 'NO' },
-      ],
-    })
+    expect(result.messages).toEqual(['Напишите потребность в формате, например: яблоки 10 кг'])
+    expect(result.replyInlineKeyboard).toBeUndefined()
   })
 
-  it('"да" when awaiting confirm returns accepted', async () => {
+  it('awaiting_company_confirm migrated to confirmed: "да" → подсказка формата', async () => {
     mockFindUnique.mockResolvedValue({
       stateJson: { type: 'awaiting_company_confirm' },
     })
@@ -62,11 +57,11 @@ describe('handleBotEvent', () => {
       text: 'да',
     })
 
-    expect(result.messages).toEqual(['Принято. Напишите потребность одним сообщением.'])
+    expect(result.messages).toEqual(['Напишите потребность в формате, например: яблоки 10 кг'])
     expect(mockUpdate).toHaveBeenCalled()
   })
 
-  it('choice YES (callback) when awaiting confirm returns accepted', async () => {
+  it('awaiting_company_confirm migrated: choice YES → подсказка формата', async () => {
     mockFindUnique.mockResolvedValue({
       stateJson: { type: 'awaiting_company_confirm' },
     })
@@ -77,11 +72,11 @@ describe('handleBotEvent', () => {
       choice: 'YES',
     })
 
-    expect(result.messages).toEqual(['Принято. Напишите потребность одним сообщением.'])
+    expect(result.messages).toEqual(['Напишите потребность в формате, например: яблоки 10 кг'])
     expect(mockUpdate).toHaveBeenCalled()
   })
 
-  it('"нет" when awaiting confirm returns admin message', async () => {
+  it('awaiting_company_confirm migrated: "нет" → подсказка формата', async () => {
     mockFindUnique.mockResolvedValue({
       stateJson: { type: 'awaiting_company_confirm' },
     })
@@ -91,7 +86,8 @@ describe('handleBotEvent', () => {
       text: 'нет',
     })
 
-    expect(result.messages).toEqual(['Обратитесь к администратору для смены компании.'])
+    expect(result.messages).toEqual(['Напишите потребность в формате, например: яблоки 10 кг'])
+    expect(mockUpdate).toHaveBeenCalled()
   })
 
   it('accepted text when confirmed returns принял', async () => {
