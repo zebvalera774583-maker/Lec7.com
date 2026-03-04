@@ -5,6 +5,17 @@ function normalizeForMatch(s: string): string {
   return (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+/**
+ * Нормализация названия позиции перед сопоставлением с каталогом:
+ * trim, убрать ведущую/хвостовую пунктуацию, схлопнуть пробелы.
+ * Дефисы/слэши внутри слова (соус-барбекю, сахар/песок) не трогаем.
+ */
+export function normalizeItemName(name: string): string {
+  let s = (name || '').trim()
+  s = s.replace(/^[\s,.;:!?()[\]{}"']+/, '').replace(/[\s,.;:!?()[\]{}"']+$/, '')
+  return s.replace(/\s+/g, ' ').trim()
+}
+
 export interface ResolvedItem {
   catalogItemId: string | null
   canonicalName: string
@@ -55,7 +66,8 @@ export async function resolveCatalogItems(
 
   const resolved: ResolvedItem[] = []
   for (const item of items) {
-    const matchedNorm = matchToCatalogSyncWithNorm(normToId, item.name)
+    const normalizedName = normalizeItemName(item.name)
+    const matchedNorm = matchToCatalogSyncWithNorm(normToId, normalizedName)
     const catalogItemId = matchedNorm ? normToId.get(matchedNorm) ?? null : null
     const canonicalName = matchedNorm ? (normToCanonical.get(matchedNorm) ?? item.name) : item.name
     const confidence = catalogItemId ? 1 : 0
