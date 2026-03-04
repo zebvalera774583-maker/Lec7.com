@@ -131,15 +131,10 @@ export async function POST(
       }
     }
 
-    // Вызов AI Gateway или server-side tool в зависимости от запроса
-    let assistantContent = 'Извините, произошла ошибка при генерации ответа.'
+    // Вызов Orchestrator (admin) или AI Gateway
+    let assistantContent = 'Ошибка связи, попробуйте ещё раз.'
     let meta: any = null
 
-    const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
-    const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
-
-    // Tool v1: get_platform_business_count
-    // Только для CREATOR и LEC7_ADMIN, вопрос вида "сколько бизнесов..."
     const isCreatorAdmin =
       conversation.mode === 'CREATOR' && user.role === 'LEC7_ADMIN'
     const normalizedContent = content.toLowerCase()
@@ -149,6 +144,7 @@ export async function POST(
         normalizedContent
       )
 
+    // Tool v1: get_platform_business_count
     if (isBusinessCountQuestion) {
       try {
         const businessCount = await prisma.business.count()
@@ -162,14 +158,75 @@ export async function POST(
         assistantContent =
           'Извините, не удалось получить число бизнесов на платформе. Попробуйте позже.'
       }
+    } else if (isCreatorAdmin && conversation.scope === 'PLATFORM') {
+      // Admin chat: Orchestrator
+      try {
+        const origin =
+          process.env.NEXTAUTH_URL ||
+          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+          (() => {
+            try {
+              return new URL(request.url).origin
+            } catch {
+              return 'http://localhost:3000'
+            }
+          })()
+        const cookieHeader = request.headers.get('cookie')
+
+        const orchestratorRes = await fetch(`${origin}/api/ai/orchestrator`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+          body: JSON.stringify({ message: content.trim() }),
+        })
+
+        if (!orchestratorRes.ok) {
+          console.error('Orchestrator error:', orchestratorRes.status)
+          assistantContent = 'Ошибка связи, попробуйте ещё раз.'
+        } else {
+          const data = (await orchestratorRes.json()) as {
+            intent?: string
+            message?: string
+            items?: Array<{
+              name: string
+              quantity: string
+              unit: string
+              canonicalName?: string
+              catalogItemId?: string | null
+            }>
+          }
+          if (data.intent === 'create_needs' && data.items?.length) {
+            assistantContent =
+              'Распознанные позиции:\n' +
+              data.items
+                .map(
+                  (i) =>
+                    `• ${i.canonicalName || i.name} — ${i.quantity} ${i.unit}`
+                )
+                .join('\n')
+            meta = { orchestrator: true, intent: 'create_needs', items: data.items }
+          } else {
+            assistantContent = data.message || 'AI Orchestrator MVP active'
+            meta = { orchestrator: true, intent: data.intent || 'unknown' }
+          }
+        }
+      } catch (error) {
+        console.error('Orchestrator request error:', error)
+        assistantContent = 'Ошибка связи, попробуйте ещё раз.'
+      }
     } else {
+      // Остальные чаты: AI Gateway
+      const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
+      const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
+
       if (!gatewayUrl || !gatewaySecret) {
         console.warn('AI Gateway configuration is missing')
         assistantContent =
           'AI не настроен. Пожалуйста, настройте LEC7_AI_GATEWAY_URL и LEC7_GATEWAY_SECRET.'
       } else {
         try {
-          // Подготовка messages для Gateway (включая system prompt)
           const gatewayMessages = [
             { role: 'system' as const, content: systemPrompt },
             ...messages,
@@ -188,13 +245,8 @@ export async function POST(
             const errorText = await gatewayResponse
               .text()
               .catch(() => 'AI gateway error')
-            console.error(
-              'AI Gateway error:',
-              gatewayResponse.status,
-              errorText
-            )
-            assistantContent =
-              'Извините, не удалось получить ответ от AI. Попробуйте позже.'
+            console.error('AI Gateway error:', gatewayResponse.status, errorText)
+            assistantContent = 'Ошибка связи, попробуйте ещё раз.'
           } else {
             const data = (await gatewayResponse.json()) as { reply?: string }
             assistantContent = data.reply?.trim() || assistantContent
@@ -206,8 +258,7 @@ export async function POST(
           }
         } catch (error) {
           console.error('AI Gateway request error:', error)
-          assistantContent =
-            'Извините, не удалось получить ответ от AI. Попробуйте позже.'
+          assistantContent = 'Ошибка связи, попробуйте ещё раз.'
         }
       }
     }
