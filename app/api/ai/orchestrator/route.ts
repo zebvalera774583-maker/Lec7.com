@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/middleware'
 import { parseMaxRequestToRows } from '@/lib/parseMaxRequest'
+import { resolveCatalogItems } from '@/lib/orchestrator/resolveCatalogItems'
 
 /**
  * POST /api/ai/orchestrator
@@ -9,7 +10,7 @@ import { parseMaxRequestToRows } from '@/lib/parseMaxRequest'
  * - Требует авторизацию (auth_token)
  * - businessId из сессии (user.businessId), не из body
  * - Принимает { message: string }
- * - Если message содержит числа + единицы (кг, шт, л, упак и т.д.) — парсит через parseMaxRequestToRows
+ * - create_needs: parseMaxRequestToRows → resolveCatalogItems (BotCatalogItem + synonyms, только чтение)
  */
 export async function POST(request: NextRequest) {
   const user = getAuthUser(request)
@@ -28,9 +29,20 @@ export async function POST(request: NextRequest) {
     items[0].unit === 'шт'
 
   if (items.length > 0 && !isFallback) {
+    const businessId = user.businessId ?? ''
+    const resolved = await resolveCatalogItems(items, businessId)
+
     return NextResponse.json({
       intent: 'create_needs',
-      items,
+      items: resolved.map((r) => ({
+        catalogItemId: r.catalogItemId,
+        canonicalName: r.canonicalName,
+        confidence: r.confidence,
+        needsUserChoice: r.needsUserChoice,
+        name: r.name,
+        quantity: r.quantity,
+        unit: r.unit,
+      })),
     })
   }
 
