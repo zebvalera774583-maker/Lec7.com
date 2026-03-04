@@ -91,12 +91,6 @@ bot.on('message_callback', async (ctx: any) => {
   console.log('[MAX callback]', { chatId, userId, choice: payload })
 
   try {
-    await ctx.answerOnCallback?.()
-  } catch (e) {
-    console.warn('[MAX] answerOnCallback error:', e)
-  }
-
-  try {
     const data = await forwardToWebhook(
       String(chatId),
       userId != null ? String(userId) : undefined,
@@ -106,6 +100,11 @@ bot.on('message_callback', async (ctx: any) => {
       undefined
     )
     const replyText = data?.replyText ?? 'Спасибо, заявка принята'
+    try {
+      await ctx.answerOnCallback?.({ notification: replyText })
+    } catch (e) {
+      console.warn('[MAX] answerOnCallback error:', e)
+    }
     await sendReply(ctx, replyText, data?.replyInlineKeyboard)
     console.log('[MAX outgoing]', { chatId, replyText: replyText.slice(0, 50) })
   } catch (err: any) {
