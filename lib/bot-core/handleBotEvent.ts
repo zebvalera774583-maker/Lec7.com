@@ -127,6 +127,22 @@ const DEPARTMENTS = [
   { slug: 'moremall_bar', label: 'МореМолл бар' },
 ] as const
 
+const UNIT_CLARIFICATION_BUTTONS = [
+  { text: 'кг', callback_data: '__UNIT__' },
+  { text: 'шт', callback_data: '__UNIT__' },
+  { text: 'л', callback_data: '__UNIT__' },
+  { text: 'уп', callback_data: '__UNIT__' },
+  { text: 'пуч', callback_data: '__UNIT__' },
+  { text: 'кор', callback_data: '__UNIT__' },
+] as const
+
+function unitButtonsForIndex(index: number) {
+  return UNIT_CLARIFICATION_BUTTONS.map((b) => ({
+    text: b.text,
+    callback_data: `set_unit|${index}|${b.text}` as const,
+  }))
+}
+
 export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventResult> {
   const { channel, chatId } = event
   const text = event.text.trim().toLowerCase()
@@ -140,7 +156,67 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     type?: string
     pendingUnit?: { needText: string; incompleteRaw: string[] }
     pendingItems?: { needText: string; parsedItems: { name: string; quantity: string; unit: string }[]; commentsText: string | null }
+    indicesNeedingUnit?: number[]
   } | null
+
+  // Обработка выбора unit (callback set_unit|index|unit)
+  const setUnitMatch = typeof choice === 'string' ? choice.match(/^set_unit\|(\d+)\|([a-zа-яё]+)$/i) : null
+  if (setUnitMatch && stateData?.type === 'awaiting_unit' && stateData?.pendingItems) {
+    const idx = parseInt(setUnitMatch[1], 10)
+    const unit = setUnitMatch[2].toLowerCase()
+    const { needText, parsedItems, commentsText } = stateData.pendingItems
+    const indicesNeedingUnit = stateData.indicesNeedingUnit ?? []
+    if (indicesNeedingUnit.includes(idx) && parsedItems[idx]) {
+      parsedItems[idx].unit = unit
+      const remaining = indicesNeedingUnit.filter((i) => i !== idx)
+      if (remaining.length === 0) {
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_department',
+              pendingItems: { needText, parsedItems, commentsText },
+            },
+          },
+        })
+        return {
+          messages: ['Выберите подразделение:'],
+          replyInlineKeyboard: {
+            rows: [
+              [
+                { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
+                { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
+              ],
+              [
+                { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
+                { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
+              ],
+              [
+                { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
+                { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
+              ],
+            ],
+          },
+        }
+      }
+      const nextIdx = remaining[0]
+      const nextItem = parsedItems[nextIdx]
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            type: 'awaiting_unit',
+            pendingItems: { needText, parsedItems, commentsText },
+            indicesNeedingUnit: remaining,
+          },
+        },
+      })
+      return {
+        messages: [`Уточните единицу измерения для: ${nextItem.name} (${nextItem.quantity})`],
+        replyInlineKeyboard: { rows: [unitButtonsForIndex(nextIdx)] },
+      }
+    }
+  }
 
   // Обработка выбора подразделения (callback set_department|<slug>)
   const setDeptMatch = typeof choice === 'string' ? choice.match(/^set_department\|([a-z_]+)$/) : null
@@ -268,8 +344,29 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       const parsedItems = orchestratorResult.items.map((r) => ({
         name: r.canonicalName,
         quantity: r.quantity,
-        unit: r.unit,
+        unit: r.unit || '',
       }))
+      const indicesNeedingUnit = orchestratorResult.needsUnitClarification ?? []
+
+      if (indicesNeedingUnit.length > 0) {
+        const firstIdx = indicesNeedingUnit[0]
+        const firstItem = parsedItems[firstIdx]
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_unit',
+              pendingItems: { needText, parsedItems, commentsText: null },
+              indicesNeedingUnit,
+            },
+          },
+        })
+        return {
+          messages: [`Уточните единицу измерения для: ${firstItem.name} (${firstItem.quantity})`],
+          replyInlineKeyboard: { rows: [unitButtonsForIndex(firstIdx)] },
+        }
+      }
+
       await prisma.botChatState.update({
         where: { channel_chatId: { channel, chatId } },
         data: {
@@ -412,6 +509,19 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
     return {
       messages: [`Принял: "${needText}" ✅`],
+    }
+  }
+
+  // awaiting_unit + текст вместо callback — напомнить выбрать unit
+  if (stateData?.type === 'awaiting_unit' && stateData?.pendingItems) {
+    const indices = stateData.indicesNeedingUnit ?? []
+    const firstIdx = indices[0]
+    if (firstIdx != null && stateData.pendingItems.parsedItems[firstIdx]) {
+      const item = stateData.pendingItems.parsedItems[firstIdx]
+      return {
+        messages: [`Уточните единицу измерения для: ${item.name} (${item.quantity})`],
+        replyInlineKeyboard: { rows: [unitButtonsForIndex(firstIdx)] },
+      }
     }
   }
 

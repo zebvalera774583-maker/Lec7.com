@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMaxRequestToRows, preprocessForParse } from './parseMaxRequest'
+import { parseMaxRequestToRows, parseMaxRequestToRowsWithOptionalUnit, preprocessForParse } from './parseMaxRequest'
 
 describe('preprocessForParse', () => {
   it('огурец-2кг → огурец 2 кг', () => {
@@ -49,5 +49,17 @@ describe('parseMaxRequestToRows', () => {
       { name: 'Картофель', quantity: '5', unit: 'кг' },
       { name: 'Лук', quantity: '2', unit: 'кг' },
     ])
+  })
+})
+
+describe('parseMaxRequestToRowsWithOptionalUnit', () => {
+  it('Чеснок 0,500 → unit пустая (для эвристики)', () => {
+    const result = parseMaxRequestToRowsWithOptionalUnit('', 'Чеснок 0,500')
+    expect(result).toEqual([{ name: 'Чеснок', quantity: '0.500', unit: '' }])
+  })
+
+  it('Лук 2кг → unit кг', () => {
+    const result = parseMaxRequestToRowsWithOptionalUnit('', 'Лук 2кг')
+    expect(result).toEqual([{ name: 'Лук', quantity: '2', unit: 'кг' }])
   })
 })

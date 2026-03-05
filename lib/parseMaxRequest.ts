@@ -39,3 +39,29 @@ export function parseMaxRequestToRows(
   if (rows.length === 0) rows.push({ name: src, quantity: '1', unit: 'шт' })
   return rows
 }
+
+/**
+ * Парсинг с сохранением отсутствия unit (для Orchestrator).
+ * Когда unit не указан в строке — возвращает пустую строку вместо "шт".
+ */
+export function parseMaxRequestToRowsWithOptionalUnit(
+  title: string,
+  description: string
+): { name: string; quantity: string; unit: string }[] {
+  const text = (description || title || '').trim()
+  if (!text) return []
+  const cleanTitle = (title || '').replace(/^Заявка из MAX:\s*/i, '').trim()
+  let src = description || cleanTitle || text
+  src = preprocessForParse(src)
+  const rows: { name: string; quantity: string; unit: string }[] = []
+  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src)) !== null) {
+    const name = m[1].trim()
+    const quantity = m[2].replace(',', '.')
+    const unit = (m[3] ?? '').toString().toLowerCase().trim()
+    if (name) rows.push({ name, quantity, unit })
+  }
+  if (rows.length === 0) rows.push({ name: src, quantity: '1', unit: '' })
+  return rows
+}

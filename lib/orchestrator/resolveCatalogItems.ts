@@ -25,6 +25,8 @@ export interface ResolvedItem {
   name: string
   quantity: string
   unit: string
+  /** Требуется уточнение unit от пользователя (эвристика дала LOW) */
+  needsUnitClarification?: boolean
 }
 
 /**
