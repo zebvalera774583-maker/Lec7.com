@@ -222,6 +222,33 @@ describe('handleBotEvent', () => {
     process.env.BOT_BUSINESS_ID = origEnv
   })
 
+  it('orchestrator: Морковь- + "2" (без unit) → просит "Уточните единицу"', async () => {
+    process.env.BOT_BUSINESS_ID = 'test-business-id'
+    mockFindUnique.mockResolvedValue({
+      stateJson: {
+        type: 'awaiting_item_clarification',
+        pendingItems: {
+          needText: 'Лук 2кг\nМорковь-\nЧеснок 0,500',
+          parsedItems: [
+            { name: 'Лук', quantity: '2', unit: 'кг' },
+            { name: 'Морковь', quantity: '', unit: 'кг' },
+            { name: 'Чеснок', quantity: '0.5', unit: 'кг' },
+          ],
+          commentsText: null,
+        },
+        pendingIndex: 1,
+      },
+    })
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: '2',
+    })
+
+    expect(result.messages[0]).toContain('Уточните единицу')
+    expect(result.messages[0]).not.toContain('Выберите подразделение')
+  })
+
   it('orchestrator: Морковь- + "2 кг" → then "Выберите подразделение"', async () => {
     const origEnv = process.env.BOT_BUSINESS_ID
     process.env.BOT_BUSINESS_ID = 'test-business-id'

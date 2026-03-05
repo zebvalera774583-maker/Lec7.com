@@ -336,8 +336,10 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       parsed = { quantity: item.quantity, unit: event.text.trim().toLowerCase() }
     }
     if (parsed) {
-      const itemNeedsUnitFill = !(item.unit ?? '').trim()
-      if (itemNeedsUnitFill && !(parsed.unit ?? '').trim()) {
+      // Требуем unit от пользователя, если: 1) item.unit пуст, ИЛИ 2) item.quantity пуст
+      // (эвристика могла подставить unit для "Морковь", но пользователь не указывал — нужен явный "2 кг")
+      const itemNeedsUnitFromUser = !(item.unit ?? '').trim() || !(item.quantity ?? '').trim()
+      if (itemNeedsUnitFromUser && !(parsed.unit ?? '').trim()) {
         return { messages: ['Уточните единицу (кг/шт/л/уп...)'] }
       }
       const { needText, parsedItems, commentsText } = stateData.pendingItems
