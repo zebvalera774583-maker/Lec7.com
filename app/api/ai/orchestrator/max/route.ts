@@ -1,38 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { parseMaxRequestToRows } from '@/lib/parseMaxRequest'
-import { resolveCatalogItems } from '@/lib/orchestrator/resolveCatalogItems'
+import { recognizeNeedsForChat } from '@/lib/orchestrator/recognizeNeedsForChat'
 
 const SECRET_HEADER = 'x-lec7-max-secret'
-
-/**
- * Найти businessId по externalChatId/chatId.
- * MAX: MaxChatContext (chatId → businessId)
- * Telegram: BusinessTelegramRecipient (chatId → businessId)
- */
-async function getBusinessIdByChatId(chatId: string): Promise<string | null> {
-  const maxCtx = await prisma.maxChatContext.findUnique({
-    where: { chatId },
-    select: { businessId: true },
-  })
-  if (maxCtx) return maxCtx.businessId
-
-  const tgRecipient = await prisma.businessTelegramRecipient.findFirst({
-    where: { chatId, isActive: true },
-    select: { businessId: true },
-  })
-  if (tgRecipient) return tgRecipient.businessId
-
-  return null
-}
 
 /**
  * POST /api/ai/orchestrator/max
  * Вход для MAX/Telegram — без cookie.
  *
  * Body: { externalChatId или chatId, message }
- * businessId только из привязки (MaxChatContext / BusinessTelegramRecipient)
- * Pipeline: normalize → parseMaxRequestToRows → resolveCatalogItems
+ * businessId из привязки (MaxChatContext / BusinessTelegramRecipient) или BOT_BUSINESS_ID
  */
 export async function POST(request: NextRequest) {
   const expectedSecret = process.env.LEC7_MAX_SECRET
@@ -58,24 +34,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'externalChatId or chatId required' }, { status: 400 })
   }
 
-  const businessId = await getBusinessIdByChatId(chatId)
-  if (!businessId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const result = await recognizeNeedsForChat(chatId, message)
 
-  const items = parseMaxRequestToRows(message, '')
-  const isFallback =
-    items.length === 1 &&
-    items[0].name === message.trim() &&
-    items[0].quantity === '1' &&
-    items[0].unit === 'шт'
-
-  if (items.length > 0 && !isFallback) {
-    const resolved = await resolveCatalogItems(items, businessId)
-
+  if (result.intent === 'create_needs' && result.items?.length) {
     return NextResponse.json({
       intent: 'create_needs',
-      items: resolved.map((r) => ({
+      items: result.items.map((r) => ({
         catalogItemId: r.catalogItemId,
         canonicalName: r.canonicalName,
         confidence: r.confidence,

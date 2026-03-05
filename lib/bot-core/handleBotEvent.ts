@@ -2,6 +2,7 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
 import { getCatalogNormMap, matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
+import { recognizeNeedsForChat } from '@/lib/orchestrator/recognizeNeedsForChat'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
 const UNIT_ONLY_PATTERN = /^(кг|г|гр|т|шт\.?|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
@@ -255,6 +256,57 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
+    // Orchestrator: read-only распознавание (единственный источник items)
+    let orchestratorResult: Awaited<ReturnType<typeof recognizeNeedsForChat>> | null = null
+    try {
+      orchestratorResult = await recognizeNeedsForChat(chatId, needText)
+    } catch (e) {
+      console.warn('[handleBotEvent] Orchestrator fallback (error):', e)
+    }
+
+    if (orchestratorResult?.intent === 'create_needs' && orchestratorResult.items?.length && businessId) {
+      const parsedItems = orchestratorResult.items.map((r) => ({
+        name: r.canonicalName,
+        quantity: r.quantity,
+        unit: r.unit,
+      }))
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            type: 'awaiting_department',
+            pendingItems: { needText, parsedItems, commentsText: null },
+          },
+        },
+      })
+      return {
+        messages: ['Выберите подразделение:'],
+        replyInlineKeyboard: {
+          rows: [
+            [
+              { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
+              { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
+            ],
+            [
+              { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
+              { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
+            ],
+            [
+              { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
+              { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
+            ],
+          ],
+        },
+      }
+    }
+
+    if (orchestratorResult?.intent === 'unknown') {
+      return {
+        messages: ['Напишите потребность в формате, например: яблоки 10 кг'],
+      }
+    }
+
+    // Fallback: старый парсер (при сбое Orchestrator)
     const rawItems = splitIntoItems(needText)
     let normToId: Map<string, string>
     try {
