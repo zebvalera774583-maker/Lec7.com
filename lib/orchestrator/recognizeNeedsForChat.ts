@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { preprocessForParse } from '@/lib/parseMaxRequest'
-import { parseMaxRequestToRowsWithOptionalUnit } from '@/lib/parseMaxRequest'
+import { parseSegment } from '@/lib/parseMaxRequest'
 import { resolveCatalogItems, type ResolvedItem } from '@/lib/orchestrator/resolveCatalogItems'
-import { buildAliasToCanonicalMap, splitNeedLines, preNormalizeLines } from '@/lib/orchestrator/preNormalizer'
+import { buildAliasToCanonicalMap, preNormalizeLines } from '@/lib/orchestrator/preNormalizer'
+import { segmentNeeds } from '@/lib/orchestrator/segmentNeeds'
 import { applyUnitHeuristic } from '@/lib/orchestrator/unitHeuristic'
 
 /**
@@ -34,7 +34,7 @@ export interface RecognizeResult {
 
 /**
  * Распознать потребности из текста (Orchestrator read-only).
- * Pipeline: pre-normalize → parse (unit optional) → unit heuristic → resolveCatalogItems.
+ * Pipeline: segmentNeeds (FIRST) → parseSegments → preNormalizer → resolveCatalogItems → unit heuristic.
  */
 export async function recognizeNeedsForChat(
   chatId: string,
@@ -45,12 +45,16 @@ export async function recognizeNeedsForChat(
     return { intent: 'unknown' }
   }
 
+  const segments = segmentNeeds(message)
+  console.log(`[ORCH] segments=${JSON.stringify(segments)}`)
+
   const aliasMap = await buildAliasToCanonicalMap()
-  const lines = splitNeedLines(message)
-  const normalizedLines = preNormalizeLines(lines, aliasMap)
-  const normalizedText = normalizedLines.join('\n')
-  const preprocessed = preprocessForParse(normalizedText)
-  const rawItems = parseMaxRequestToRowsWithOptionalUnit(preprocessed, '')
+  const normalizedSegments = preNormalizeLines(segments, aliasMap)
+  const rawItems: { name: string; quantity: string; unit: string }[] = []
+  for (const seg of normalizedSegments) {
+    const parsed = parseSegment(seg)
+    if (parsed) rawItems.push(parsed)
+  }
 
   const isFallback =
     rawItems.length === 1 &&

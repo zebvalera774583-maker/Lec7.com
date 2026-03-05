@@ -65,3 +65,25 @@ export function parseMaxRequestToRowsWithOptionalUnit(
   if (rows.length === 0) rows.push({ name: src, quantity: '1', unit: '' })
   return rows
 }
+
+/**
+ * Парсинг одного сегмента (после segmentNeeds).
+ * "Морковь-" -> quantity: "", "1 кг" (нет title) -> null.
+ */
+export function parseSegment(segment: string): { name: string; quantity: string; unit: string } | null {
+  const src = preprocessForParse(segment.trim())
+  if (!src) return null
+  if (/^\d+$/.test(src)) return null
+  if (/^\d+(?:[.,]\d+)?\s*(?:кг|г|л|шт|уп|т)/i.test(src) && !/[\p{L}]/u.test(src.replace(/\d/g, '').replace(/\s/g, ''))) return null
+  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ)?/i
+  const m = src.match(re)
+  if (m) {
+    const name = m[1].trim()
+    const quantity = m[2].replace(',', '.')
+    const unit = (m[3] ?? '').toString().toLowerCase().trim()
+    if (name) return { name, quantity, unit }
+  }
+  const name = src.replace(/[-–—]+$/, '').trim()
+  if (name && /[\p{L}]/u.test(name)) return { name, quantity: '', unit: '' }
+  return null
+}
