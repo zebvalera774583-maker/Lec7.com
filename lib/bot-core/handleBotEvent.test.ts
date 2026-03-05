@@ -24,6 +24,11 @@ vi.mock('@/lib/catalog-match', async (importOriginal) => {
   }
 })
 
+const mockRecognizeNeedsForChat = vi.fn()
+vi.mock('@/lib/orchestrator/recognizeNeedsForChat', () => ({
+  recognizeNeedsForChat: (...args: unknown[]) => mockRecognizeNeedsForChat(...args),
+}))
+
 describe('handleBotEvent', () => {
   const baseEvent = {
     channel: 'telegram' as const,
@@ -33,6 +38,7 @@ describe('handleBotEvent', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRecognizeNeedsForChat.mockResolvedValue(undefined)
   })
 
   it('first message (no state): привет → подсказка формата, без Да/Нет', async () => {
@@ -196,7 +202,28 @@ describe('handleBotEvent', () => {
     expect(result.messages[0]).toContain('Принял')
   })
 
+  it('orchestrator: item with empty qty (Морковь-) asks for quantity clarification', async () => {
+    const origEnv = process.env.BOT_BUSINESS_ID
+    process.env.BOT_BUSINESS_ID = 'test-business-id'
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
+    mockRecognizeNeedsForChat.mockResolvedValue({
+      intent: 'create_needs',
+      items: [{ canonicalName: 'Морковь', quantity: '', unit: '' }],
+    })
+
+    const result = await handleBotEvent({
+      ...baseEvent,
+      text: 'Лук 2кг\nМорковь-\nЧеснок 0,500',
+    })
+
+    expect(result.messages[0]).toContain('Уточните количество для:')
+    expect(result.messages[0]).toContain('Морковь')
+    expect(result.replyInlineKeyboard?.rows?.[0]?.some((b) => b.text === '1 кг' || b.text === 'Другое')).toBe(true)
+    process.env.BOT_BUSINESS_ID = origEnv
+  })
+
   it('clarification: "Айсберг салат 3 шт, груши 5" asks for unit, then "кг" yields full list', async () => {
+    delete process.env.BOT_BUSINESS_ID
     mockGetCatalogNormMap.mockResolvedValue(
       new Map([
         ['айсберг', 'id1'],

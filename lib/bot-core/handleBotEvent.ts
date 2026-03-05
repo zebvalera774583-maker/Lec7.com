@@ -155,6 +155,34 @@ function unitButtonsForIndex(index: number) {
   }))
 }
 
+const QTY_CLARIFICATION_BUTTONS = [
+  { text: '1 кг', qty: '1', unit: 'кг' },
+  { text: '1 шт', qty: '1', unit: 'шт' },
+  { text: '0.5 кг', qty: '0.5', unit: 'кг' },
+  { text: 'Другое', callback: 'other' },
+] as const
+
+function qtyButtonsForIndex(index: number) {
+  return [
+    ...QTY_CLARIFICATION_BUTTONS.filter((b) => b.callback !== 'other').map((b) => ({
+      text: b.text,
+      callback_data: `set_qty|${index}|${b.qty}|${b.unit}` as const,
+    })),
+    { text: 'Другое', callback_data: `set_qty_other|${index}` as const },
+  ]
+}
+
+/** Парсинг "2 кг" или "1" → { quantity, unit } */
+function parseQtyInput(text: string): { quantity: string; unit: string } | null {
+  const t = (text || '').trim()
+  if (!t) return null
+  const m = t.match(/^(\d+(?:[.,]\d+)?)\s*([a-zа-яё]+)?$/i)
+  if (!m) return null
+  const quantity = m[1].replace(',', '.')
+  const unit = (m[2] ?? 'шт').toLowerCase().trim()
+  return { quantity, unit }
+}
+
 export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventResult> {
   const { channel, chatId } = event
   const text = event.text.trim().toLowerCase()
@@ -169,7 +197,96 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     pendingUnit?: { needText: string; incompleteRaw: string[] }
     pendingItems?: { needText: string; parsedItems: { name: string; quantity: string; unit: string }[]; commentsText: string | null }
     indicesNeedingUnit?: number[]
+    indicesNeedingQty?: number[]
+    pendingClarificationIndex?: number
   } | null
+
+  // Обработка выбора qty (callback set_qty|index|qty|unit)
+  const setQtyMatch = typeof choice === 'string' ? choice.match(/^set_qty\|(\d+)\|([^|]+)\|([a-zа-яё]+)$/i) : null
+  if (setQtyMatch && stateData?.type === 'awaiting_qty' && stateData?.pendingItems) {
+    const idx = parseInt(setQtyMatch[1], 10)
+    const qty = setQtyMatch[2].replace(',', '.')
+    const unit = setQtyMatch[3].toLowerCase()
+    const { needText, parsedItems, commentsText } = stateData.pendingItems
+    const indicesNeedingQty = stateData.indicesNeedingQty ?? []
+    if (indicesNeedingQty.includes(idx) && parsedItems[idx]) {
+      parsedItems[idx].quantity = qty
+      parsedItems[idx].unit = unit
+      const remaining = indicesNeedingQty.filter((i) => i !== idx)
+      if (remaining.length === 0) {
+        const indicesNeedingUnit = (stateData.indicesNeedingUnit ?? []).filter((i) => parsedItems[i]?.quantity)
+        if (indicesNeedingUnit.length > 0) {
+          await prisma.botChatState.update({
+            where: { channel_chatId: { channel, chatId } },
+            data: {
+              stateJson: {
+                type: 'awaiting_unit',
+                pendingItems: { needText, parsedItems, commentsText },
+                indicesNeedingUnit,
+              },
+            },
+          })
+          const nextItem = parsedItems[indicesNeedingUnit[0]]
+          return {
+            messages: [`Уточните единицу измерения для: ${nextItem.name} (${nextItem.quantity})`],
+            replyInlineKeyboard: { rows: [unitButtonsForIndex(indicesNeedingUnit[0])] },
+          }
+        }
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_department',
+              pendingItems: { needText, parsedItems, commentsText },
+            },
+          },
+        })
+        return {
+          messages: ['Выберите подразделение:'],
+          replyInlineKeyboard: { rows: departmentKeyboardRows() },
+        }
+      }
+      const nextIdx = remaining[0]
+      const nextItem = parsedItems[nextIdx]
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            type: 'awaiting_qty',
+            pendingItems: { needText, parsedItems, commentsText },
+            indicesNeedingQty: remaining,
+          },
+        },
+      })
+      return {
+        messages: [`Уточните количество для: ${nextItem.name}`],
+        replyInlineKeyboard: { rows: [qtyButtonsForIndex(nextIdx)] },
+      }
+    }
+  }
+
+  // set_qty_other: переход в awaiting_qty_other, ждём текст от пользователя
+  const setQtyOtherMatch = typeof choice === 'string' ? choice.match(/^set_qty_other\|(\d+)$/) : null
+  if (setQtyOtherMatch && stateData?.type === 'awaiting_qty' && stateData?.pendingItems) {
+    const idx = parseInt(setQtyOtherMatch[1], 10)
+    const indicesNeedingQty = stateData.indicesNeedingQty ?? []
+    if (indicesNeedingQty.includes(idx)) {
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            ...stateData,
+            type: 'awaiting_qty_other',
+            pendingClarificationIndex: idx,
+          },
+        },
+      })
+      const item = stateData.pendingItems.parsedItems[idx]
+      return {
+        messages: [`Напишите количество и единицу для: ${item.name} (например: 2 кг)`],
+      }
+    }
+  }
 
   // Обработка выбора unit (callback set_unit|index|unit)
   const setUnitMatch = typeof choice === 'string' ? choice.match(/^set_unit\|(\d+)\|([a-zа-яё]+)$/i) : null
@@ -301,6 +418,149 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     stateData = { type: 'confirmed' } as typeof stateData
   }
 
+  // awaiting_qty_other: пользователь ввёл количество текстом (например "2 кг")
+  if (
+    !choice &&
+    event.text.trim() &&
+    stateData?.type === 'awaiting_qty_other' &&
+    stateData?.pendingItems &&
+    stateData?.pendingClarificationIndex != null
+  ) {
+    const idx = stateData.pendingClarificationIndex
+    const parsed = parseQtyInput(event.text)
+    if (parsed && stateData.pendingItems.parsedItems[idx]) {
+      const { needText, parsedItems, commentsText } = stateData.pendingItems
+      parsedItems[idx].quantity = parsed.quantity
+      parsedItems[idx].unit = parsed.unit
+      const indicesNeedingQty = (stateData.indicesNeedingQty ?? []).filter((i) => i !== idx)
+      if (indicesNeedingQty.length === 0) {
+        const indicesNeedingUnit = (stateData.indicesNeedingUnit ?? []).filter((i) => parsedItems[i]?.quantity)
+        if (indicesNeedingUnit.length > 0) {
+          await prisma.botChatState.update({
+            where: { channel_chatId: { channel, chatId } },
+            data: {
+              stateJson: {
+                type: 'awaiting_unit',
+                pendingItems: { needText, parsedItems, commentsText },
+                indicesNeedingUnit,
+              },
+            },
+          })
+          const nextItem = parsedItems[indicesNeedingUnit[0]]
+          return {
+            messages: [`Уточните единицу измерения для: ${nextItem.name} (${nextItem.quantity})`],
+            replyInlineKeyboard: { rows: [unitButtonsForIndex(indicesNeedingUnit[0])] },
+          }
+        }
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_department',
+              pendingItems: { needText, parsedItems, commentsText },
+            },
+          },
+        })
+        return {
+          messages: ['Выберите подразделение:'],
+          replyInlineKeyboard: { rows: departmentKeyboardRows() },
+        }
+      }
+      const nextIdx = indicesNeedingQty[0]
+      const nextItem = parsedItems[nextIdx]
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            type: 'awaiting_qty',
+            pendingItems: { needText, parsedItems, commentsText },
+            indicesNeedingQty,
+            indicesNeedingUnit: stateData.indicesNeedingUnit,
+          },
+        },
+      })
+      return {
+        messages: [`Уточните количество для: ${nextItem.name}`],
+        replyInlineKeyboard: { rows: [qtyButtonsForIndex(nextIdx)] },
+      }
+    }
+    return {
+      messages: ['Не удалось распознать. Напишите, например: 2 кг или 1 шт'],
+    }
+  }
+
+  // awaiting_qty + текст вместо callback — принять как "Другое" (парсим qty из текста)
+  if (
+    !choice &&
+    event.text.trim() &&
+    stateData?.type === 'awaiting_qty' &&
+    stateData?.pendingItems &&
+    (stateData.indicesNeedingQty ?? []).length > 0
+  ) {
+    const idx = stateData.indicesNeedingQty![0]
+    const parsed = parseQtyInput(event.text)
+    if (parsed && stateData.pendingItems.parsedItems[idx]) {
+      const { needText, parsedItems, commentsText } = stateData.pendingItems
+      parsedItems[idx].quantity = parsed.quantity
+      parsedItems[idx].unit = parsed.unit
+      const remaining = (stateData.indicesNeedingQty ?? []).filter((i) => i !== idx)
+      if (remaining.length === 0) {
+        const indicesNeedingUnit = (stateData.indicesNeedingUnit ?? []).filter((i) => parsedItems[i]?.quantity)
+        if (indicesNeedingUnit.length > 0) {
+          await prisma.botChatState.update({
+            where: { channel_chatId: { channel, chatId } },
+            data: {
+              stateJson: {
+                type: 'awaiting_unit',
+                pendingItems: { needText, parsedItems, commentsText },
+                indicesNeedingUnit,
+              },
+            },
+          })
+          const nextItem = parsedItems[indicesNeedingUnit[0]]
+          return {
+            messages: [`Уточните единицу измерения для: ${nextItem.name} (${nextItem.quantity})`],
+            replyInlineKeyboard: { rows: [unitButtonsForIndex(indicesNeedingUnit[0])] },
+          }
+        }
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_department',
+              pendingItems: { needText, parsedItems, commentsText },
+            },
+          },
+        })
+        return {
+          messages: ['Выберите подразделение:'],
+          replyInlineKeyboard: { rows: departmentKeyboardRows() },
+        }
+      }
+      const nextIdx = remaining[0]
+      const nextItem = parsedItems[nextIdx]
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: {
+          stateJson: {
+            type: 'awaiting_qty',
+            pendingItems: { needText, parsedItems, commentsText },
+            indicesNeedingQty: remaining,
+            indicesNeedingUnit: stateData.indicesNeedingUnit,
+          },
+        },
+      })
+      return {
+        messages: [`Уточните количество для: ${nextItem.name}`],
+        replyInlineKeyboard: { rows: [qtyButtonsForIndex(nextIdx)] },
+      }
+    }
+    return {
+      messages: ['Не удалось распознать. Напишите, например: 2 кг или 1 шт'],
+      replyInlineKeyboard: { rows: [qtyButtonsForIndex(idx)] },
+    }
+  }
+
   // Уже подтвердил (или только что создали) — принимаем текст как потребность
   if (stateData?.type === 'confirmed') {
     let needText = event.text.trim()
@@ -340,10 +600,33 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     if (orchestratorResult?.intent === 'create_needs' && orchestratorResult.items?.length && businessId) {
       const parsedItems = orchestratorResult.items.map((r) => ({
         name: r.canonicalName,
-        quantity: r.quantity,
+        quantity: r.quantity ?? '',
         unit: r.unit || '',
       }))
+      const indicesNeedingQty = parsedItems
+        .map((p, i) => (p.quantity === '' || p.quantity == null ? i : -1))
+        .filter((i) => i >= 0)
       const indicesNeedingUnit = orchestratorResult.needsUnitClarification ?? []
+
+      if (indicesNeedingQty.length > 0) {
+        const firstIdx = indicesNeedingQty[0]
+        const firstItem = parsedItems[firstIdx]
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_qty',
+              pendingItems: { needText, parsedItems, commentsText: null },
+              indicesNeedingQty,
+              indicesNeedingUnit,
+            },
+          },
+        })
+        return {
+          messages: [`Уточните количество для: ${firstItem.name}`],
+          replyInlineKeyboard: { rows: [qtyButtonsForIndex(firstIdx)] },
+        }
+      }
 
       if (indicesNeedingUnit.length > 0) {
         const firstIdx = indicesNeedingUnit[0]
@@ -476,6 +759,19 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
     return {
       messages: [`Принял: "${needText}" ✅`],
+    }
+  }
+
+  // awaiting_qty + текст вместо callback — напомнить выбрать количество
+  if (stateData?.type === 'awaiting_qty' && stateData?.pendingItems) {
+    const indices = stateData.indicesNeedingQty ?? []
+    const firstIdx = indices[0]
+    if (firstIdx != null && stateData.pendingItems.parsedItems[firstIdx]) {
+      const item = stateData.pendingItems.parsedItems[firstIdx]
+      return {
+        messages: [`Уточните количество для: ${item.name}`],
+        replyInlineKeyboard: { rows: [qtyButtonsForIndex(firstIdx)] },
+      }
     }
   }
 
