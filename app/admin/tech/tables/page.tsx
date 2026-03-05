@@ -124,7 +124,7 @@ export default function TechTablesPage() {
           <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №1</h3>
           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
             <li><strong>Назначение:</strong> Сводное сравнение цен поставщиков по позициям заявки и формирование заявки.</li>
-            <li><strong>Подразделение:</strong> Отображается над таблицей при заявке из MAX/Telegram (Навагинская кухня, Войково бар и т.п.).</li>
+            <li><strong>Подразделение:</strong> Отображается над таблицей при заявке из MAX/Telegram (Навагин кухня, Войково бар и т.п.).</li>
             <li><strong>Колонки:</strong> №, Наименование, Кол-во, Ед., колонки поставщиков (с чекбоксом «В заявку»), Итоговая сумма.</li>
             <li><strong>Поставщики:</strong> Все подключённые контрагенты с активными прайсами в категории.</li>
             <li><strong>Выбор цены:</strong> Клик по ячейке — ручной выбор поставщика для позиции (зелёный фон). Позиции без цены можно включать в заявку (цена 0).</li>
@@ -136,7 +136,7 @@ export default function TechTablesPage() {
         </div>
 
         <div style={{ marginBottom: '0.5rem', fontSize: '0.875rem', color: '#4b5563' }}>
-          <strong>Подразделение:</strong> МореМолл кухня
+          <strong>Подразделение:</strong> ММ кухня
         </div>
         <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
@@ -308,7 +308,7 @@ export default function TechTablesPage() {
         <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
           <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №5</h3>
           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
-            <li><strong>Назначение:</strong> Просмотр заявки из MAX/Telegram. Блок «Подразделение» — выбранное в боте (Навагинская кухня, Войково бар и т.п.). Блок «Комментарий» — не сопоставленные с каталогом строки (адрес, заведение и т.п.).</li>
+            <li><strong>Назначение:</strong> Просмотр заявки из MAX/Telegram. Блок «Подразделение» — выбранное в боте (Навагин кухня, Войково бар и т.п.). Блок «Комментарий» — не сопоставленные с каталогом строки (адрес, заведение и т.п.).</li>
             <li><strong>Таблица:</strong> Колонки Наименование, Вес (или Кол-во + Ед.).</li>
             <li><strong>Кнопка:</strong> «Сформировать сводную таблицу» — переход к созданию заявки с подбором цен.</li>
           </ul>
@@ -318,7 +318,7 @@ export default function TechTablesPage() {
           <div style={{ padding: '1rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '0.875rem' }}>
             <div style={{ marginBottom: '0.75rem' }}>
               <strong>Подразделение:</strong>
-              <span style={{ marginLeft: '0.5rem', color: '#4b5563' }}>МореМолл кухня</span>
+              <span style={{ marginLeft: '0.5rem', color: '#4b5563' }}>ММ кухня</span>
             </div>
             <strong>Комментарий:</strong>
             <div style={{ marginTop: '0.5rem', color: '#4b5563', whiteSpace: 'pre-wrap' }}>

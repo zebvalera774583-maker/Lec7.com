@@ -45,10 +45,10 @@ export default async function RequestDetailPage({ params }: PageProps) {
   const DEPT_LABELS: Record<string, string> = {
     voikovo_kitchen: 'Войково кухня',
     voikovo_bar: 'Войково бар',
-    navaginskaya_kitchen: 'Навагинская кухня',
-    navaginskaya_bar: 'Навагинская бар',
-    moremall_kitchen: 'МореМолл кухня',
-    moremall_bar: 'МореМолл бар',
+    navaginskaya_kitchen: 'Навагин кухня',
+    navaginskaya_bar: 'Навагин бар',
+    moremall_kitchen: 'ММ кухня',
+    moremall_bar: 'ММ бар',
   }
   const department = departmentSlug ? (DEPT_LABELS[departmentSlug] ?? departmentSlug) : null
   if (incoming?.items?.length) {
