@@ -20,7 +20,7 @@ export function buildBotLogicDoc(): BotLogicDoc {
     updatedAt: new Date().toISOString().slice(0, 10),
 
     pipeline: [
-      { step: 1, name: 'segmentNeeds', description: 'Разбиение текста по \\n, ;, запятая. Лимиты: 2000 символов, 50 сегментов.' },
+      { step: 1, name: 'segmentNeeds', description: 'Разбиение по \\n, ;, запятая. Запятая перед qty+unit НЕ режет ("Шампиньоны, 1 кг" → один сегмент). Лимиты: 2000 символов, 50 сегментов.' },
       { step: 2, name: 'parseSegment + sanitizeTitle', description: 'Извлечение title, quantity, unit, hasDashTerminated. sanitizeTitle(name) — удаление хвостовой пунктуации (,.;:-–—). 500г → 0.5 кг.' },
       { step: 3, name: 'preNormalizer', description: 'lowercase, ё→е, удаление скобок и кавычек.' },
       { step: 4, name: 'resolveCatalogItems', description: '1) alias (catalog) 2) alias (learned) 3) token fuzzy match. После канонизации: sanitizeTitle(canonicalName) перед items и clarification.' },

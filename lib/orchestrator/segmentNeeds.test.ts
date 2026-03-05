@@ -58,4 +58,22 @@ describe('segmentNeeds', () => {
     expect(r[1].toLowerCase()).toMatch(/морковь.*1/)
     expect(r[2].toLowerCase()).toMatch(/чеснок.*0[,.]5/)
   })
+
+  it('"Шампиньоны, 1 кг" → один сегмент (запятая перед qty+unit не режет)', () => {
+    const r = segmentNeeds('Шампиньоны, 1 кг')
+    expect(r).toHaveLength(1)
+    expect(r[0].toLowerCase()).toMatch(/шампиньоны.*1.*кг/)
+  })
+
+  it('"лук 1 кг, морковь 1 кг" → два сегмента', () => {
+    const r = segmentNeeds('лук 1 кг, морковь 1 кг')
+    expect(r).toHaveLength(2)
+    expect(r[0].toLowerCase()).toMatch(/лук.*1.*кг/)
+    expect(r[1].toLowerCase()).toMatch(/морковь.*1.*кг/)
+  })
+
+  it('"лук, морковь, чеснок 1 кг" → чеснок 1 кг не ломается', () => {
+    const r = segmentNeeds('лук, морковь, чеснок 1 кг')
+    expect(r.some((s) => /чеснок.*1.*кг/i.test(s))).toBe(true)
+  })
 })

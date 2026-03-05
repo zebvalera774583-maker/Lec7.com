@@ -1,3 +1,9 @@
+/**
+ * Страница просмотра заявки.
+ * UI таблица (Наименование/Вес): источник данных — IncomingRequest.items (Orchestrator) или MaxRequestLink.itemsJson.
+ * Comments — только в блоке «Комментарий», НЕ добавляются в таблицу позиций.
+ * Fallback: parseMaxRequestToRows(description) только когда нет items (legacy).
+ */
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { getAuthUserFromContext } from '@/lib/middleware'
@@ -58,26 +64,13 @@ export default async function RequestDetailPage({ params }: PageProps) {
     })
     itemsJson = link?.itemsJson ?? null
   }
-  // Если нет распарсенных позиций — парсим description (поддержка дефиса: Картофель-5кг)
+  // Если нет распарсенных позиций — парсим description (legacy, поддержка дефиса: Картофель-5кг)
+  // Таблица строится ТОЛЬКО из items (Orchestrator/MaxRequestLink). Comments — только в блоке «Комментарий».
   if ((!itemsJson || (Array.isArray(itemsJson) && itemsJson.length === 0)) && request.description) {
     const parsed = parseMaxRequestToRows(request.title || '', request.description)
     if (parsed.length > 0) {
       itemsJson = parsed.map((r) => ({ title: r.name, qty: r.quantity, unit: r.unit }))
     }
-  }
-  // Позиции из комментария (не сопоставленные с каталогом при создании, напр. реган 0,05 кг) — добавляем в таблицу
-  if (commentsText && commentsText.trim()) {
-    const fromComments = parseMaxRequestToRows('', commentsText)
-    const existing = (Array.isArray(itemsJson) ? itemsJson : []) as { title?: string; qty?: string; unit?: string }[]
-    const existingNames = new Set(existing.map((it) => (it.title || '').toLowerCase().trim()))
-    for (const r of fromComments) {
-      const nameNorm = r.name.toLowerCase().trim()
-      if (nameNorm && !existingNames.has(nameNorm)) {
-        existing.push({ title: r.name, qty: r.quantity, unit: r.unit })
-        existingNames.add(nameNorm)
-      }
-    }
-    if (existing.length > 0) itemsJson = existing
   }
 
   return (
