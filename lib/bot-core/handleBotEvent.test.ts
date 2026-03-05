@@ -202,7 +202,7 @@ describe('handleBotEvent', () => {
     expect(result.messages[0]).toContain('Принял')
   })
 
-  it('orchestrator: item with empty qty (Морковь-) asks for quantity clarification', async () => {
+  it('orchestrator: item with empty qty (Морковь-) asks for qty+unit clarification (text-only)', async () => {
     const origEnv = process.env.BOT_BUSINESS_ID
     process.env.BOT_BUSINESS_ID = 'test-business-id'
     mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
@@ -216,9 +216,69 @@ describe('handleBotEvent', () => {
       text: 'Лук 2кг\nМорковь-\nЧеснок 0,500',
     })
 
-    expect(result.messages[0]).toContain('Уточните количество для:')
+    expect(result.messages[0]).toContain('Уточните количество и единицу для:')
     expect(result.messages[0]).toContain('Морковь')
-    expect(result.replyInlineKeyboard?.rows?.[0]?.some((b) => b.text === '1 кг' || b.text === 'Другое')).toBe(true)
+    expect(result.replyInlineKeyboard).toBeUndefined()
+    process.env.BOT_BUSINESS_ID = origEnv
+  })
+
+  it('orchestrator: Морковь- + "2 кг" → then "Выберите подразделение"', async () => {
+    const origEnv = process.env.BOT_BUSINESS_ID
+    process.env.BOT_BUSINESS_ID = 'test-business-id'
+    mockFindUnique
+      .mockResolvedValueOnce({ stateJson: { type: 'confirmed' } })
+      .mockResolvedValueOnce({
+        stateJson: {
+          type: 'awaiting_item_clarification',
+          pendingItems: {
+            needText: 'Лук 2кг\nМорковь-\nЧеснок 0,500',
+            parsedItems: [
+              { name: 'Лук', quantity: '2', unit: 'кг' },
+              { name: 'Морковь', quantity: '', unit: '' },
+              { name: 'Чеснок', quantity: '0.5', unit: 'кг' },
+            ],
+            commentsText: null,
+          },
+          pendingIndex: 1,
+        },
+      })
+
+    mockRecognizeNeedsForChat.mockResolvedValue({
+      intent: 'create_needs',
+      items: [
+        { canonicalName: 'Лук', quantity: '2', unit: 'кг' },
+        { canonicalName: 'Морковь', quantity: '', unit: '' },
+        { canonicalName: 'Чеснок', quantity: '0.5', unit: 'кг' },
+      ],
+    })
+
+    const askResult = await handleBotEvent({
+      ...baseEvent,
+      text: 'Лук 2кг\nМорковь-\nЧеснок 0,500',
+    })
+    expect(askResult.messages[0]).toContain('Уточните количество и единицу для: Морковь')
+
+    mockFindUnique.mockResolvedValue({
+      stateJson: {
+        type: 'awaiting_item_clarification',
+        pendingItems: {
+          needText: 'Лук 2кг\nМорковь-\nЧеснок 0,500',
+          parsedItems: [
+            { name: 'Лук', quantity: '2', unit: 'кг' },
+            { name: 'Морковь', quantity: '', unit: '' },
+            { name: 'Чеснок', quantity: '0.5', unit: 'кг' },
+          ],
+          commentsText: null,
+        },
+        pendingIndex: 1,
+      },
+    })
+
+    const replyResult = await handleBotEvent({
+      ...baseEvent,
+      text: '2 кг',
+    })
+    expect(replyResult.messages[0]).toContain('Выберите подразделение')
     process.env.BOT_BUSINESS_ID = origEnv
   })
 
