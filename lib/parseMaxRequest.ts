@@ -12,7 +12,7 @@ export function preprocessForParse(text: string): string {
   s = s.replace(/([a-zA-Zа-яёА-ЯЁ])([\-\u2013\u2014])(\d)/g, '$1 $3')
   s = s.replace(/(\d)([\-\u2013\u2014])([a-zA-Zа-яёА-ЯЁ])/g, '$1 $3')
   // Число слеплено с единицей: 2кг → 2 кг, 500г → 500 г
-  s = s.replace(/(\d)(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ)/gi, '$1 $2')
+  s = s.replace(/(\d)(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ|g)/gi, '$1 $2')
   return s.replace(/\s+/g, ' ').trim()
 }
 
@@ -77,29 +77,32 @@ export interface ParseSegmentResult {
   hasDashTerminated: boolean
 }
 
+/** Единицы граммов: г, гр, g (латиница) */
+const GRAM_UNITS = new Set(['г', 'гр', 'g'])
+
 /**
- * Нормализация г/гр:
- * - qty < 1: считаем опечатку (0.300г → 0.3 кг), unit=кг, qty без деления, reason=G_TO_KG_SMALL_DECIMAL
- * - qty >= 1000: граммы в кг (1500г → 1.5 кг)
- * - 1 <= qty < 1000: оставить граммы (100г, 200г)
+ * Нормализация г/гр/g:
+ * - qty < 1: опечатка единицы (0.100гр → 0.1 кг)
+ * - qty >= 1000: настоящие граммы → кг
+ * - 1 <= qty < 1000: оставить граммы (стандарт: г)
  */
 function normalizeGramQty(qty: string, unit: string): { quantity: string; unit: string } {
   const u = (unit || '').toLowerCase().trim()
-  if (u !== 'г' && u !== 'гр') {
+  if (!GRAM_UNITS.has(u)) {
     return { quantity: qty.replace(',', '.'), unit: u || '' }
   }
   const n = parseFloat(qty.replace(',', '.'))
   if (isNaN(n) || n < 0) {
-    return { quantity: qty.replace(',', '.'), unit: u }
+    return { quantity: qty.replace(',', '.'), unit: 'г' }
   }
   if (n < 1) {
-    console.log('[ORCH] g_to_kg reason=G_TO_KG_SMALL_DECIMAL qty=', qty, '→ unit=кг, qty unchanged')
-    return { quantity: qty.replace(',', '.'), unit: 'кг' }
+    console.log('[ORCH] g_to_kg reason=G_TO_KG_SMALL_DECIMAL qty=', qty, '→ unit=кг')
+    return { quantity: n.toString(), unit: 'кг' }
   }
   if (n >= 1000) {
     return { quantity: (n / 1000).toString(), unit: 'кг' }
   }
-  return { quantity: qty.replace(',', '.'), unit: u }
+  return { quantity: n.toString(), unit: 'г' }
 }
 
 /**
@@ -116,7 +119,7 @@ export function parseSegment(segment: string): ParseSegmentResult | null {
 
   const hasDashTerminated = /[-–—]+$/.test(rawText)
 
-  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ)?/i
+  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ|g)?/i
   const m = src.match(re)
   if (m) {
     const name = sanitizeTitle(m[1].trim())

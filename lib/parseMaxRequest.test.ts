@@ -82,31 +82,38 @@ describe('parseSegment (sanitizeTitle)', () => {
 })
 
 describe('parseSegment (normalizeGramQty g→kg)', () => {
-  it('0.300г → 0.3 кг (G_TO_KG_SMALL_DECIMAL: qty<1, unit=кг, qty без деления)', () => {
-    const r = parseSegment('чеснок 0,300 г')
+  it('"Мята 0.100 гр" → qty "0.1", unit "кг" (опечатка единицы)', () => {
+    const r = parseSegment('Мята 0.100 гр')
     expect(r).not.toBeNull()
+    expect(r!.quantity).toBe('0.1')
     expect(r!.unit).toBe('кг')
-    expect(r!.quantity).toBe('0.300')
   })
 
-  it('500г → оставить г (1<=qty<1000)', () => {
-    const r = parseSegment('чеснок 500 г')
+  it('"Сельдерей 300 гр" → qty "300", unit "г"', () => {
+    const r = parseSegment('Сельдерей 300 гр')
     expect(r).not.toBeNull()
+    expect(r!.quantity).toBe('300')
     expect(r!.unit).toBe('г')
-    expect(r!.quantity).toBe('500')
   })
 
-  it('1500г → 1.5 кг (qty>=1000, настоящие граммы)', () => {
-    const r = parseSegment('чеснок 1500 г')
+  it('"Сахар 1500 г" → qty "1.5", unit "кг"', () => {
+    const r = parseSegment('Сахар 1500 г')
     expect(r).not.toBeNull()
-    expect(r!.unit).toBe('кг')
     expect(r!.quantity).toBe('1.5')
+    expect(r!.unit).toBe('кг')
   })
 
-  it('100г → оставить г', () => {
+  it('"перец 100 г" → qty "100", unit "г"', () => {
     const r = parseSegment('перец 100 г')
     expect(r).not.toBeNull()
-    expect(r!.unit).toBe('г')
     expect(r!.quantity).toBe('100')
+    expect(r!.unit).toBe('г')
+  })
+
+  it('"соль 500g" → qty "500", unit "г" (латинская g)', () => {
+    const r = parseSegment('соль 500g')
+    expect(r).not.toBeNull()
+    expect(r!.quantity).toBe('500')
+    expect(r!.unit).toBe('г')
   })
 })
