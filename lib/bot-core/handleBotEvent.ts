@@ -125,7 +125,19 @@ const DEPARTMENTS = [
   { slug: 'navaginskaya_bar', label: 'Навагинская бар' },
   { slug: 'moremall_kitchen', label: 'МореМолл кухня' },
   { slug: 'moremall_bar', label: 'МореМолл бар' },
+  { slug: 'konditerka', label: 'Кондитерка' },
+  { slug: 'zagotovitelny', label: 'Заготовительный' },
+  { slug: 'pekarnya', label: 'Пекарня' },
 ] as const
+
+function departmentKeyboardRows() {
+  const buttons = DEPARTMENTS.map((d) => ({ text: d.label, callback_data: `set_department|${d.slug}` }))
+  const rows: { text: string; callback_data: string }[][] = []
+  for (let i = 0; i < buttons.length; i += 3) {
+    rows.push(buttons.slice(i, i + 3))
+  }
+  return rows
+}
 
 const UNIT_CLARIFICATION_BUTTONS = [
   { text: 'кг', callback_data: '__UNIT__' },
@@ -181,22 +193,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         })
         return {
           messages: ['Выберите подразделение:'],
-          replyInlineKeyboard: {
-            rows: [
-              [
-                { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
-                { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
-              ],
-              [
-                { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
-                { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
-              ],
-              [
-                { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
-                { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
-              ],
-            ],
-          },
+          replyInlineKeyboard: { rows: departmentKeyboardRows() },
         }
       }
       const nextIdx = remaining[0]
@@ -378,22 +375,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       })
       return {
         messages: ['Выберите подразделение:'],
-        replyInlineKeyboard: {
-          rows: [
-            [
-              { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
-              { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
-            ],
-            [
-              { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
-              { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
-            ],
-            [
-              { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
-              { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
-            ],
-          ],
-        },
+        replyInlineKeyboard: { rows: departmentKeyboardRows() },
       }
     }
 
@@ -488,22 +470,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       })
       return {
         messages: ['Выберите подразделение:'],
-        replyInlineKeyboard: {
-          rows: [
-            [
-              { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
-              { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
-            ],
-            [
-              { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
-              { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
-            ],
-            [
-              { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
-              { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
-            ],
-          ],
-        },
+        replyInlineKeyboard: { rows: departmentKeyboardRows() },
       }
     }
 
@@ -529,22 +496,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
   if (stateData?.type === 'awaiting_department') {
     return {
       messages: ['Выберите подразделение из кнопок выше.'],
-      replyInlineKeyboard: {
-        rows: [
-          [
-            { text: 'Войково кухня', callback_data: 'set_department|voikovo_kitchen' },
-            { text: 'Войково бар', callback_data: 'set_department|voikovo_bar' },
-          ],
-          [
-            { text: 'Навагинская кухня', callback_data: 'set_department|navaginskaya_kitchen' },
-            { text: 'Навагинская бар', callback_data: 'set_department|navaginskaya_bar' },
-          ],
-          [
-            { text: 'МореМолл кухня', callback_data: 'set_department|moremall_kitchen' },
-            { text: 'МореМолл бар', callback_data: 'set_department|moremall_bar' },
-          ],
-        ],
-      },
+      replyInlineKeyboard: { rows: departmentKeyboardRows() },
     }
   }
 
