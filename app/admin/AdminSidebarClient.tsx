@@ -13,9 +13,9 @@ const SIDEBAR_ITEMS: (
   {
     label: 'Техничка',
     children: [
+      { label: 'Логика бота', href: '/admin/tech/bot-logic' },
       { label: 'Таблицы', href: '/admin/tech/tables' },
       { label: 'ТЗ AI агента', href: '/admin/tech/ai-spec' },
-      { label: 'Логика бота', href: '/admin/tech/bot-logic' },
     ],
   },
 ]
