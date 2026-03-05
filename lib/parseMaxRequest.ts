@@ -78,17 +78,28 @@ export interface ParseSegmentResult {
 }
 
 /**
- * Нормализация 500г → 0.5 кг (граммы в кг).
+ * Нормализация г/гр:
+ * - qty < 1: считаем опечатку (0.300г → 0.3 кг), unit=кг, qty без деления, reason=G_TO_KG_SMALL_DECIMAL
+ * - qty >= 1000: граммы в кг (1500г → 1.5 кг)
+ * - 1 <= qty < 1000: оставить граммы (100г, 200г)
  */
 function normalizeGramQty(qty: string, unit: string): { quantity: string; unit: string } {
-  const u = (unit || '').toLowerCase()
-  if (u === 'г' || u === 'гр') {
-    const n = parseFloat(qty.replace(',', '.'))
-    if (!isNaN(n) && n >= 0) {
-      return { quantity: (n / 1000).toString(), unit: 'кг' }
-    }
+  const u = (unit || '').toLowerCase().trim()
+  if (u !== 'г' && u !== 'гр') {
+    return { quantity: qty.replace(',', '.'), unit: u || '' }
   }
-  return { quantity: qty.replace(',', '.'), unit: u || '' }
+  const n = parseFloat(qty.replace(',', '.'))
+  if (isNaN(n) || n < 0) {
+    return { quantity: qty.replace(',', '.'), unit: u }
+  }
+  if (n < 1) {
+    console.log('[ORCH] g_to_kg reason=G_TO_KG_SMALL_DECIMAL qty=', qty, '→ unit=кг, qty unchanged')
+    return { quantity: qty.replace(',', '.'), unit: 'кг' }
+  }
+  if (n >= 1000) {
+    return { quantity: (n / 1000).toString(), unit: 'кг' }
+  }
+  return { quantity: qty.replace(',', '.'), unit: u }
 }
 
 /**

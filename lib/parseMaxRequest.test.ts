@@ -80,3 +80,33 @@ describe('parseSegment (sanitizeTitle)', () => {
     expect(r!.name).not.toMatch(/[,.\-]$/)
   })
 })
+
+describe('parseSegment (normalizeGramQty g→kg)', () => {
+  it('0.300г → 0.3 кг (G_TO_KG_SMALL_DECIMAL: qty<1, unit=кг, qty без деления)', () => {
+    const r = parseSegment('чеснок 0,300 г')
+    expect(r).not.toBeNull()
+    expect(r!.unit).toBe('кг')
+    expect(r!.quantity).toBe('0.300')
+  })
+
+  it('500г → оставить г (1<=qty<1000)', () => {
+    const r = parseSegment('чеснок 500 г')
+    expect(r).not.toBeNull()
+    expect(r!.unit).toBe('г')
+    expect(r!.quantity).toBe('500')
+  })
+
+  it('1500г → 1.5 кг (qty>=1000, настоящие граммы)', () => {
+    const r = parseSegment('чеснок 1500 г')
+    expect(r).not.toBeNull()
+    expect(r!.unit).toBe('кг')
+    expect(r!.quantity).toBe('1.5')
+  })
+
+  it('100г → оставить г', () => {
+    const r = parseSegment('перец 100 г')
+    expect(r).not.toBeNull()
+    expect(r!.unit).toBe('г')
+    expect(r!.quantity).toBe('100')
+  })
+})
