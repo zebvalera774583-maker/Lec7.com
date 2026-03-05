@@ -4,6 +4,7 @@ import { resolveCatalogItems, type ResolvedItem } from '@/lib/orchestrator/resol
 import { buildAliasToCanonicalMap, preNormalizeLines } from '@/lib/orchestrator/preNormalizer'
 import { segmentNeeds } from '@/lib/orchestrator/segmentNeeds'
 import { applyUnitHeuristic } from '@/lib/orchestrator/unitHeuristic'
+import { isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
 
 /**
  * Найти businessId по chatId (MaxChatContext / BusinessTelegramRecipient).
@@ -28,6 +29,8 @@ export async function getBusinessIdByChatId(chatId: string): Promise<string | nu
 export interface RecognizeResult {
   intent: 'create_needs' | 'unknown'
   items?: ResolvedItem[]
+  /** Строки, отфильтрованные как non-item (заголовки, компания, адрес) */
+  comments?: string[]
   /** Индексы items, для которых нужна уточнение unit */
   needsUnitClarification?: number[]
 }
@@ -50,10 +53,10 @@ export async function recognizeNeedsForChat(
 
   const aliasMap = await buildAliasToCanonicalMap()
   const normalizedSegments = preNormalizeLines(segments, aliasMap)
-  const rawItems: { name: string; quantity: string; unit: string }[] = []
+  const rawItems: { name: string; quantity: string; unit: string; originalSegment: string }[] = []
   for (const seg of normalizedSegments) {
     const parsed = parseSegment(seg)
-    if (parsed) rawItems.push(parsed)
+    if (parsed) rawItems.push({ ...parsed, originalSegment: seg })
   }
 
   const isFallback =
@@ -74,7 +77,6 @@ export async function recognizeNeedsForChat(
     const item = rawItems[i]
     const { unit, confidence } = applyUnitHeuristic(item.name, item.quantity, item.unit || undefined)
 
-    const itemShort = JSON.stringify({ n: item.name.slice(0, 20), q: item.quantity, u: unit || '(empty)' })
     console.log(`[ORCH] unit_heuristic title="${item.name.slice(0, 30)}" qty="${item.quantity}" unit="${unit || ''}" confidence=${confidence}`)
 
     if (confidence === 'LOW' && !unit) {
@@ -91,21 +93,42 @@ export async function recognizeNeedsForChat(
 
   const resolved = await resolveCatalogItems(itemsWithUnit, businessId)
 
+  // Non-item filter: заголовки/компания/адрес → comments
+  const items: ResolvedItem[] = []
+  const comments: string[] = []
+  const needsUnitClarificationFiltered: number[] = []
+  let itemIndex = 0
+
   for (let i = 0; i < resolved.length; i++) {
-    if (needsUnitClarification.includes(i)) {
-      resolved[i].needsUnitClarification = true
-      resolved[i].unit = ''
+    const r = resolved[i]
+    const segment = rawItems[i].originalSegment
+    const matchScore = r.matchScore ?? 0
+    const parsed = { name: r.name, quantity: r.quantity, unit: r.unit }
+    const { isNonItem, reason } = isLikelyNonItem(segment, matchScore, parsed)
+
+    if (isNonItem) {
+      comments.push(segment)
+      console.log(`[ORCH] non_item line="${segment.slice(0, 40)}" score=${matchScore.toFixed(2)} reason="${reason ?? ''}"`)
     } else {
-      resolved[i].unit = itemsWithUnit[i].unit
+      if (needsUnitClarification.includes(i)) {
+        r.needsUnitClarification = true
+        r.unit = ''
+        needsUnitClarificationFiltered.push(itemIndex)
+      } else {
+        r.unit = itemsWithUnit[i].unit
+      }
+      items.push(r)
+      itemIndex++
     }
   }
 
-  const itemsShort = resolved.map((r) => ({ n: r.canonicalName.slice(0, 15), q: r.quantity, u: r.unit }))
-  console.log(`[ORCH] used=true items=${JSON.stringify(itemsShort)}`)
+  const itemsShort = items.map((r) => ({ n: r.canonicalName.slice(0, 15), q: r.quantity, u: r.unit }))
+  console.log(`[ORCH] used=true items=${JSON.stringify(itemsShort)} comments=${JSON.stringify(comments)}`)
 
   return {
     intent: 'create_needs',
-    items: resolved,
-    needsUnitClarification: needsUnitClarification.length > 0 ? needsUnitClarification : undefined,
+    items,
+    comments: comments.length > 0 ? comments : undefined,
+    needsUnitClarification: needsUnitClarificationFiltered.length > 0 ? needsUnitClarificationFiltered : undefined,
   }
 }

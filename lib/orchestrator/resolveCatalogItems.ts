@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
+import { buildTokenIndex, tokenMatchCatalog } from '@/lib/orchestrator/tokenMatchCatalog'
 
 function normalizeForMatch(s: string): string {
   return (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
@@ -27,11 +28,16 @@ export interface ResolvedItem {
   unit: string
   /** Требуется уточнение unit от пользователя (эвристика дала LOW) */
   needsUnitClarification?: boolean
+  /** Тип совпадения с каталогом */
+  matchType?: 'alias' | 'token' | 'none'
+  /** Score совпадения (alias=1, token=0.6..1, none=0) */
+  matchScore?: number
 }
 
 /**
  * Сопоставить позиции с BotCatalogItem (только чтение, без создания).
- * Использует canonicalName + synonyms.
+ * 1) Exact alias match (canonicalName + synonyms)
+ * 2) Token fuzzy match если alias не найден
  */
 export async function resolveCatalogItems(
   items: { name: string; quantity: string; unit: string }[],
@@ -44,9 +50,11 @@ export async function resolveCatalogItems(
 
   const normToId = new Map<string, string>()
   const normToCanonical = new Map<string, string>()
+  const canonicalToId = new Map<string, string>()
   const ambiguous = new Set<string>()
 
   for (const item of catalogItems) {
+    canonicalToId.set(item.canonicalName, item.id)
     const addMapping = (norm: string) => {
       if (!norm) return
       if (normToId.has(norm)) {
@@ -66,14 +74,39 @@ export async function resolveCatalogItems(
     normToCanonical.delete(k)
   }
 
+  const tokenIndex = buildTokenIndex(
+    catalogItems.map((c) => ({ canonicalName: c.canonicalName, synonyms: c.synonyms }))
+  )
+
   const resolved: ResolvedItem[] = []
   for (const item of items) {
     const normalizedName = normalizeItemName(item.name)
+    let catalogItemId: string | null = null
+    let canonicalName = item.name
+    let matchType: 'alias' | 'token' | 'none' = 'none'
+    let matchScore = 0
+
     const matchedNorm = matchToCatalogSyncWithNorm(normToId, normalizedName)
-    const catalogItemId = matchedNorm ? normToId.get(matchedNorm) ?? null : null
-    const canonicalName = matchedNorm ? (normToCanonical.get(matchedNorm) ?? item.name) : item.name
+    if (matchedNorm) {
+      catalogItemId = normToId.get(matchedNorm) ?? null
+      canonicalName = normToCanonical.get(matchedNorm) ?? item.name
+      matchType = 'alias'
+      matchScore = 1
+    } else {
+      const tokenResult = tokenMatchCatalog(normalizedName, tokenIndex)
+      if (tokenResult) {
+        canonicalName = tokenResult.canonicalName
+        catalogItemId = canonicalToId.get(canonicalName) ?? null
+        matchType = tokenResult.matchType
+        matchScore = tokenResult.matchScore
+        console.log(
+          `[ORCH] token_match title="${item.name.slice(0, 30)}" canonical="${canonicalName.slice(0, 20)}" score=${matchScore.toFixed(2)}`
+        )
+      }
+    }
+
     const confidence = catalogItemId ? 1 : 0
-    const needsUserChoice = !catalogItemId || confidence < 0.8 // >1 кандидата или низкая уверенность
+    const needsUserChoice = !catalogItemId || confidence < 0.8
 
     resolved.push({
       catalogItemId,
@@ -83,6 +116,8 @@ export async function resolveCatalogItems(
       name: item.name,
       quantity: item.quantity,
       unit: item.unit,
+      matchType,
+      matchScore,
     })
   }
 

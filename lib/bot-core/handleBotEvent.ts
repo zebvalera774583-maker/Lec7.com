@@ -428,6 +428,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         quantity: r.quantity ?? '',
         unit: r.unit || '',
       }))
+      const commentsText = orchestratorResult.comments?.join('\n') ?? null
       const firstIdx = findNextIncompleteIndex(parsedItems)
       if (firstIdx >= 0) {
         const firstItem = parsedItems[firstIdx]
@@ -436,7 +437,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           data: {
             stateJson: {
               type: 'awaiting_item_clarification',
-              pendingItems: { needText, parsedItems, commentsText: null },
+              pendingItems: { needText, parsedItems, commentsText },
               pendingIndex: firstIdx,
             },
           },
@@ -451,7 +452,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         data: {
           stateJson: {
             type: 'awaiting_department',
-            pendingItems: { needText, parsedItems, commentsText: null },
+            pendingItems: { needText, parsedItems, commentsText },
           },
         },
       })
