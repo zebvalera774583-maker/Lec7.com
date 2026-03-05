@@ -1,3 +1,5 @@
+import { sanitizeTitle } from '@/lib/orchestrator/sanitizeTitle'
+
 /**
  * Предобработка текста перед парсингом:
  * - буквы-цифры / буквы–цифры / буквы—цифры → буквы цифры
@@ -106,12 +108,12 @@ export function parseSegment(segment: string): ParseSegmentResult | null {
   const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ)?/i
   const m = src.match(re)
   if (m) {
-    const name = m[1].trim()
+    const name = sanitizeTitle(m[1].trim())
     const { quantity, unit } = normalizeGramQty(m[2], (m[3] ?? '').toString())
     if (name) return { rawText, name, quantity, unit, hasDashTerminated }
   }
 
-  const name = src.replace(/[-–—]+$/, '').trim()
+  const name = sanitizeTitle(src.replace(/[-–—]+$/, '').trim())
   if (name && /[\p{L}]/u.test(name)) return { rawText, name, quantity: '', unit: '', hasDashTerminated }
   return null
 }

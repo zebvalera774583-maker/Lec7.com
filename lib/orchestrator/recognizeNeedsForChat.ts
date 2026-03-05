@@ -7,6 +7,7 @@ import { applyUnitHeuristic } from '@/lib/orchestrator/unitHeuristic'
 import { extractFeatures } from '@/lib/orchestrator/extractFeatures'
 import { decide } from '@/lib/orchestrator/decisionEngine'
 import { maybeLearnAlias } from '@/lib/orchestrator/learningLoop'
+import { sanitizeTitle } from '@/lib/orchestrator/sanitizeTitle'
 
 /**
  * Найти businessId по chatId (MaxChatContext / BusinessTelegramRecipient).
@@ -123,6 +124,8 @@ export async function recognizeNeedsForChat(
     if (verdict === 'COMMENT') {
       comments.push(segment)
     } else {
+      r.canonicalName = sanitizeTitle(r.canonicalName)
+      r.name = sanitizeTitle(r.name)
       r.unit = itemsWithUnit[i].unit
       if (verdict === 'ASK_QTY') {
         r.quantity = ''

@@ -21,9 +21,9 @@ export function buildBotLogicDoc(): BotLogicDoc {
 
     pipeline: [
       { step: 1, name: 'segmentNeeds', description: 'Разбиение текста по \\n, ;, запятая. Лимиты: 2000 символов, 50 сегментов.' },
-      { step: 2, name: 'parseSegment', description: 'Извлечение title, quantity, unit, hasDashTerminated. 500г → 0.5 кг.' },
+      { step: 2, name: 'parseSegment + sanitizeTitle', description: 'Извлечение title, quantity, unit, hasDashTerminated. sanitizeTitle(name) — удаление хвостовой пунктуации (,.;:-–—). 500г → 0.5 кг.' },
       { step: 3, name: 'preNormalizer', description: 'lowercase, ё→е, удаление скобок и кавычек.' },
-      { step: 4, name: 'resolveCatalogItems', description: '1) alias (catalog) 2) alias (learned) 3) token fuzzy match.' },
+      { step: 4, name: 'resolveCatalogItems', description: '1) alias (catalog) 2) alias (learned) 3) token fuzzy match. После канонизации: sanitizeTitle(canonicalName) перед items и clarification.' },
       { step: 5, name: 'extractFeatures', description: 'hasQty, hasUnit, wordCount, hasLegalForm, hasAddressWord, matchScore...' },
       { step: 6, name: 'decisionEngine', description: 'Таблица правил: company → address → high → medium → clarification → comment.' },
       { step: 7, name: 'confidenceLadder', description: '≥0.85 HIGH, 0.6–0.85 MEDIUM, 0.3–0.6 LOW, <0.3 NONE.' },
@@ -54,6 +54,7 @@ export function buildBotLogicDoc(): BotLogicDoc {
     ],
 
     tests: [
+      { label: 'sanitizeTitle', command: 'npm test -- lib/orchestrator/sanitizeTitle' },
       { label: 'Orchestrator (segmentNeeds, tokenMatch, nonItemFilter, resolveCatalogItems)', command: 'npm test -- lib/orchestrator' },
       { label: 'Bot handleBotEvent', command: 'npm test -- lib/bot-core/handleBotEvent' },
       { label: 'Все тесты', command: 'npm test' },

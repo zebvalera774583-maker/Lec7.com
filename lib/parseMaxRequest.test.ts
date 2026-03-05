@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMaxRequestToRows, parseMaxRequestToRowsWithOptionalUnit, preprocessForParse } from './parseMaxRequest'
+import { parseMaxRequestToRows, parseMaxRequestToRowsWithOptionalUnit, parseSegment, preprocessForParse } from './parseMaxRequest'
 
 describe('preprocessForParse', () => {
   it('огурец-2кг → огурец 2 кг', () => {
@@ -61,5 +61,22 @@ describe('parseMaxRequestToRowsWithOptionalUnit', () => {
   it('Лук 2кг → unit кг', () => {
     const result = parseMaxRequestToRowsWithOptionalUnit('', 'Лук 2кг')
     expect(result).toEqual([{ name: 'Лук', quantity: '2', unit: 'кг' }])
+  })
+})
+
+describe('parseSegment (sanitizeTitle)', () => {
+  it('"Грибы шампиньоны, 1 кг" → name "Грибы шампиньоны"', () => {
+    const r = parseSegment('Грибы шампиньоны, 1 кг')
+    expect(r).not.toBeNull()
+    expect(r!.name).toBe('Грибы шампиньоны')
+    expect(r!.quantity).toBe('1')
+    expect(r!.unit).toBe('кг')
+  })
+
+  it('"Шампиньоны-1к" → name "Шампиньоны" (без trailing punctuation)', () => {
+    const r = parseSegment('Шампиньоны-1к')
+    expect(r).not.toBeNull()
+    expect(r!.name).toBe('Шампиньоны')
+    expect(r!.name).not.toMatch(/[,.\-]$/)
   })
 })
