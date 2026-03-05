@@ -29,24 +29,31 @@ export interface ResolvedItem {
   /** Требуется уточнение unit от пользователя (эвристика дала LOW) */
   needsUnitClarification?: boolean
   /** Тип совпадения с каталогом */
-  matchType?: 'alias' | 'token' | 'none'
-  /** Score совпадения (alias=1, token=0.6..1, none=0) */
+  matchType?: 'alias' | 'learned' | 'token' | 'none'
+  /** Score совпадения (alias=1, learned=1, token=0.6..1, none=0) */
   matchScore?: number
 }
 
 /**
  * Сопоставить позиции с BotCatalogItem (только чтение, без создания).
- * 1) Exact alias match (canonicalName + synonyms)
- * 2) Token fuzzy match если alias не найден
+ * 1) Alias match (catalog)
+ * 2) Alias match (learned)
+ * 3) Token fuzzy match
  */
 export async function resolveCatalogItems(
   items: { name: string; quantity: string; unit: string }[],
-  _businessId: string
+  businessId: string
 ): Promise<ResolvedItem[]> {
-  const catalogItems = await prisma.botCatalogItem.findMany({
-    where: { scope: 'GLOBAL', isActive: true },
-    select: { id: true, canonicalName: true, synonyms: true },
-  })
+  const [catalogItems, learnedAliases] = await Promise.all([
+    prisma.botCatalogItem.findMany({
+      where: { scope: 'GLOBAL', isActive: true },
+      select: { id: true, canonicalName: true, synonyms: true },
+    }),
+    prisma.botLearnedAlias.findMany({
+      where: { businessId },
+      select: { aliasText: true, canonicalName: true },
+    }),
+  ])
 
   const normToId = new Map<string, string>()
   const normToCanonical = new Map<string, string>()
@@ -74,6 +81,14 @@ export async function resolveCatalogItems(
     normToCanonical.delete(k)
   }
 
+  const learnedNormToCanonical = new Map<string, string>()
+  for (const la of learnedAliases) {
+    const norm = normalizeForMatch(la.aliasText)
+    if (norm && canonicalToId.has(la.canonicalName)) {
+      learnedNormToCanonical.set(norm, la.canonicalName)
+    }
+  }
+
   const tokenIndex = buildTokenIndex(
     catalogItems.map((c) => ({ canonicalName: c.canonicalName, synonyms: c.synonyms }))
   )
@@ -83,7 +98,7 @@ export async function resolveCatalogItems(
     const normalizedName = normalizeItemName(item.name)
     let catalogItemId: string | null = null
     let canonicalName = item.name
-    let matchType: 'alias' | 'token' | 'none' = 'none'
+    let matchType: 'alias' | 'learned' | 'token' | 'none' = 'none'
     let matchScore = 0
 
     const matchedNorm = matchToCatalogSyncWithNorm(normToId, normalizedName)
@@ -93,15 +108,23 @@ export async function resolveCatalogItems(
       matchType = 'alias'
       matchScore = 1
     } else {
-      const tokenResult = tokenMatchCatalog(normalizedName, tokenIndex)
-      if (tokenResult) {
-        canonicalName = tokenResult.canonicalName
-        catalogItemId = canonicalToId.get(canonicalName) ?? null
-        matchType = tokenResult.matchType
-        matchScore = tokenResult.matchScore
-        console.log(
-          `[ORCH] token_match title="${item.name.slice(0, 30)}" canonical="${canonicalName.slice(0, 20)}" score=${matchScore.toFixed(2)}`
-        )
+      const learnedCanonical = learnedNormToCanonical.get(normalizedName)
+      if (learnedCanonical) {
+        canonicalName = learnedCanonical
+        catalogItemId = canonicalToId.get(learnedCanonical) ?? null
+        matchType = 'learned'
+        matchScore = 1
+      } else {
+        const tokenResult = tokenMatchCatalog(normalizedName, tokenIndex)
+        if (tokenResult) {
+          canonicalName = tokenResult.canonicalName
+          catalogItemId = canonicalToId.get(canonicalName) ?? null
+          matchType = 'token'
+          matchScore = tokenResult.matchScore
+          console.log(
+            `[ORCH] token_match title="${item.name.slice(0, 30)}" canonical="${canonicalName.slice(0, 20)}" score=${matchScore.toFixed(2)}`
+          )
+        }
       }
     }
 

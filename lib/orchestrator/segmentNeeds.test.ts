@@ -50,4 +50,12 @@ describe('segmentNeeds', () => {
     const r = segmentNeeds('лук 1 кг; морковь 1 кг; чеснок 0,5')
     expect(r).toHaveLength(3)
   })
+
+  it(', as separator (Orchestrator 2.1)', () => {
+    const r = segmentNeeds('лук 2кг, морковь 1кг\nчеснок 0,500')
+    expect(r).toHaveLength(3)
+    expect(r[0].toLowerCase()).toMatch(/лук.*2/)
+    expect(r[1].toLowerCase()).toMatch(/морковь.*1/)
+    expect(r[2].toLowerCase()).toMatch(/чеснок.*0[,.]5/)
+  })
 })

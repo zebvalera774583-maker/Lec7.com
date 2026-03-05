@@ -4,7 +4,9 @@ import { resolveCatalogItems, type ResolvedItem } from '@/lib/orchestrator/resol
 import { buildAliasToCanonicalMap, preNormalizeLines } from '@/lib/orchestrator/preNormalizer'
 import { segmentNeeds } from '@/lib/orchestrator/segmentNeeds'
 import { applyUnitHeuristic } from '@/lib/orchestrator/unitHeuristic'
-import { isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
+import { extractFeatures } from '@/lib/orchestrator/extractFeatures'
+import { decide } from '@/lib/orchestrator/decisionEngine'
+import { maybeLearnAlias } from '@/lib/orchestrator/learningLoop'
 
 /**
  * Найти businessId по chatId (MaxChatContext / BusinessTelegramRecipient).
@@ -33,11 +35,13 @@ export interface RecognizeResult {
   comments?: string[]
   /** Индексы items, для которых нужна уточнение unit */
   needsUnitClarification?: number[]
+  /** Индексы items, для которых нужна уточнение quantity */
+  needsQtyClarification?: number[]
 }
 
 /**
- * Распознать потребности из текста (Orchestrator read-only).
- * Pipeline: segmentNeeds (FIRST) → parseSegments → preNormalizer → resolveCatalogItems → unit heuristic.
+ * Распознать потребности из текста (Orchestrator 2.1).
+ * Pipeline: segmentNeeds → parseSegment → preNormalizer → resolveCatalogItems → extractFeatures → decisionEngine → learningLoop.
  */
 export async function recognizeNeedsForChat(
   chatId: string,
@@ -53,7 +57,7 @@ export async function recognizeNeedsForChat(
 
   const aliasMap = await buildAliasToCanonicalMap()
   const normalizedSegments = preNormalizeLines(segments, aliasMap)
-  const rawItems: { name: string; quantity: string; unit: string; originalSegment: string }[] = []
+  const rawItems: { rawText: string; name: string; quantity: string; unit: string; hasDashTerminated: boolean; originalSegment: string }[] = []
   for (const seg of normalizedSegments) {
     const parsed = parseSegment(seg)
     if (parsed) rawItems.push({ ...parsed, originalSegment: seg })
@@ -69,7 +73,6 @@ export async function recognizeNeedsForChat(
     return { intent: 'unknown' }
   }
 
-  // Unit heuristic для каждого item
   const itemsWithUnit: { name: string; quantity: string; unit: string }[] = []
   const needsUnitClarification: number[] = []
 
@@ -91,34 +94,58 @@ export async function recognizeNeedsForChat(
     }
   }
 
-  const resolved = await resolveCatalogItems(itemsWithUnit, businessId)
+  let resolved: ResolvedItem[]
+  try {
+    resolved = await resolveCatalogItems(itemsWithUnit, businessId)
+  } catch (err) {
+    console.error('[ORCH] resolveCatalogItems error', err)
+    return { intent: 'unknown' }
+  }
 
-  // Non-item filter: заголовки/компания/адрес → comments
   const items: ResolvedItem[] = []
   const comments: string[] = []
   const needsUnitClarificationFiltered: number[] = []
+  const needsQtyClarificationFiltered: number[] = []
   let itemIndex = 0
 
   for (let i = 0; i < resolved.length; i++) {
     const r = resolved[i]
-    const segment = rawItems[i].originalSegment
-    const matchScore = r.matchScore ?? 0
-    const parsed = { name: r.name, quantity: r.quantity, unit: r.unit }
-    const { isNonItem, reason } = isLikelyNonItem(segment, matchScore, parsed)
+    const raw = rawItems[i]
+    const segment = raw.originalSegment
+    const features = extractFeatures(
+      { ...raw, rawText: segment },
+      { matchType: r.matchType, matchScore: r.matchScore }
+    )
+    const { verdict, reason } = decide(features)
 
-    if (isNonItem) {
+    console.log(`[ORCH] decide verdict=${verdict} reason=${reason}`)
+
+    if (verdict === 'COMMENT') {
       comments.push(segment)
-      console.log(`[ORCH] non_item line="${segment.slice(0, 40)}" score=${matchScore.toFixed(2)} reason="${reason ?? ''}"`)
     } else {
-      if (needsUnitClarification.includes(i)) {
+      r.unit = itemsWithUnit[i].unit
+      if (verdict === 'ASK_QTY') {
+        r.quantity = ''
+        r.needsUnitClarification = false
+        needsQtyClarificationFiltered.push(itemIndex)
+      } else if (verdict === 'ASK_UNIT' || verdict === 'ITEM_ASK_UNIT' || needsUnitClarification.includes(i)) {
         r.needsUnitClarification = true
         r.unit = ''
         needsUnitClarificationFiltered.push(itemIndex)
-      } else {
-        r.unit = itemsWithUnit[i].unit
       }
       items.push(r)
       itemIndex++
+
+      if (verdict === 'ITEM' || verdict === 'ITEM_AUTO') {
+        maybeLearnAlias(
+          businessId,
+          raw.name,
+          r.canonicalName,
+          r.matchType ?? 'none',
+          r.matchScore ?? 0,
+          verdict
+        ).catch(() => {})
+      }
     }
   }
 
@@ -130,5 +157,6 @@ export async function recognizeNeedsForChat(
     items,
     comments: comments.length > 0 ? comments : undefined,
     needsUnitClarification: needsUnitClarificationFiltered.length > 0 ? needsUnitClarificationFiltered : undefined,
+    needsQtyClarification: needsQtyClarificationFiltered.length > 0 ? needsQtyClarificationFiltered : undefined,
   }
 }

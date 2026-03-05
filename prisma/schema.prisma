@@ -255,6 +255,23 @@ model BotCatalogItem {
   @@index([scope])
 }
 
+// Выученные алиасы (Orchestrator 2.1 Learning Loop)
+model BotLearnedAlias {
+  id             String   @id @default(cuid())
+  businessId     String
+  aliasText      String
+  canonicalName  String
+  confidence     Float    @default(1)
+  usageCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastUsedAt     DateTime @default(now())
+
+  @@unique([businessId, aliasText])
+  @@index([businessId])
+  @@index([businessId, canonicalName])
+}
+
 model BusinessProfile {
   id              String   @id @default(cuid())
   businessId      String   @unique

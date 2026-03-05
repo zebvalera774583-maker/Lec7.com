@@ -9,8 +9,8 @@ export function preprocessForParse(text: string): string {
   // Между буквами и цифрами: -/–/— → пробел
   s = s.replace(/([a-zA-Zа-яёА-ЯЁ])([\-\u2013\u2014])(\d)/g, '$1 $3')
   s = s.replace(/(\d)([\-\u2013\u2014])([a-zA-Zа-яёА-ЯЁ])/g, '$1 $3')
-  // Число слеплено с единицей: 2кг → 2 кг
-  s = s.replace(/(\d)(кг|шт|т|л|м|ед|упак)/gi, '$1 $2')
+  // Число слеплено с единицей: 2кг → 2 кг, 500г → 500 г
+  s = s.replace(/(\d)(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ)/gi, '$1 $2')
   return s.replace(/\s+/g, ' ').trim()
 }
 
@@ -66,24 +66,52 @@ export function parseMaxRequestToRowsWithOptionalUnit(
   return rows
 }
 
+/** Результат parseSegment (Orchestrator 2.1) */
+export interface ParseSegmentResult {
+  rawText: string
+  name: string
+  quantity: string
+  unit: string
+  hasDashTerminated: boolean
+}
+
+/**
+ * Нормализация 500г → 0.5 кг (граммы в кг).
+ */
+function normalizeGramQty(qty: string, unit: string): { quantity: string; unit: string } {
+  const u = (unit || '').toLowerCase()
+  if (u === 'г' || u === 'гр') {
+    const n = parseFloat(qty.replace(',', '.'))
+    if (!isNaN(n) && n >= 0) {
+      return { quantity: (n / 1000).toString(), unit: 'кг' }
+    }
+  }
+  return { quantity: qty.replace(',', '.'), unit: u || '' }
+}
+
 /**
  * Парсинг одного сегмента (после segmentNeeds).
- * "Морковь-" -> quantity: "", "1 кг" (нет title) -> null.
+ * "Морковь-" -> quantity: "", hasDashTerminated: true.
+ * "500г" -> 0.5 кг.
  */
-export function parseSegment(segment: string): { name: string; quantity: string; unit: string } | null {
-  const src = preprocessForParse(segment.trim())
+export function parseSegment(segment: string): ParseSegmentResult | null {
+  const rawText = segment.trim()
+  const src = preprocessForParse(rawText)
   if (!src) return null
   if (/^\d+$/.test(src)) return null
   if (/^\d+(?:[.,]\d+)?\s*(?:кг|г|л|шт|уп|т)/i.test(src) && !/[\p{L}]/u.test(src.replace(/\d/g, '').replace(/\s/g, ''))) return null
+
+  const hasDashTerminated = /[-–—]+$/.test(rawText)
+
   const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ)?/i
   const m = src.match(re)
   if (m) {
     const name = m[1].trim()
-    const quantity = m[2].replace(',', '.')
-    const unit = (m[3] ?? '').toString().toLowerCase().trim()
-    if (name) return { name, quantity, unit }
+    const { quantity, unit } = normalizeGramQty(m[2], (m[3] ?? '').toString())
+    if (name) return { rawText, name, quantity, unit, hasDashTerminated }
   }
+
   const name = src.replace(/[-–—]+$/, '').trim()
-  if (name && /[\p{L}]/u.test(name)) return { name, quantity: '', unit: '' }
+  if (name && /[\p{L}]/u.test(name)) return { rawText, name, quantity: '', unit: '', hasDashTerminated }
   return null
 }

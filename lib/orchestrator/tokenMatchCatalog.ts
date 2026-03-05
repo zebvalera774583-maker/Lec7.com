@@ -3,8 +3,10 @@
  * Когда alias match не найден — ищем по токенам.
  */
 
+import { ORCHESTRATOR_CONFIG } from './config'
+
 const STOP_WORDS = new Set([
-  'кг', 'шт', 'л', 'уп', 'пуч', 'кор', 'г', 'гр', 'мл', 'упак', 'пач', 'ящ', 'т',
+  'кг', 'г', 'гр', 'л', 'мл', 'шт', 'уп', 'упак', 'пач', 'ящ', 'т', 'пуч', 'кор',
 ])
 
 const ENDINGS = ['ый', 'ая', 'ое', 'ие', 'ые']
@@ -79,15 +81,15 @@ export interface TokenMatchResult {
   matchScore: number
 }
 
-const TOKEN_MATCH_THRESHOLD = 0.6
-
 /**
  * Поиск в каталоге по токенам.
- * score = |intersection| / max(|tokensQ|, |tokensC|)
+ * score = intersection / tokensQ.length
+ * Tie-breaker: при равенстве score — более длинный canonicalName.
  */
 export function tokenMatchCatalog(
   queryTitle: string,
-  tokenIndex: TokenIndex
+  tokenIndex: TokenIndex,
+  threshold = ORCHESTRATOR_CONFIG.tokenMatchThreshold
 ): TokenMatchResult | null {
   const tokensQ = normalizeTokens(queryTitle)
   if (tokensQ.size === 0) return null
@@ -105,8 +107,10 @@ export function tokenMatchCatalog(
     if (!tokensC) continue
     const inter = [...tokensQ].filter((x) => tokensC.has(x)).length
     const score = inter / tokensQ.size
-    if (score >= TOKEN_MATCH_THRESHOLD && (!best || score > best.score)) {
-      best = { canonical: canon, score }
+    if (score >= threshold) {
+      if (!best || score > best.score || (score === best.score && canon.length > best.canonical.length)) {
+        best = { canonical: canon, score }
+      }
     }
   }
   if (!best) return null

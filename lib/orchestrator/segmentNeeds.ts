@@ -7,9 +7,10 @@
 const QTY_PATTERN = /\d+(?:[.,]\d+)?/g
 const UNIT_AFTER_QTY = /\s*(?:кг|кг\.|kg|г|гр|г\.|мг|л|л\.|ml|мл|шт|pcs|уп|уп\.|упак|пач|пуч|кор|ящ|т)?/i
 
-/** Нормализация: \r\n и ;, разбить на строки, trim, схлопнуть пробелы в каждой */
+/** Нормализация: \r\n, ;, запятая (не между цифрами) → \n; разбить на строки, trim, схлопнуть пробелы */
 function normalizeAndSplit(text: string): string[] {
-  const s = (text || '').replace(/\r\n/g, '\n').replace(/;/g, '\n').trim()
+  let s = (text || '').replace(/\r\n/g, '\n').replace(/;/g, '\n').trim()
+  s = s.replace(/(?<!\d),(?!\d)/g, '\n')
   return s
     .split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
@@ -119,14 +120,20 @@ function segmentLine(line: string): string[] {
   return segments
 }
 
+const MAX_MESSAGE_LENGTH = 2000
+const MAX_SEGMENTS = 50
+
 /**
  * segmentNeeds(text) — первый шаг pipeline.
+ * Лимиты: 2000 символов, 50 сегментов.
  */
 export function segmentNeeds(text: string): string[] {
-  const lines = normalizeAndSplit(text)
+  const raw = (text || '').slice(0, MAX_MESSAGE_LENGTH)
+  const lines = normalizeAndSplit(raw)
   const all: string[] = []
   for (const line of lines) {
+    if (all.length >= MAX_SEGMENTS) break
     all.push(...segmentLine(line))
   }
-  return all.filter(Boolean)
+  return all.slice(0, MAX_SEGMENTS).filter(Boolean)
 }

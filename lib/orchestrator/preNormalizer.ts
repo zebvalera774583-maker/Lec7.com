@@ -27,10 +27,17 @@ export async function buildAliasToCanonicalMap(): Promise<Map<string, string>> {
 }
 
 /**
- * Чистит мусор: точки (в т.ч. репч. -> репч), лишние дефисы, двойные пробелы.
+ * PreNormalizer 2.1: удалить () [] {} " ', сохранить - . ,
+ */
+function removeSpecChars(s: string): string {
+  return (s || '').replace(/[()\[\]{}"']/g, '')
+}
+
+/**
+ * Чистит мусор: удаление спецсимволов, точки (репч. -> репч), лишние дефисы, двойные пробелы.
  */
 function cleanGarbage(s: string): string {
-  return (s || '')
+  return removeSpecChars(s || '')
     .trim()
     .toLowerCase()
     .replace(/\.(?=[^0-9]|$)/g, '') // убрать точки не между цифрами
