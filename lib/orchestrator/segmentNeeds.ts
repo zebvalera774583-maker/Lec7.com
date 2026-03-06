@@ -75,10 +75,30 @@ function isValidSegment(s: string): boolean {
   return true
 }
 
+/** Строка — один товар: название + дефис/пробел + qty + unit. Единица обязательна. */
+const SINGLE_PRODUCT_LINE =
+  /^[^\d]+\s*[-–—]?\s*\d+(?:[.,]\d+)?\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)\s*$/i
+
+/** Заголовок/адрес: короткая строка без валидной единицы в конце */
+function isHeaderLikeLine(line: string): boolean {
+  const hasValidUnit = /\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)\s*$/i.test(line)
+  if (hasValidUnit) return false
+  if (/[-–—]\s*$/.test(line)) return false
+  if (line.length <= 12 && !/\d/.test(line)) return true
+  if (line.length <= 15 && /\d[^\d\s,.]$/.test(line)) return true
+  if (line.length < 10 && /\d\s*$/.test(line)) return true
+  return false
+}
+
 /** Сегментировать одну строку */
 function segmentLine(line: string): string[] {
   const trimmed = line.trim()
   if (!trimmed) return []
+  if (isHeaderLikeLine(trimmed)) return []
+
+  if (SINGLE_PRODUCT_LINE.test(trimmed) && isValidSegment(trimmed)) {
+    return [reorderStartsWithQty(trimmed)]
+  }
 
   const allQty = findAllQty(trimmed)
   const validQty = allQty.filter((q) => !q.isTypo)
