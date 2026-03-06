@@ -75,7 +75,17 @@ function logRawUpdate(ctx: any, eventType: string) {
   }))
   const link = msg?.link
   const linkSum = linkSummary(link)
-  console.log('[MAX raw update]', {
+  const linkMsg = link?.message
+  const linkMsgBody = linkMsg?.body
+  const linkMsgAttachments = linkMsgBody?.attachments ?? []
+  const linkMsgAttPayloads = linkMsgAttachments.map((a: any) => ({
+    type: a?.type,
+    payloadKeys: a?.payload ? safeKeys(a.payload) : [],
+    hasUrl: !!(a?.payload?.url ?? a?.payload?.link),
+    hasFile: !!(a?.payload?.file ?? a?.payload?.file_id ?? a?.payload?.id),
+  }))
+
+  const out: Record<string, unknown> = {
     eventType,
     updateKeys: safeKeys(u),
     messageKeys: msg ? safeKeys(msg) : [],
@@ -88,7 +98,18 @@ function logRawUpdate(ctx: any, eventType: string) {
     userId: ctx?.user?.user_id ?? msg?.sender?.user_id,
     linkKeys: link != null && typeof link === 'object' && !Array.isArray(link) ? safeKeys(link) : undefined,
     linkSummary: linkSum ?? undefined,
-  })
+  }
+  if (linkMsg != null && typeof linkMsg === 'object') {
+    out.linkMessageKeys = safeKeys(linkMsg)
+    if (linkMsgBody != null) {
+      out.linkMessageBodyKeys = safeKeys(linkMsgBody)
+      out.linkMessageBodyText = typeof linkMsgBody?.text === 'string' ? linkMsgBody.text.slice(0, 80) : linkMsgBody?.text
+      out.linkMessageAttachmentCount = linkMsgAttachments.length
+      out.linkMessageAttachmentTypes = linkMsgAttachments.map((a: any) => a?.type)
+      out.linkMessageAttachmentPayloads = linkMsgAttPayloads
+    }
+  }
+  console.log('[MAX raw update]', out)
 }
 
 type WebhookResponse = {
