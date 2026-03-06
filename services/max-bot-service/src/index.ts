@@ -26,6 +26,38 @@ app.listen(PORT, () => {
 
 const bot = new Bot(MAX_BOT_TOKEN)
 
+/** Безопасное извлечение ключей для debug-лога (без бинарных данных) */
+function safeKeys(obj: unknown): string[] {
+  if (obj == null || typeof obj !== 'object') return []
+  return Object.keys(obj as object)
+}
+
+/** Debug: сырой update для диагностики изображений */
+function logRawUpdate(ctx: any, eventType: string) {
+  const u = ctx?.update ?? ctx
+  const msg = ctx?.message ?? u?.message
+  const body = msg?.body ?? {}
+  const attachments = body?.attachments ?? []
+  const attPayloads = attachments.map((a: any) => ({
+    type: a?.type,
+    payloadKeys: a?.payload ? safeKeys(a.payload) : [],
+    hasUrl: !!(a?.payload?.url ?? a?.payload?.link),
+    hasFile: !!(a?.payload?.file ?? a?.payload?.file_id ?? a?.payload?.id),
+  }))
+  console.log('[MAX raw update]', {
+    eventType,
+    updateKeys: safeKeys(u),
+    messageKeys: msg ? safeKeys(msg) : [],
+    bodyKeys: safeKeys(body),
+    bodyText: typeof body?.text === 'string' ? body.text.slice(0, 80) : body?.text,
+    attachmentCount: attachments?.length ?? 0,
+    attachmentTypes: attachments?.map((a: any) => a?.type) ?? [],
+    attachmentPayloads: attPayloads,
+    chatId: ctx?.chatId ?? ctx?.chat?.chat_id ?? msg?.recipient?.chat_id,
+    userId: ctx?.user?.user_id ?? msg?.sender?.user_id,
+  })
+}
+
 type WebhookResponse = {
   replyText?: string
   replyInlineKeyboard?: {
@@ -118,6 +150,8 @@ bot.on('message_callback', async (ctx: any) => {
 })
 
 bot.on('message_created', async (ctx: any) => {
+  logRawUpdate(ctx, 'message_created')
+
   const body = ctx.message?.body
   const text = body?.text
   const attachments = body?.attachments as { type?: string; payload?: { url?: string; link?: string } }[] | undefined
@@ -184,6 +218,14 @@ bot.on('message_created', async (ctx: any) => {
 bot.catch((err) => {
   console.error('[MAX bot error]', err)
   process.exit(1)
+})
+
+bot.on('message_constructed', (ctx: any) => {
+  logRawUpdate(ctx, 'message_constructed')
+})
+
+bot.on('message_construction_request', (ctx: any) => {
+  logRawUpdate(ctx, 'message_construction_request')
 })
 
 bot.start()
