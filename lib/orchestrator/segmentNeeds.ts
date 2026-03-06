@@ -4,6 +4,28 @@
  * Строки не склеиваются. Packed-line разбивается по qty.
  */
 
+const UNIT_ONLY_LINE = /^\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т)\s*$/i
+const ENDS_WITH_NUMBER = /\d(?:[.,]\d+)?\s*$/
+
+/** Склеить перенос единицы: "Мята - 0,2\nкг" → "Мята - 0,2 кг" */
+function glueUnitLineBreaks(text: string): string {
+  const lines = (text || '').split(/\r?\n/)
+  const result: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trim()
+    if (UNIT_ONLY_LINE.test(trimmed) && result.length > 0) {
+      const prev = result[result.length - 1]
+      if (ENDS_WITH_NUMBER.test(prev)) {
+        result[result.length - 1] = (prev.trimEnd() + ' ' + trimmed).trim()
+        continue
+      }
+    }
+    result.push(line)
+  }
+  return result.join('\n')
+}
+
 const QTY_PATTERN = /\d+(?:[.,]\d+)?/g
 const UNIT_AFTER_QTY = /\s*(?:кг|кг\.|kg|г|гр|г\.|мг|л|л\.|ml|мл|шт|pcs|уп|уп\.|упак|пач|пуч|кор|ящ|т)?/i
 
@@ -46,13 +68,17 @@ function findAllQty(line: string): { index: number; end: number; isTypo: boolean
   return result
 }
 
-/** Разбить "морковь- чеснок 0,500" на ["морковь-", "чеснок 0,500"] */
+/** Паттерн: qty + optional unit — остаток одной позиции, не резать */
+const QTY_UNIT_REST = /^\d+(?:[.,]\d+)?\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)?\s*$/i
+
+/** Разбить "морковь- чеснок 0,500" на ["морковь-", "чеснок 0,500"]. Не резать "Мята - 0,2 кг" (after = qty+unit). */
 function splitDashTerminated(segment: string): string[] {
   const m = segment.match(/^(.+[-–—])\s+(.+)$/)
   if (!m) return [segment]
   const before = m[1].trim()
   const after = m[2].trim()
   if (!/\d/.test(after)) return [segment]
+  if (QTY_UNIT_REST.test(after)) return [segment]
   const word = before.replace(/[-–—]+$/, '').trim()
   if (!word) return [segment]
   return [before, after]
@@ -75,9 +101,9 @@ function isValidSegment(s: string): boolean {
   return true
 }
 
-/** Строка — один товар: название + дефис/пробел + qty + unit. Единица обязательна. */
+/** Строка — один товар: название + дефис/пробелы + qty + unit. Unit опционален. */
 const SINGLE_PRODUCT_LINE =
-  /^[^\d]+\s*[-–—]?\s*\d+(?:[.,]\d+)?\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)\s*$/i
+  /^[^\d]+\s*[-–—]?\s*\d+(?:[.,]\d+)?\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)?\s*$/i
 
 /** Заголовок/адрес: короткая строка без валидной единицы в конце */
 function isHeaderLikeLine(line: string): boolean {
@@ -154,7 +180,8 @@ const MAX_SEGMENTS = 50
  */
 export function segmentNeeds(text: string): string[] {
   const raw = (text || '').slice(0, MAX_MESSAGE_LENGTH)
-  const lines = normalizeAndSplit(raw)
+  const glued = glueUnitLineBreaks(raw)
+  const lines = normalizeAndSplit(glued)
   const all: string[] = []
   for (const line of lines) {
     if (all.length >= MAX_SEGMENTS) break

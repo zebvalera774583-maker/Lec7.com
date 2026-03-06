@@ -92,4 +92,46 @@ describe('segmentNeeds', () => {
       'Морковь мытая - 4 кг',
     ])
   })
+
+  it('Кейс 1: нет мусорных сегментов кг 7, ,2 0, к 4', () => {
+    const input = `Мк - 2; Войкова 4В, бар
+
+Апельсины - 7 кг
+Яблоки - 4 кг
+Мята - 0,2 кг
+Морковь мытая - 4 кг`
+    const r = segmentNeeds(input)
+    expect(r).not.toContain('кг 7')
+    expect(r).not.toContain('кг 4')
+    expect(r).not.toContain(',2 0')
+    expect(r).not.toContain('к 4')
+    expect(r).not.toContain('Апельсины -')
+    expect(r).toEqual([
+      'Апельсины - 7 кг',
+      'Яблоки - 4 кг',
+      'Мята - 0,2 кг',
+      'Морковь мытая - 4 кг',
+    ])
+  })
+
+  it('Кейс 2: перенос единицы — Мята - 0,2\\nкг → один сегмент', () => {
+    const input = `Мята - 0,2
+кг`
+    const r = segmentNeeds(input)
+    expect(r).toEqual(['Мята - 0,2 кг'])
+  })
+
+  it('Кейс 3: много пробелов — Апельсины 7 кг один сегмент', () => {
+    const input = 'Апельсины            7 кг'
+    const r = segmentNeeds(input)
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatch(/апельсины.*7.*кг/i)
+  })
+
+  it('Кейс 4: packed-line картофель 1 кг лук 2 кг → 2 сегмента', () => {
+    const r = segmentNeeds('картофель 1 кг лук 2 кг')
+    expect(r).toHaveLength(2)
+    expect(r[0]).toMatch(/картофель.*1.*кг/i)
+    expect(r[1]).toMatch(/лук.*2.*кг/i)
+  })
 })
