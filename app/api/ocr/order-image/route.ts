@@ -38,10 +38,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Content-Type must be multipart/form-data or application/json' }, { status: 400 })
     }
 
+    console.log('[OCR] start')
     const result = await processOrderImage(buffer)
+    console.log('[OCR] success')
     return NextResponse.json(result)
   } catch (e) {
-    console.error('[OCR order-image] error:', e)
+    const msg = e instanceof Error ? e.message : String(e)
+    console.log('[OCR] fail:', msg)
     return NextResponse.json({ error: 'OCR failed' }, { status: 500 })
   }
 }
