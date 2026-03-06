@@ -1,5 +1,5 @@
 import path from 'path'
-import * as Tesseract from 'tesseract.js'
+import { createWorker, OEM } from 'tesseract.js'
 import { segmentNeeds } from '@/lib/orchestrator/segmentNeeds'
 import { parseMaxRequestToRows, parseSegment } from '@/lib/parseMaxRequest'
 
@@ -11,17 +11,24 @@ function getTesseractWorkerPath(): string {
 
 /**
  * Extract text from image buffer using tesseract.js (rus+eng).
+ * Uses explicit worker API; image passed as data URL for production-safe worker messaging.
  */
 export async function extractTextFromImage(buffer: Buffer): Promise<string> {
   const workerPath = getTesseractWorkerPath()
-  const options: Record<string, unknown> = {
+  const workerOpts = {
+    workerPath,
     logger: () => {},
-    workerPath: String(workerPath),
   }
-  console.log('[OCR] paths', { workerPath: options.workerPath })
+  console.log('[OCR] paths', { workerPath })
 
-  const { data } = await Tesseract.recognize(buffer, 'rus+eng', options)
-  return data.text?.trim() ?? ''
+  const worker = await createWorker('rus+eng', OEM.LSTM_ONLY, workerOpts)
+  try {
+    const imageInput = `data:image/png;base64,${buffer.toString('base64')}`
+    const { data } = await worker.recognize(imageInput)
+    return data.text?.trim() ?? ''
+  } finally {
+    await worker.terminate()
+  }
 }
 
 /**
