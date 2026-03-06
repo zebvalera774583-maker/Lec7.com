@@ -208,7 +208,10 @@ bot.on('message_created', async (ctx: any) => {
 
   const body = ctx.message?.body
   const text = body?.text
-  const attachments = body?.attachments as { type?: string; payload?: { url?: string; link?: string } }[] | undefined
+  const bodyAttachments = body?.attachments as { type?: string; payload?: { url?: string; link?: string } }[] | undefined
+  const linkMsgAttachments = ctx.message?.link?.message?.attachments as
+    | { type?: string; payload?: { url?: string; link?: string } }[]
+    | undefined
 
   const chatId = ctx.chatId ?? ctx.chat?.chat_id ?? ctx.message?.recipient?.chat_id
   const userId = ctx.user?.user_id ?? ctx.message?.sender?.user_id
@@ -217,10 +220,21 @@ bot.on('message_created', async (ctx: any) => {
 
   let messageText = typeof text === 'string' ? text : ''
   let useOcrSource = false
+  let attachmentSource: 'body.attachments' | 'link.message.attachments' | undefined
+
+  // Поиск image: primary = body.attachments, fallback = link.message.attachments
+  let imageAtt: { type?: string; payload?: { url?: string; link?: string } } | undefined
+  if (Array.isArray(bodyAttachments) && bodyAttachments.length > 0) {
+    imageAtt = bodyAttachments.find((a) => a?.type === 'image')
+    if (imageAtt) attachmentSource = 'body.attachments'
+  }
+  if (!imageAtt && Array.isArray(linkMsgAttachments) && linkMsgAttachments.length > 0) {
+    imageAtt = linkMsgAttachments.find((a) => a?.type === 'image')
+    if (imageAtt) attachmentSource = 'link.message.attachments'
+  }
 
   // Обработка изображений (attachments) — OCR
-  if (!messageText.trim() && Array.isArray(attachments) && attachments.length > 0) {
-    const imageAtt = attachments.find((a) => a?.type === 'image')
+  if (!messageText.trim() && imageAtt) {
     const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
     if (url) {
       try {
@@ -242,6 +256,10 @@ bot.on('message_created', async (ctx: any) => {
         console.warn('[MAX] OCR from attachment failed:', e)
       }
     }
+  }
+
+  if (attachmentSource) {
+    console.log('[MAX image attachment]', { attachmentSource })
   }
 
   if (!messageText.trim()) return
