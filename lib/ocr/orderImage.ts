@@ -1,12 +1,12 @@
 import path from 'path'
-import { createWorker } from 'tesseract.js'
+import * as Tesseract from 'tesseract.js'
 import { segmentNeeds } from '@/lib/orchestrator/segmentNeeds'
 import { parseMaxRequestToRows, parseSegment } from '@/lib/parseMaxRequest'
 
 /** Resolve tesseract worker path for production standalone (avoids .next/worker-script) */
 function getTesseractWorkerPath(): string {
   const pkgPath = require.resolve('tesseract.js/package.json')
-  return path.join(path.dirname(pkgPath), 'src', 'worker-script', 'node', 'index.js')
+  return path.resolve(path.dirname(pkgPath), 'src', 'worker-script', 'node', 'index.js')
 }
 
 /**
@@ -14,16 +14,14 @@ function getTesseractWorkerPath(): string {
  */
 export async function extractTextFromImage(buffer: Buffer): Promise<string> {
   const workerPath = getTesseractWorkerPath()
-  const worker = await createWorker(['rus', 'eng'], 1, {
+  const options: Record<string, unknown> = {
     logger: () => {},
-    workerPath,
-  })
-  try {
-    const ret = await worker.recognize(buffer)
-    return ret.data.text?.trim() ?? ''
-  } finally {
-    await worker.terminate()
+    workerPath: String(workerPath),
   }
+  console.log('[OCR] paths', { workerPath: options.workerPath })
+
+  const { data } = await Tesseract.recognize(buffer, 'rus+eng', options)
+  return data.text?.trim() ?? ''
 }
 
 /**
