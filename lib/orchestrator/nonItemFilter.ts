@@ -1,9 +1,47 @@
 /**
  * Фильтр non-item строк: заголовки, компания, адреса → comments.
  * Строки с низким score и признаками не-номенклатуры не попадают в items.
+ * Защита: не придумывать товары из мусорных/неполных сегментов.
  */
 
 const COMPANY_PATTERN = /(?:^|[\s,.-])(ооо|ип|зао|оао|пао|ao|llc)(?:[\s,.-]|$)/i
+
+/** Единицы измерения в начале строки — обрывок (кг 7, л 2) */
+const UNIT_FIRST = /^(кг|г|гр|л|мл|шт|уп|упак|т)\s+\d/i
+
+/** Мусор: начинается с : или , — обрывок количества */
+const GARBAGE_PREFIX = /^[:\s,]/
+
+/** Адрес/подразделение: слово + число + буква (Войкова 4В, корпус 2А) */
+const ADDRESS_LIKE = /^[а-яёa-z]+\s+\d+[а-яёa-z]$/i
+
+/** Короткий заголовок: Мк -, 2 шт - и т.п. */
+const SHORT_HEADER = /^[а-яёa-z]{1,3}\s*[-–—]\s*$/i
+
+/**
+ * Сегмент — мусор или обрывок: нельзя превращать в товар.
+ * Примеры: Мк -, Войкова 4В, бар, кг 7, ,2 0, :10, :1
+ */
+export function isGarbageSegment(
+  segment: string,
+  parsed: { name: string; quantity: string; unit: string }
+): boolean {
+  const s = (segment || '').trim()
+  const name = (parsed?.name || '').trim()
+  if (!s) return true
+
+  if (GARBAGE_PREFIX.test(s)) return true
+  if (UNIT_FIRST.test(s)) return true
+  if (ADDRESS_LIKE.test(s)) return true
+  if (SHORT_HEADER.test(s)) return true
+
+  if (s.length <= 4 && !/\d/.test(s)) return true
+
+  const commaNum = /^,\d|\d,\d*$/
+  if (commaNum.test(s) || /^[,\d\s]+$/.test(s)) return true
+
+  return false
+}
 const SERVICE_PATTERN = /(?:^|[\s,.-])(ул\.?|дом|д\.|адрес|кухня|бар|кафе|ресторан|склад|точка|филиал|поставка|срочно|кофейня)(?:[\s,.-]|$)/i
 const ADDRESS_WORDS = new Set([
   'навагинская', 'войково', 'моремолл', 'ул', 'дом', 'д', 'адрес', 'офис', 'кв',

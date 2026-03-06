@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isLikelyNonItem } from './nonItemFilter'
+import { isGarbageSegment, isLikelyNonItem } from './nonItemFilter'
 
 describe('isLikelyNonItem', () => {
   it('Rule A: high score → item', () => {
@@ -58,5 +58,35 @@ describe('isLikelyNonItem', () => {
     })
     expect(r.isNonItem).toBe(true)
     expect(r.reason).toBe('long_low_score')
+  })
+})
+
+describe('isGarbageSegment', () => {
+  it('Мк - → garbage', () => {
+    expect(isGarbageSegment('Мк -', { name: 'Мк', quantity: '', unit: '' })).toBe(true)
+  })
+  it('Войкова 4В → garbage', () => {
+    expect(isGarbageSegment('Войкова 4В', { name: 'Войкова', quantity: '4', unit: '' })).toBe(true)
+  })
+  it('бар → garbage', () => {
+    expect(isGarbageSegment('бар', { name: 'бар', quantity: '', unit: '' })).toBe(true)
+  })
+  it('кг 7 → garbage', () => {
+    expect(isGarbageSegment('кг 7', { name: 'кг', quantity: '7', unit: '' })).toBe(true)
+  })
+  it(',2 0 → garbage', () => {
+    expect(isGarbageSegment(',2 0', { name: '', quantity: '0', unit: '' })).toBe(true)
+  })
+  it(':10 → garbage', () => {
+    expect(isGarbageSegment(':10', { name: '', quantity: '10', unit: '' })).toBe(true)
+  })
+  it(':1 → garbage', () => {
+    expect(isGarbageSegment(':1', { name: '', quantity: '1', unit: '' })).toBe(true)
+  })
+  it('Апельсины - 7 кг → not garbage', () => {
+    expect(isGarbageSegment('Апельсины - 7 кг', { name: 'Апельсины', quantity: '7', unit: 'кг' })).toBe(false)
+  })
+  it('Морковь- → not garbage (dash-terminated)', () => {
+    expect(isGarbageSegment('Морковь-', { name: 'Морковь', quantity: '', unit: '' })).toBe(false)
   })
 })

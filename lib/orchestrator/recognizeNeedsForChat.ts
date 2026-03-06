@@ -8,6 +8,8 @@ import { extractFeatures } from '@/lib/orchestrator/extractFeatures'
 import { decide } from '@/lib/orchestrator/decisionEngine'
 import { maybeLearnAlias } from '@/lib/orchestrator/learningLoop'
 import { sanitizeTitle } from '@/lib/orchestrator/sanitizeTitle'
+import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
+import { isGarbageSegment, isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
 
 /**
  * Найти businessId по chatId (MaxChatContext / BusinessTelegramRecipient).
@@ -109,10 +111,33 @@ export async function recognizeNeedsForChat(
   const needsQtyClarificationFiltered: number[] = []
   let itemIndex = 0
 
+  const HIGH = ORCHESTRATOR_CONFIG.highConfidenceThreshold
+
   for (let i = 0; i < resolved.length; i++) {
     const r = resolved[i]
     const raw = rawItems[i]
     const segment = raw.originalSegment
+    const matchScore = r.matchScore ?? 0
+
+    if (isGarbageSegment(segment, raw)) {
+      comments.push(segment)
+      console.log(`[ORCH] safeguard garbage segment="${segment.slice(0, 30)}" → comment`)
+      continue
+    }
+
+    const nonItem = isLikelyNonItem(segment, matchScore, raw)
+    if (nonItem.isNonItem) {
+      comments.push(segment)
+      console.log(`[ORCH] safeguard nonItem reason=${nonItem.reason} segment="${segment.slice(0, 30)}" → comment`)
+      continue
+    }
+
+    if (r.matchType === 'token' && matchScore < HIGH) {
+      comments.push(segment)
+      console.log(`[ORCH] safeguard weak token match score=${matchScore.toFixed(2)} < ${HIGH} → comment`)
+      continue
+    }
+
     const features = extractFeatures(
       { ...raw, rawText: segment },
       { matchType: r.matchType, matchScore: r.matchScore }
