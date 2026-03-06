@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import axios from 'axios'
 import { Bot } from '@maxhub/max-bot-api'
+import { createWorker, OEM } from 'tesseract.js'
 
 const PORT = 3005
 const MAX_BOT_TOKEN = process.env.MAX_BOT_TOKEN
@@ -110,6 +111,21 @@ function logRawUpdate(ctx: any, eventType: string) {
     }
   }
   console.log('[MAX raw update]', out)
+}
+
+/** OCR: extract text from image buffer (runs locally in Node, no Next.js bundling) */
+async function extractTextFromImage(buffer: Buffer): Promise<string> {
+  console.log('[OCR] start')
+  const worker = await createWorker('rus+eng', OEM.LSTM_ONLY, { logger: () => {} })
+  try {
+    const imageInput = `data:image/png;base64,${buffer.toString('base64')}`
+    const { data } = await worker.recognize(imageInput)
+    const text = data.text?.trim() ?? ''
+    console.log('[OCR] success')
+    return text
+  } finally {
+    await worker.terminate()
+  }
 }
 
 type WebhookResponse = {
@@ -233,27 +249,18 @@ bot.on('message_created', async (ctx: any) => {
     if (imageAtt) attachmentSource = 'link.message.attachments'
   }
 
-  // Обработка изображений (attachments) — OCR
+  // Обработка изображений (attachments) — OCR (локально в max-bot, без Lec7 API)
   if (!messageText.trim() && imageAtt) {
     const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
     if (url) {
       try {
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
         const buffer = Buffer.from(imgRes.data)
-        const ocrRes = await axios.post<{ text: string }>(
-          `${LEC7_BASE_URL}/api/ocr/order-image`,
-          { image: buffer.toString('base64') },
-          {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 30000,
-          }
-        )
-        if (ocrRes.data?.text?.trim()) {
-          messageText = ocrRes.data.text
-          useOcrSource = true
-        }
+        messageText = await extractTextFromImage(buffer)
+        if (messageText) useOcrSource = true
       } catch (e) {
-        console.warn('[MAX] OCR from attachment failed:', e)
+        const msg = e instanceof Error ? e.message : String(e)
+        console.log('[OCR] fail:', msg)
       }
     }
   }
