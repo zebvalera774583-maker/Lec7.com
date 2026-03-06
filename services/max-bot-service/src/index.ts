@@ -32,6 +32,35 @@ function safeKeys(obj: unknown): string[] {
   return Object.keys(obj as object)
 }
 
+/** Компактный summary для message.link (объект или массив) */
+function linkSummary(link: unknown): Record<string, unknown> | null {
+  if (link == null) return null
+  if (Array.isArray(link)) {
+    const first = link[0]
+    return {
+      type: 'array',
+      length: link.length,
+      firstElementKeys: first != null && typeof first === 'object' ? safeKeys(first) : [],
+    }
+  }
+  if (typeof link === 'object') {
+    const payload = (link as any)?.payload
+    const att = (link as any)?.attachments
+    return {
+      type: 'object',
+      linkKeys: safeKeys(link),
+      hasType: 'type' in (link as object),
+      hasUrl: 'url' in (link as object) || !!(payload?.url ?? (link as any)?.url),
+      hasFile: 'file' in (link as object) || !!(payload?.file ?? (link as any)?.file ?? payload?.file_id),
+      hasPayload: !!payload,
+      payloadKeys: payload ? safeKeys(payload) : [],
+      hasAttachments: !!att,
+      attachmentsLength: Array.isArray(att) ? att.length : 0,
+    }
+  }
+  return { type: typeof link }
+}
+
 /** Debug: сырой update для диагностики изображений */
 function logRawUpdate(ctx: any, eventType: string) {
   const u = ctx?.update ?? ctx
@@ -44,6 +73,8 @@ function logRawUpdate(ctx: any, eventType: string) {
     hasUrl: !!(a?.payload?.url ?? a?.payload?.link),
     hasFile: !!(a?.payload?.file ?? a?.payload?.file_id ?? a?.payload?.id),
   }))
+  const link = msg?.link
+  const linkSum = linkSummary(link)
   console.log('[MAX raw update]', {
     eventType,
     updateKeys: safeKeys(u),
@@ -55,6 +86,8 @@ function logRawUpdate(ctx: any, eventType: string) {
     attachmentPayloads: attPayloads,
     chatId: ctx?.chatId ?? ctx?.chat?.chat_id ?? msg?.recipient?.chat_id,
     userId: ctx?.user?.user_id ?? msg?.sender?.user_id,
+    linkKeys: link != null && typeof link === 'object' && !Array.isArray(link) ? safeKeys(link) : undefined,
+    linkSummary: linkSum ?? undefined,
   })
 }
 
