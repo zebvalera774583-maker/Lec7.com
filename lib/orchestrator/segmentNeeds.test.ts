@@ -134,4 +134,24 @@ describe('segmentNeeds', () => {
     expect(r[0]).toMatch(/картофель.*1.*кг/i)
     expect(r[1]).toMatch(/лук.*2.*кг/i)
   })
+
+  it('post-merge: Морковь мытая - + к 4 → Морковь мытая - 4 кг', () => {
+    const input = `Мк - 2; Войкова 4В, бар
+
+Апельсины - 7 кг
+Яблоки - 4 кг
+Мята - 0,2 кг
+Морковь мытая -
+к 4`
+    const r = segmentNeeds(input)
+    expect(r).toContain('Морковь мытая - 4 кг')
+    expect(r).not.toContain('Морковь мытая -')
+    expect(r).not.toContain('к 4')
+    expect(r).toEqual([
+      'Апельсины - 7 кг',
+      'Яблоки - 4 кг',
+      'Мята - 0,2 кг',
+      'Морковь мытая - 4 кг',
+    ])
+  })
 })

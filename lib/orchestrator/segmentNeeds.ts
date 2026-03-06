@@ -105,8 +105,12 @@ function isValidSegment(s: string): boolean {
 const SINGLE_PRODUCT_LINE =
   /^[^\d]+\s*[-–—]?\s*\d+(?:[.,]\d+)?\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)?\s*$/i
 
+/** Обрывок qty+unit — не заголовок (к 4, г 500) */
+const QTY_UNIT_FRAGMENT_LINE = /^(?:[а-яёa-z]{1,3}\s+)?\d+(?:[.,]\d+)?(?:\s*[а-яёa-z]{1,3})?$|^\d+(?:[.,]\d+)?\s*[а-яёa-z]{1,3}$/i
+
 /** Заголовок/адрес: короткая строка без валидной единицы в конце */
 function isHeaderLikeLine(line: string): boolean {
+  if (QTY_UNIT_FRAGMENT_LINE.test(line.trim())) return false
   const hasValidUnit = /\s*(?:кг|кг\.|kg|г|гр|мг|л|мл|шт|pcs|уп|упак|пач|пуч|кор|ящ|т)\s*$/i.test(line)
   if (hasValidUnit) return false
   if (/[-–—]\s*$/.test(line)) return false
@@ -174,6 +178,34 @@ function segmentLine(line: string): string[] {
 const MAX_MESSAGE_LENGTH = 2000
 const MAX_SEGMENTS = 50
 
+
+/** Нормализовать обрывок: "к 4" → "4 кг", "г 500" → "500 г" */
+function normalizeQtyUnitFragment(frag: string): string {
+  const s = (frag || '').trim()
+  const qtyM = s.match(/(\d+(?:[.,]\d+)?)/)
+  if (!qtyM) return s
+  const qty = qtyM[1]
+  const rest = s.replace(qtyM[0], '').replace(/\s+/g, ' ').trim()
+  const unitMap: Record<string, string> = { к: 'кг', г: 'г', гр: 'гр', л: 'л', мл: 'мл', шт: 'шт', уп: 'уп' }
+  const unit = unitMap[rest.toLowerCase()] || (rest.length <= 2 ? 'кг' : rest)
+  return `${qty} ${unit}`.trim()
+}
+
+/** Post-merge: склеить "title-" + "qty/unit fragment" */
+function mergeDashFragments(segments: string[]): string[] {
+  const result: string[] = []
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const prev = result[result.length - 1]
+    if (prev && /[-–—]\s*$/.test(prev) && QTY_UNIT_FRAGMENT_LINE.test(seg.trim()) && seg.trim().length <= 12) {
+      result[result.length - 1] = (prev.trimEnd() + ' ' + normalizeQtyUnitFragment(seg)).trim()
+    } else {
+      result.push(seg)
+    }
+  }
+  return result
+}
+
 /**
  * segmentNeeds(text) — первый шаг pipeline.
  * Лимиты: 2000 символов, 50 сегментов.
@@ -187,5 +219,5 @@ export function segmentNeeds(text: string): string[] {
     if (all.length >= MAX_SEGMENTS) break
     all.push(...segmentLine(line))
   }
-  return all.slice(0, MAX_SEGMENTS).filter(Boolean)
+  return mergeDashFragments(all.slice(0, MAX_SEGMENTS).filter(Boolean))
 }
