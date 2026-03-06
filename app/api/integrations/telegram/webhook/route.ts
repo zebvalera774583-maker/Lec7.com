@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
+import { processOrderImage } from '@/lib/ocr/orderImage'
 
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token'
 const TELEGRAM_API = 'https://api.telegram.org'
@@ -69,7 +70,12 @@ export async function POST(req: NextRequest) {
   }
 
   let body: {
-    message?: { text?: string; chat?: { id?: number }; from?: { id?: number; username?: string } }
+    message?: {
+      text?: string
+      photo?: { file_id: string; width: number; height: number }[]
+      chat?: { id?: number }
+      from?: { id?: number; username?: string }
+    }
     callback_query?: { data?: string; message?: { chat?: { id?: number } }; from?: { id?: number; username?: string }; id?: string }
   }
   try {
@@ -117,11 +123,61 @@ export async function POST(req: NextRequest) {
   // 2) Обычное сообщение
   const text = body?.message?.text?.trim()
   const chatId = body?.message?.chat?.id
-  if (!text || chatId == null) {
-    return NextResponse.json({ ok: true })
+  const photos = body?.message?.photo
+
+  if (chatId == null) return NextResponse.json({ ok: true })
+
+  // 2a) Фото — OCR и handleBotEvent с source:'ocr'
+  if (photos?.length) {
+    const largest = photos[photos.length - 1]
+    const fileId = largest?.file_id
+    if (fileId) {
+      try {
+        const token = process.env.TELEGRAM_BOT_TOKEN
+        if (!token) {
+          await sendTelegramMessage(String(chatId), 'OCR недоступен: TELEGRAM_BOT_TOKEN не настроен')
+          return NextResponse.json({ ok: true })
+        }
+        const getFileRes = await fetch(`${TELEGRAM_API}/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`)
+        const getFileJson = await getFileRes.json()
+        const filePath = getFileJson?.result?.file_path
+        if (!filePath) {
+          await sendTelegramMessage(String(chatId), 'Не удалось получить файл изображения.')
+          return NextResponse.json({ ok: true })
+        }
+        const fileUrl = `${TELEGRAM_API}/file/bot${token}/${filePath}`
+        const imgRes = await fetch(fileUrl)
+        const arrayBuffer = await imgRes.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+        const { text: ocrText } = await processOrderImage(buffer)
+        if (!ocrText.trim()) {
+          await sendTelegramMessage(String(chatId), 'Не удалось распознать текст на изображении.')
+          return NextResponse.json({ ok: true })
+        }
+        const event = {
+          channel: 'telegram' as const,
+          chatId: String(chatId),
+          userId: body?.message?.from?.id != null ? String(body.message.from.id) : undefined,
+          username: body?.message?.from?.username,
+          text: ocrText,
+          source: 'ocr' as const,
+          raw: body,
+        }
+        const { messages, replyInlineKeyboard, removeKeyboard } = await handleBotEvent(event)
+        for (let i = 0; i < messages.length; i++) {
+          await sendTelegramMessage(String(chatId), messages[i], i === 0 ? replyInlineKeyboard : undefined, i === 0 ? removeKeyboard : undefined)
+        }
+      } catch (err) {
+        console.error('[tg] OCR error:', err)
+        await sendTelegramMessage(String(chatId), 'Ошибка при распознавании изображения.')
+      }
+      return NextResponse.json({ ok: true })
+    }
   }
 
-  // 2a) /start с токеном — привязка чата к бизнесу
+  if (!text) return NextResponse.json({ ok: true })
+
+  // 2b) /start с токеном — привязка чата к бизнесу
   const match = /^\/start\s+(.+)$/.exec(text)
   const token = match?.[1]?.trim()
   if (token) {
@@ -184,7 +240,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2b) Остальные сообщения — handleBotEvent (потребности, кнопки)
+  // 2c) Остальные сообщения — handleBotEvent (потребности, кнопки)
   try {
     const event = {
       channel: 'telegram' as const,

@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let body: { chatId?: unknown; userId?: unknown; text?: string; messageId?: unknown; choice?: string }
+  let body: { chatId?: unknown; userId?: unknown; text?: string; messageId?: unknown; choice?: string; source?: 'ocr' }
   try {
     body = await req.json()
   } catch {
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
   const chatId = body?.chatId != null ? String(body.chatId) : null
   const text = typeof body?.text === 'string' ? body.text : ''
   const choice = typeof body?.choice === 'string' ? body.choice : undefined
+  const source: 'ocr' | undefined = body?.source === 'ocr' ? 'ocr' : undefined
 
   if (!chatId) {
     return NextResponse.json({ replyText: 'Ошибка: chatId отсутствует' })
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     username: undefined,
     text: text.trim() || '',
     choice,
+    source,
     raw: body,
   }
 

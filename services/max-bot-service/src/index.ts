@@ -40,11 +40,14 @@ async function forwardToWebhook(
   text: string,
   choice?: string,
   messageId?: string,
-  ts?: string
+  ts?: string,
+  source?: 'ocr'
 ) {
+  const payload: Record<string, unknown> = { chatId, userId, text, messageId, ts, choice }
+  if (source) payload.source = source
   const { data } = await axios.post<WebhookResponse>(
     `${LEC7_BASE_URL}/api/integrations/max/webhook`,
-    { chatId, userId, text, messageId, ts, choice },
+    payload,
     {
       headers: {
         'Content-Type': 'application/json',
@@ -115,18 +118,58 @@ bot.on('message_callback', async (ctx: any) => {
 })
 
 bot.on('message_created', async (ctx: any) => {
-  const text = ctx.message?.body?.text
-  if (!text || typeof text !== 'string') return
+  const body = ctx.message?.body
+  const text = body?.text
+  const attachments = body?.attachments as { type?: string; payload?: { url?: string; link?: string } }[] | undefined
 
   const chatId = ctx.chatId ?? ctx.chat?.chat_id ?? ctx.message?.recipient?.chat_id
   const userId = ctx.user?.user_id ?? ctx.message?.sender?.user_id
   const messageId = ctx.messageId ?? ctx.message?.body?.mid
   const ts = ctx.message?.created_at ?? new Date().toISOString()
 
-  console.log('[MAX incoming]', { chatId, userId, text: text.slice(0, 50) })
+  let messageText = typeof text === 'string' ? text : ''
+  let useOcrSource = false
+
+  // Обработка изображений (attachments) — OCR
+  if (!messageText.trim() && Array.isArray(attachments) && attachments.length > 0) {
+    const imageAtt = attachments.find((a) => a?.type === 'image')
+    const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
+    if (url) {
+      try {
+        const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
+        const buffer = Buffer.from(imgRes.data)
+        const ocrRes = await axios.post<{ text: string }>(
+          `${LEC7_BASE_URL}/api/ocr/order-image`,
+          { image: buffer.toString('base64') },
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 30000,
+          }
+        )
+        if (ocrRes.data?.text?.trim()) {
+          messageText = ocrRes.data.text
+          useOcrSource = true
+        }
+      } catch (e) {
+        console.warn('[MAX] OCR from attachment failed:', e)
+      }
+    }
+  }
+
+  if (!messageText.trim()) return
+
+  console.log('[MAX incoming]', { chatId, userId, text: messageText.slice(0, 50), ocr: useOcrSource })
 
   try {
-    const data = await forwardToWebhook(chatId, userId, text, undefined, messageId, ts)
+    const data = await forwardToWebhook(
+      chatId,
+      userId,
+      messageText,
+      undefined,
+      messageId,
+      ts,
+      useOcrSource ? 'ocr' : undefined
+    )
 
     const replyText = data?.replyText ?? 'Спасибо, заявка принята'
     await sendReply(ctx, replyText, data?.replyInlineKeyboard)

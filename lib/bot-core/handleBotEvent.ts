@@ -109,6 +109,8 @@ export interface BotEvent {
   raw?: unknown
   /** Выбор из InlineKeyboard (callback): "YES" | "NO" | "set_department|<slug>" */
   choice?: string
+  /** Источник текста — OCR (фото заявки) */
+  source?: 'ocr'
 }
 
 export interface HandleBotEventResult {
@@ -195,7 +197,31 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     pendingIndex?: number
   } | null
 
-  // (removed: set_qty, set_qty_other, set_unit callbacks — text-only clarification)
+  // awaiting_ocr_confirm + YES → awaiting_department (выбор подразделения)
+  if (choice === 'YES' && stateData?.type === 'awaiting_ocr_confirm' && stateData?.pendingItems) {
+    await prisma.botChatState.update({
+      where: { channel_chatId: { channel, chatId } },
+      data: {
+        stateJson: {
+          type: 'awaiting_department',
+          pendingItems: stateData.pendingItems,
+        },
+      },
+    })
+    return {
+      messages: ['Выберите подразделение:'],
+      replyInlineKeyboard: { rows: departmentKeyboardRows() },
+    }
+  }
+
+  // awaiting_ocr_confirm + NO → сброс
+  if (choice === 'NO' && stateData?.type === 'awaiting_ocr_confirm') {
+    await prisma.botChatState.update({
+      where: { channel_chatId: { channel, chatId } },
+      data: { stateJson: { type: 'confirmed' } },
+    })
+    return { messages: ['Напишите заявку заново.'], removeKeyboard: true }
+  }
 
   // Обработка выбора подразделения (callback set_department|<slug>)
   const setDeptMatch = typeof choice === 'string' ? choice.match(/^set_department\|([a-z_]+)$/) : null
@@ -429,6 +455,31 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         unit: r.unit || '',
       }))
       const commentsText = orchestratorResult.comments?.join('\n') ?? null
+
+      // OCR: подтверждение перед созданием заявки
+      if (event.source === 'ocr') {
+        const itemsDisplay = parsedItems.map((p) => `${p.name} — ${p.quantity} ${p.unit}`.trim()).filter(Boolean)
+        const msg = `Я распознал заявку так:\n\n${itemsDisplay.join('\n')}\n\nПодтвердить?`
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_ocr_confirm',
+              pendingItems: { needText, parsedItems, commentsText },
+            },
+          },
+        })
+        return {
+          messages: [msg],
+          replyInlineKeyboard: {
+            buttons: [
+              { text: 'Да', callback_data: 'YES' },
+              { text: 'Нет', callback_data: 'NO' },
+            ],
+          },
+        }
+      }
+
       const firstIdx = findNextIncompleteIndex(parsedItems)
       if (firstIdx >= 0) {
         const firstItem = parsedItems[firstIdx]
