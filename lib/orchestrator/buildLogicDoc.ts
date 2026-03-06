@@ -24,7 +24,7 @@ export function buildBotLogicDoc(): BotLogicDoc {
       { step: 2, name: 'parseSegment + sanitizeTitle', description: 'Извлечение title, quantity, unit, hasDashTerminated. sanitizeTitle(name). g→kg: qty<1→опечатка (unit=кг), qty≥1000→/1000, 1≤qty<1000→оставить г.' },
       { step: 3, name: 'preNormalizer', description: 'lowercase, ё→е, удаление скобок и кавычек.' },
       { step: 4, name: 'resolveCatalogItems', description: '1) alias (catalog) 2) alias (learned) 3) token fuzzy match. После канонизации: sanitizeTitle(canonicalName) перед items и clarification.' },
-      { step: 4.5, name: 'safeguard (nonItemFilter)', description: 'Защита: не придумывать товары. isGarbageSegment (Мк -, Войкова 4В, бар, кг 7, ,2 0, :10, :1) → comment. isLikelyNonItem (company, address, service) → comment. token match score<0.85 → comment.' },
+      { step: 4.5, name: 'safeguard (nonItemFilter)', description: 'Защита: не придумывать товары. isGarbageSegment → comment. isLikelyNonItem → comment. token score<0.85 → comment. isDoubtfulSegment: нет внятного name+qty, segment<5 символов, canonicalName далёк от segment (token) → comment.' },
       { step: 5, name: 'extractFeatures', description: 'hasQty, hasUnit, wordCount, hasLegalForm, hasAddressWord, matchScore...' },
       { step: 6, name: 'decisionEngine', description: 'Таблица правил: company → address → high → medium → clarification → comment.' },
       { step: 7, name: 'confidenceLadder', description: '≥0.85 HIGH, 0.6–0.85 MEDIUM, 0.3–0.6 LOW, <0.3 NONE.' },
@@ -52,7 +52,7 @@ export function buildBotLogicDoc(): BotLogicDoc {
       { order: 7, when: '!hasUnit, wordCount≤3', then: 'ITEM_ASK_UNIT', reason: 'SAFEGUARD' },
       { order: 8, when: '!hasUnit', then: 'ASK_UNIT', reason: 'MISSING_UNIT' },
       { order: 9, when: 'wordCount>6, matchScore<0.6', then: 'COMMENT', reason: 'LONG_LOW_SCORE' },
-      { order: 10, when: 'isGarbageSegment | isLikelyNonItem | token+score<0.85', then: 'COMMENT', reason: 'SAFEGUARD_NO_INVENT' },
+      { order: 10, when: 'isGarbageSegment | isLikelyNonItem | token+score<0.85 | isDoubtfulSegment', then: 'COMMENT', reason: 'SAFEGUARD_NO_INVENT' },
     ],
 
     tests: [

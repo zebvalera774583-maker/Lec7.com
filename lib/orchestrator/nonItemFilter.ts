@@ -42,6 +42,58 @@ export function isGarbageSegment(
 
   return false
 }
+
+/** Единицы — не названия товаров */
+const UNIT_ONLY = new Set(['кг', 'г', 'гр', 'л', 'мл', 'шт', 'уп', 'упак', 'пач', 'пуч', 'кор', 'ящ', 'т', 'бар'])
+
+/** Извлечь значимые слова (≥3 букв, не единицы) */
+function getSignificantWords(text: string): string[] {
+  const s = (text || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\s]/gu, ' ')
+  return s.split(/\s+/).filter((w) => w.length >= 3 && !UNIT_ONLY.has(w))
+}
+
+/**
+ * Сегмент сомнительный: нельзя уверенно прочитать товар из исходного текста.
+ * Не создавать item, если нет внятного названия И количества, или canonicalName далёк от segment.
+ */
+export function isDoubtfulSegment(
+  segment: string,
+  parsed: { name: string; quantity: string; unit: string },
+  resolved: { canonicalName: string; matchType?: string },
+  opts?: { hasDashTerminated?: boolean }
+): boolean {
+  const s = (segment || '').trim()
+  const name = (parsed?.name || '').trim()
+  const qty = (parsed?.quantity || '').trim()
+  const canonical = (resolved?.canonicalName || '').trim()
+
+  if (!s || !name) return true
+
+  if (s.length < 5) return true
+
+  const nameWords = getSignificantWords(name)
+  if (nameWords.length === 0) return true
+
+  if (UNIT_ONLY.has(name.toLowerCase())) return true
+
+  if (!opts?.hasDashTerminated) {
+    if (!qty || qty === '0') return true
+    const n = parseFloat(qty.replace(',', '.'))
+    if (isNaN(n) || n <= 0 || n > 10000) return true
+  }
+
+  if (resolved?.matchType === 'token' && canonical) {
+    const canonicalWords = getSignificantWords(canonical)
+    const segmentWords = getSignificantWords(s)
+    const hasOverlap =
+      canonicalWords.some((cw) => segmentWords.some((sw) => sw.includes(cw) || cw.includes(sw))) ||
+      nameWords.some((nw) => canonicalWords.some((cw) => cw.includes(nw) || nw.includes(cw)))
+    if (!hasOverlap) return true
+  }
+
+  return false
+}
+
 const SERVICE_PATTERN = /(?:^|[\s,.-])(ул\.?|дом|д\.|адрес|кухня|бар|кафе|ресторан|склад|точка|филиал|поставка|срочно|кофейня)(?:[\s,.-]|$)/i
 const ADDRESS_WORDS = new Set([
   'навагинская', 'войково', 'моремолл', 'ул', 'дом', 'д', 'адрес', 'офис', 'кв',

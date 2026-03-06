@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isGarbageSegment, isLikelyNonItem } from './nonItemFilter'
+import { isDoubtfulSegment, isGarbageSegment, isLikelyNonItem } from './nonItemFilter'
 
 describe('isLikelyNonItem', () => {
   it('Rule A: high score → item', () => {
@@ -88,5 +88,39 @@ describe('isGarbageSegment', () => {
   })
   it('Морковь- → not garbage (dash-terminated)', () => {
     expect(isGarbageSegment('Морковь-', { name: 'Морковь', quantity: '', unit: '' })).toBe(false)
+  })
+})
+
+describe('isDoubtfulSegment', () => {
+  it('Апельсины - 7 кг → not doubtful', () => {
+    expect(
+      isDoubtfulSegment('Апельсины - 7 кг', { name: 'Апельсины', quantity: '7', unit: 'кг' }, { canonicalName: 'Апельсины', matchType: 'alias' })
+    ).toBe(false)
+  })
+  it('кг 7 → doubtful (unit as name)', () => {
+    expect(isDoubtfulSegment('кг 7', { name: 'кг', quantity: '7', unit: '' }, { canonicalName: 'Грибы шампиньоны', matchType: 'token' })).toBe(true)
+  })
+  it('Апельсины + canonical Кумкват (no overlap) → doubtful', () => {
+    expect(
+      isDoubtfulSegment('Апельсины - 7 кг', { name: 'Апельсины', quantity: '7', unit: 'кг' }, { canonicalName: 'Кумкват', matchType: 'token' })
+    ).toBe(true)
+  })
+  it('Шампиньоны + canonical Грибы шампиньоны (overlap) → not doubtful', () => {
+    expect(
+      isDoubtfulSegment('Шампиньоны 1 кг', { name: 'Шампиньоны', quantity: '1', unit: 'кг' }, { canonicalName: 'Грибы шампиньоны', matchType: 'token' })
+    ).toBe(false)
+  })
+  it('segment too short → doubtful', () => {
+    expect(isDoubtfulSegment('Мк', { name: 'Мк', quantity: '2', unit: '' }, { canonicalName: 'Мк', matchType: 'alias' })).toBe(true)
+  })
+  it('no quantity → doubtful', () => {
+    expect(
+      isDoubtfulSegment('Лук красный', { name: 'Лук красный', quantity: '', unit: '' }, { canonicalName: 'Лук красный', matchType: 'alias' })
+    ).toBe(true)
+  })
+  it('Морковь- (dash-terminated, no qty) → not doubtful', () => {
+    expect(
+      isDoubtfulSegment('Морковь-', { name: 'Морковь', quantity: '', unit: '' }, { canonicalName: 'Морковь', matchType: 'alias' }, { hasDashTerminated: true })
+    ).toBe(false)
   })
 })

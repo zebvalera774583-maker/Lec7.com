@@ -9,7 +9,7 @@ import { decide } from '@/lib/orchestrator/decisionEngine'
 import { maybeLearnAlias } from '@/lib/orchestrator/learningLoop'
 import { sanitizeTitle } from '@/lib/orchestrator/sanitizeTitle'
 import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
-import { isGarbageSegment, isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
+import { isDoubtfulSegment, isGarbageSegment, isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
 
 /**
  * Найти businessId по chatId (MaxChatContext / BusinessTelegramRecipient).
@@ -135,6 +135,12 @@ export async function recognizeNeedsForChat(
     if (r.matchType === 'token' && matchScore < HIGH) {
       comments.push(segment)
       console.log(`[ORCH] safeguard weak token match score=${matchScore.toFixed(2)} < ${HIGH} → comment`)
+      continue
+    }
+
+    if (isDoubtfulSegment(segment, raw, r, { hasDashTerminated: raw.hasDashTerminated })) {
+      comments.push(segment)
+      console.log(`[ORCH] safeguard doubtful segment="${segment.slice(0, 30)}" canonical="${r.canonicalName.slice(0, 20)}" → comment`)
       continue
     }
 
