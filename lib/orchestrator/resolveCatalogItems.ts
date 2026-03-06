@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
+import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
 import { buildTokenIndex, tokenMatchCatalog } from '@/lib/orchestrator/tokenMatchCatalog'
 
 function normalizeForMatch(s: string): string {
@@ -128,8 +129,9 @@ export async function resolveCatalogItems(
       }
     }
 
-    const confidence = catalogItemId ? 1 : 0
-    const needsUserChoice = !catalogItemId || confidence < 0.8
+    const confidence =
+      matchType === 'token' ? matchScore : catalogItemId ? 1 : 0
+    const needsUserChoice = confidence < ORCHESTRATOR_CONFIG.highConfidenceThreshold
 
     resolved.push({
       catalogItemId,
