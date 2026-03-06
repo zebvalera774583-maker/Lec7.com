@@ -13,12 +13,39 @@ export function preprocessForParse(text: string): string {
   s = s.replace(/(\d)([\-\u2013\u2014])([a-zA-Zа-яёА-ЯЁ])/g, '$1 $3')
   // Число слеплено с единицей: 2кг → 2 кг, 500г → 500 г
   s = s.replace(/(\d)(кг|шт|т|л|м|ед|упак|г|гр|мг|мл|уп|упак|пач|пуч|кор|ящ|g)/gi, '$1 $2')
-  return s.replace(/\s+/g, ' ').trim()
+  // Нормализация пробелов: только внутри строк, переносы строк сохраняем
+  return s
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .trim()
+}
+
+/** Строка-заголовок (Мк - 2; Войкова 4В, бар) — не парсим как позиции */
+function isHeaderLine(line: string): boolean {
+  return line.includes(';')
+}
+
+function parseLineToRows(
+  line: string,
+  defaultUnit: string
+): { name: string; quantity: string; unit: string }[] {
+  const rows: { name: string; quantity: string; unit: string }[] = []
+  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(line)) !== null) {
+    const name = m[1].trim()
+    const quantity = m[2].replace(',', '.')
+    const unit = ((m[3] || defaultUnit) as string).toLowerCase()
+    if (name) rows.push({ name, quantity, unit })
+  }
+  return rows
 }
 
 /**
  * Парсинг позиций из description/title заявки MAX.
  * Поддерживает разделители: пробел или дефис (Картофель-5кг, Лук 2кг).
+ * Многострочные заявки парсятся построчно; строки-заголовки (с ";") пропускаются.
  */
 export function parseMaxRequestToRows(
   title: string,
@@ -30,21 +57,19 @@ export function parseMaxRequestToRows(
   let src = description || cleanTitle || text
   src = preprocessForParse(src)
   const rows: { name: string; quantity: string; unit: string }[] = []
-  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
-  let m: RegExpExecArray | null
-  while ((m = re.exec(src)) !== null) {
-    const name = m[1].trim()
-    const quantity = m[2].replace(',', '.')
-    const unit = ((m[3] || 'шт') as string).toLowerCase()
-    if (name) rows.push({ name, quantity, unit })
+  const lines = src.split('\n').filter(Boolean)
+  for (const line of lines) {
+    if (isHeaderLine(line)) continue
+    rows.push(...parseLineToRows(line, 'шт'))
   }
-  if (rows.length === 0) rows.push({ name: src, quantity: '1', unit: 'шт' })
+  if (rows.length === 0) rows.push({ name: src.split('\n')[0] || src, quantity: '1', unit: 'шт' })
   return rows
 }
 
 /**
  * Парсинг с сохранением отсутствия unit (для Orchestrator).
  * Когда unit не указан в строке — возвращает пустую строку вместо "шт".
+ * Многострочные заявки парсятся построчно; строки-заголовки (с ";") пропускаются.
  */
 export function parseMaxRequestToRowsWithOptionalUnit(
   title: string,
@@ -56,15 +81,19 @@ export function parseMaxRequestToRowsWithOptionalUnit(
   let src = description || cleanTitle || text
   src = preprocessForParse(src)
   const rows: { name: string; quantity: string; unit: string }[] = []
-  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
-  let m: RegExpExecArray | null
-  while ((m = re.exec(src)) !== null) {
-    const name = m[1].trim()
-    const quantity = m[2].replace(',', '.')
-    const unit = (m[3] ?? '').toString().toLowerCase().trim()
-    if (name) rows.push({ name, quantity, unit })
+  const lines = src.split('\n').filter(Boolean)
+  for (const line of lines) {
+    if (isHeaderLine(line)) continue
+    let m: RegExpExecArray | null
+    const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
+    while ((m = re.exec(line)) !== null) {
+      const name = m[1].trim()
+      const quantity = m[2].replace(',', '.')
+      const unit = (m[3] ?? '').toString().toLowerCase().trim()
+      if (name) rows.push({ name, quantity, unit })
+    }
   }
-  if (rows.length === 0) rows.push({ name: src, quantity: '1', unit: '' })
+  if (rows.length === 0) rows.push({ name: src.split('\n')[0] || src, quantity: '1', unit: '' })
   return rows
 }
 

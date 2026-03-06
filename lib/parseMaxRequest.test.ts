@@ -25,6 +25,11 @@ describe('preprocessForParse', () => {
   it('помидоры 5шт, молоко 1л', () => {
     expect(preprocessForParse('помидоры 5шт, молоко 1л')).toBe('помидоры 5 шт, молоко 1 л')
   })
+
+  it('сохраняет переносы строк', () => {
+    const input = 'Апельсины - 7 кг\nЯблоки - 4 кг'
+    expect(preprocessForParse(input)).toBe('Апельсины - 7 кг\nЯблоки - 4 кг')
+  })
 })
 
 describe('parseMaxRequestToRows', () => {
@@ -48,6 +53,22 @@ describe('parseMaxRequestToRows', () => {
     expect(result).toEqual([
       { name: 'Картофель', quantity: '5', unit: 'кг' },
       { name: 'Лук', quantity: '2', unit: 'кг' },
+    ])
+  })
+
+  it('многострочная заявка: шапка + товары — парсятся только позиции', () => {
+    const input = `Мк - 2; Войкова 4В, бар
+
+Апельсины - 7 кг
+Яблоки - 4 кг
+Мята - 0,2 кг
+Морковь мытая - 4 кг`
+    const result = parseMaxRequestToRows('', input)
+    expect(result).toEqual([
+      { name: 'Апельсины', quantity: '7', unit: 'кг' },
+      { name: 'Яблоки', quantity: '4', unit: 'кг' },
+      { name: 'Мята', quantity: '0.2', unit: 'кг' },
+      { name: 'Морковь мытая', quantity: '4', unit: 'кг' },
     ])
   })
 })
