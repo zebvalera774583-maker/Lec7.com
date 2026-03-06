@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
-import { cleanOcrTable, normalizeOcrUnits } from '@/lib/ocr/orderImage'
+import { cleanOcrTable, normalizeOcrUnits, extractTableItems } from '@/lib/ocr/orderImage'
 
 const SECRET_HEADER = 'x-lec7-max-secret'
 
@@ -23,7 +23,10 @@ export async function POST(req: NextRequest) {
   const chatId = body?.chatId != null ? String(body.chatId) : null
   let text = typeof body?.text === 'string' ? body.text : ''
   if (body?.source === 'ocr' && text) {
-    text = normalizeOcrUnits(cleanOcrTable(text))
+    const cleaned = normalizeOcrUnits(cleanOcrTable(text))
+    const rows = cleaned.split(/\n/).filter(Boolean)
+    const tableItems = extractTableItems(rows)
+    text = tableItems.length > 0 ? tableItems.join('\n') : cleaned
   }
   const choice = typeof body?.choice === 'string' ? body.choice : undefined
   const source: 'ocr' | undefined = body?.source === 'ocr' ? 'ocr' : undefined
