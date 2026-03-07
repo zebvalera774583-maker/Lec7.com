@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import axios from 'axios'
+import sharp from 'sharp'
 import { Bot } from '@maxhub/max-bot-api'
 
 const PORT = 3005
@@ -294,9 +295,15 @@ bot.on('message_created', async (ctx: any) => {
       try {
         console.log('[MAX PHOTO] received')
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
-        const buffer = Buffer.from(imgRes.data)
-        const mimeType = parseMimeFromContentType(imgRes.headers['content-type'])
+        let buffer = Buffer.from(imgRes.data)
+        let mimeType = parseMimeFromContentType(imgRes.headers['content-type'])
         console.log('[MAX PHOTO] downloaded bytes=', buffer.length, 'mime=', mimeType)
+
+        if (mimeType === 'image/webp') {
+          buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer()
+          mimeType = 'image/jpeg'
+          console.log('[MAX PHOTO] converted webp -> jpeg bytes=', buffer.length)
+        }
 
         const ocrText = await recognizeImageWithYandex(buffer, mimeType)
         console.log('[MAX OCR TEXT]\n', ocrText)
