@@ -135,8 +135,16 @@ function extractTextFromYandexResponse(data: unknown): string {
   return lines.join('\n')
 }
 
+const VALID_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp']
+
+function parseMimeFromContentType(contentType: string | undefined): string {
+  if (!contentType || typeof contentType !== 'string') return 'image/jpeg'
+  const mime = contentType.split(';')[0].trim().toLowerCase()
+  return VALID_IMAGE_MIMES.includes(mime) ? mime : 'image/jpeg'
+}
+
 /** OCR: Yandex Vision OCR (same as Lec7). Env: YANDEX_API_KEY, YANDEX_FOLDER_ID */
-async function recognizeImageWithYandex(buffer: Buffer): Promise<string> {
+async function recognizeImageWithYandex(buffer: Buffer, mimeType: string = 'image/jpeg'): Promise<string> {
   const apiKey = process.env.YANDEX_API_KEY?.trim()
   const folderId = process.env.YANDEX_FOLDER_ID?.trim()
   if (!apiKey || !folderId) {
@@ -145,7 +153,7 @@ async function recognizeImageWithYandex(buffer: Buffer): Promise<string> {
   const content = buffer.toString('base64')
   const res = await axios.post(
     YANDEX_OCR_URL,
-    { mimeType: 'image/png', languageCodes: ['ru'], model: 'table', content },
+    { mimeType, languageCodes: ['ru'], model: 'table', content },
     {
       headers: {
         'Content-Type': 'application/json',
@@ -287,9 +295,10 @@ bot.on('message_created', async (ctx: any) => {
         console.log('[MAX PHOTO] received')
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
         const buffer = Buffer.from(imgRes.data)
-        console.log('[MAX PHOTO] downloaded bytes=', buffer.length)
+        const mimeType = parseMimeFromContentType(imgRes.headers['content-type'])
+        console.log('[MAX PHOTO] downloaded bytes=', buffer.length, 'mime=', mimeType)
 
-        const ocrText = await recognizeImageWithYandex(buffer)
+        const ocrText = await recognizeImageWithYandex(buffer, mimeType)
         console.log('[MAX OCR TEXT]\n', ocrText)
 
         if (!ocrText.trim()) {
