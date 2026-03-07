@@ -11,6 +11,38 @@ const STOP_WORDS = new Set([
 
 const ENDINGS = ['ый', 'ая', 'ое', 'ие', 'ые']
 
+/** Расстояние Левенштейна (1–2 опечатки) */
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  const m = a.length
+  const n = b.length
+  const d: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0))
+  for (let i = 0; i <= m; i++) d[i][0] = i
+  for (let j = 0; j <= n; j++) d[0][j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+    }
+  }
+  return d[m][n]
+}
+
+/** Токен совпадает с каталогом (точное или опечатка 1 символ для 4+ букв) */
+function tokenMatchesCatalogToken(queryToken: string, catalogTokens: Set<string>): boolean {
+  if (catalogTokens.has(queryToken)) return true
+  if (queryToken.length < 4) return false
+  for (const ct of catalogTokens) {
+    if (Math.abs(ct.length - queryToken.length) <= 1 && levenshtein(queryToken, ct) <= 1) {
+      return true
+    }
+  }
+  return false
+}
+
 /**
  * Нормализация текста в токены для fuzzy match.
  * lowercase, ё→е, убрать пунктуацию, стоп-слова, мягкая обрезка окончаний.
@@ -98,6 +130,13 @@ export function tokenMatchCatalog(
   for (const t of tokensQ) {
     const set = tokenIndex.tokenToCanonical.get(t)
     if (set) for (const c of set) candidates.add(c)
+    else if (t.length >= 4) {
+      for (const [key, canonSet] of tokenIndex.tokenToCanonical) {
+        if (Math.abs(key.length - t.length) <= 1 && levenshtein(t, key) <= 1) {
+          for (const c of canonSet) candidates.add(c)
+        }
+      }
+    }
   }
   if (candidates.size === 0) return null
 
@@ -105,7 +144,7 @@ export function tokenMatchCatalog(
   for (const canon of candidates) {
     const tokensC = tokenIndex.canonicalToTokens.get(canon)
     if (!tokensC) continue
-    const inter = [...tokensQ].filter((x) => tokensC.has(x)).length
+    const inter = [...tokensQ].filter((x) => tokenMatchesCatalogToken(x, tokensC)).length
     const score = inter / tokensQ.size
     if (score >= threshold) {
       if (!best || score > best.score || (score === best.score && canon.length > best.canonical.length)) {

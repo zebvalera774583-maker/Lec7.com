@@ -54,5 +54,15 @@ describe('tokenMatchCatalog', () => {
       expect(r).not.toBeNull()
       expect(r!.canonicalName).toBe('Морковь')
     })
+    it('matches typo "броколи" to Брокколи (1-char edit)', () => {
+      const catalogWithBroccoli = [
+        ...catalog,
+        { canonicalName: 'Брокколи', synonyms: [] },
+      ]
+      const idx = buildTokenIndex(catalogWithBroccoli)
+      const r = tokenMatchCatalog('броколи', idx)
+      expect(r).not.toBeNull()
+      expect(r!.canonicalName).toBe('Брокколи')
+    })
   })
 })
