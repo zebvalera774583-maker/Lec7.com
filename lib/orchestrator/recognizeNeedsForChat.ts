@@ -39,12 +39,13 @@ export interface RecognizeResult {
  */
 export async function recognizeNeedsForChat(
   chatId: string,
-  message: string
+  message: string,
+  source: 'max_text' | 'max_photo' = 'max_text'
 ): Promise<RecognizeResult> {
   const businessId = await getBusinessIdByChatId(chatId)
   if (!businessId) return { intent: 'unknown' }
   return normalizeIncomingOrder(
-    { source: 'max_text', rawText: message },
+    { source, rawText: message },
     businessId
   )
 }

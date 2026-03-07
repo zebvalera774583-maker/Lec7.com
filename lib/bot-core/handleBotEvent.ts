@@ -455,9 +455,10 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     // Orchestrator: read-only распознавание (единственный источник items)
+    const orchestratorSource = event.source === 'ocr' && event.channel === 'max' ? 'max_photo' : 'max_text'
     let orchestratorResult: Awaited<ReturnType<typeof recognizeNeedsForChat>> | null = null
     try {
-      orchestratorResult = await recognizeNeedsForChat(chatId, needText)
+      orchestratorResult = await recognizeNeedsForChat(chatId, needText, orchestratorSource)
     } catch (e) {
       console.warn('[handleBotEvent] Orchestrator fallback (error):', e)
     }
