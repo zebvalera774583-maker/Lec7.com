@@ -115,19 +115,21 @@ function logRawUpdate(ctx: any, eventType: string) {
 
 const YANDEX_OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
 
-function extractTextFromYandexResponse(data: unknown): string {
-  if (!data || typeof data !== 'object') return ''
+function extractLinesFromYandexResponse(data: unknown): string[] {
+  if (!data || typeof data !== 'object') return []
   const obj = data as Record<string, unknown>
   const root = (obj.result ?? obj.textAnnotation ?? obj) as Record<string, unknown> | undefined
-  if (!root) return ''
+  if (!root) return []
   const textAnnotation = root.textAnnotation as Record<string, unknown> | undefined
   if (textAnnotation && typeof textAnnotation.text === 'string' && textAnnotation.text.trim()) {
-    return textAnnotation.text.trim()
+    return textAnnotation.text.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   }
   const directText = root.text
-  if (typeof directText === 'string' && directText.trim()) return directText.trim()
+  if (typeof directText === 'string' && directText.trim()) {
+    return directText.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  }
   const blocks = (root.blocks ?? textAnnotation?.blocks) as Array<Record<string, unknown>> | undefined
-  if (!Array.isArray(blocks)) return ''
+  if (!Array.isArray(blocks)) return []
   const lines: string[] = []
   for (const block of blocks) {
     const blockLines = block.lines as Array<Record<string, unknown>> | undefined
@@ -137,7 +139,63 @@ function extractTextFromYandexResponse(data: unknown): string {
       if (typeof text === 'string' && text.trim()) lines.push(text.trim())
     }
   }
+  return lines
+}
+
+function extractTextFromYandexResponse(data: unknown): string {
+  const lines = extractLinesFromYandexResponse(data)
   return lines.join('\n')
+}
+
+/** Мусорные строки: номера строк, одиночные символы, разделители */
+const GARBAGE_LINE = /^\d+$|^[|:()]$|^.$/
+
+/** Строка содержит только единицу измерения */
+const UNIT_ONLY = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i
+
+/** Строка содержит qty+unit (1.5кг, 10 шт) */
+const HAS_QTY_UNIT = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i
+
+/** Похожа на название товара: буквы, не только цифры/символы */
+function looksLikeProductName(s: string): boolean {
+  const t = s.trim()
+  if (!t || t.length < 2) return false
+  if (GARBAGE_LINE.test(t)) return false
+  if (UNIT_ONLY.test(t)) return false
+  return /[\p{L}]/u.test(t) && !/^\d+$/.test(t)
+}
+
+/** Реконструкция OCR-строк: фильтр мусора + объединение unit-строк с названием */
+function reconstructOcrLines(lines: string[]): string[] {
+  const filtered: string[] = []
+  for (const line of lines) {
+    const t = line.trim()
+    if (!t) continue
+    if (GARBAGE_LINE.test(t)) continue
+    filtered.push(t)
+  }
+
+  const result: string[] = []
+  for (let i = 0; i < filtered.length; i++) {
+    const line = filtered[i]
+    const isUnitOnly = UNIT_ONLY.test(line)
+    const hasQtyUnit = HAS_QTY_UNIT.test(line)
+    const nextLine = filtered[i + 1]
+    const nextHasQtyUnit = nextLine ? HAS_QTY_UNIT.test(nextLine) : false
+
+    if (isUnitOnly && nextHasQtyUnit) {
+      continue
+    }
+    if (isUnitOnly || hasQtyUnit) {
+      const prev = result[result.length - 1]
+      if (prev && looksLikeProductName(prev)) {
+        result[result.length - 1] = `${prev} ${line}`.trim()
+        continue
+      }
+    }
+    result.push(line)
+  }
+  return result
 }
 
 const VALID_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp']
@@ -149,7 +207,10 @@ function parseMimeFromContentType(contentType: string | undefined): string {
 }
 
 /** OCR: Yandex Vision OCR (same as Lec7). Env: YANDEX_API_KEY, YANDEX_FOLDER_ID */
-async function recognizeImageWithYandex(buffer: Buffer, mimeType: string = 'image/jpeg'): Promise<string> {
+async function recognizeImageWithYandex(
+  buffer: Buffer,
+  mimeType: string = 'image/jpeg'
+): Promise<{ text: string; lines: string[] }> {
   const apiKey = process.env.YANDEX_API_KEY?.trim()
   const folderId = process.env.YANDEX_FOLDER_ID?.trim()
   if (!apiKey || !folderId) {
@@ -168,11 +229,12 @@ async function recognizeImageWithYandex(buffer: Buffer, mimeType: string = 'imag
       timeout: 30000,
     }
   )
-  const text = extractTextFromYandexResponse(res.data)
+  const lines = extractLinesFromYandexResponse(res.data)
+  const text = lines.join('\n')
   if (!text) {
     console.log('[MAX OCR RAW]', JSON.stringify(res.data).slice(0, 4000))
   }
-  return text
+  return { text, lines }
 }
 
 type WebhookResponse = {
@@ -190,11 +252,15 @@ async function forwardToWebhook(
   choice?: string,
   messageId?: string,
   ts?: string,
-  source?: 'ocr'
+  source?: 'ocr' | 'max_photo',
+  rawText?: string,
+  lines?: string[]
 ) {
   const payload: Record<string, unknown> = { chatId, userId, text, messageId, ts, choice }
   if (source) payload.source = source
-  const timeoutMs = source === 'ocr' ? 60000 : 15000
+  if (rawText != null) payload.rawText = rawText
+  if (lines != null) payload.lines = lines
+  const timeoutMs = source === 'ocr' || source === 'max_photo' ? 60000 : 15000
   const { data } = await axios.post<WebhookResponse>(
     `${LEC7_BASE_URL}/api/integrations/max/webhook`,
     payload,
@@ -302,6 +368,8 @@ bot.on('message_created', async (ctx: any) => {
     const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
     if (url) {
       let textForBot: string
+      let rawText = ''
+      let reconstructedLines: string[] = []
       try {
         console.log('[MAX PHOTO] received')
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
@@ -315,7 +383,7 @@ bot.on('message_created', async (ctx: any) => {
           console.log('[MAX PHOTO] converted webp -> jpeg bytes=', buffer.length)
         }
 
-        const ocrText = await recognizeImageWithYandex(buffer, mimeType)
+        const { text: ocrText, lines: ocrLines } = await recognizeImageWithYandex(buffer, mimeType)
         console.log('[MAX OCR TEXT]\n', ocrText)
 
         if (!ocrText.trim()) {
@@ -323,14 +391,15 @@ bot.on('message_created', async (ctx: any) => {
           return
         }
 
-        messageText = ocrText
+        reconstructedLines = reconstructOcrLines(ocrLines)
+        rawText = ocrText
+        textForBot = reconstructedLines.join('\n')
+        messageText = textForBot
         useOcrSource = true
-        textForBot = messageText
 
-        const normalizedText = messageText
-        console.log('[MAX PHOTO] normalizedText=\n', normalizedText)
+        console.log('[MAX PHOTO] reconstructed lines=', reconstructedLines)
         console.log('[MAX PHOTO] textForBot=\n', textForBot)
-        console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', textForBot, 'ocr=true')
+        console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', textForBot, 'source=max_photo')
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         console.log('[OCR] fail:', msg)
@@ -346,7 +415,9 @@ bot.on('message_created', async (ctx: any) => {
           undefined,
           messageId,
           ts,
-          'ocr'
+          'max_photo',
+          rawText,
+          reconstructedLines
         )
 
         console.log('[handleBotEvent -> MAX]', JSON.stringify(data))
