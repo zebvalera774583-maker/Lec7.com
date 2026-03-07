@@ -10,6 +10,9 @@ import { maybeLearnAlias } from '@/lib/orchestrator/learningLoop'
 import { sanitizeTitle } from '@/lib/orchestrator/sanitizeTitle'
 import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
 import { isDoubtfulSegment, isGarbageSegment, isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
+import { recognizeOrderWithAI } from '@/lib/ai/recognizeOrderWithAI'
+
+type RawItem = { rawText: string; name: string; quantity: string; unit: string; hasDashTerminated: boolean; originalSegment: string }
 
 /**
  * Найти businessId по chatId (MaxChatContext / BusinessTelegramRecipient).
@@ -44,7 +47,7 @@ export interface RecognizeResult {
 
 /**
  * Распознать потребности из текста (Orchestrator 2.1).
- * Pipeline: segmentNeeds → parseSegment → preNormalizer → resolveCatalogItems → extractFeatures → decisionEngine → learningLoop.
+ * AI-first: Yandex AI → resolveCatalogItems. Fallback при технической ошибке AI.
  */
 export async function recognizeNeedsForChat(
   chatId: string,
@@ -55,15 +58,41 @@ export async function recognizeNeedsForChat(
     return { intent: 'unknown' }
   }
 
-  const segments = segmentNeeds(message)
-  console.log(`[ORCH] segments=${JSON.stringify(segments)}`)
+  let rawItems: RawItem[]
 
-  const aliasMap = await buildAliasToCanonicalMap()
-  const normalizedSegments = preNormalizeLines(segments, aliasMap)
-  const rawItems: { rawText: string; name: string; quantity: string; unit: string; hasDashTerminated: boolean; originalSegment: string }[] = []
-  for (const seg of normalizedSegments) {
-    const parsed = parseSegment(seg)
-    if (parsed) rawItems.push({ ...parsed, originalSegment: seg })
+  try {
+    console.log('[ORCH][AI] request message=', message.slice(0, 80))
+    const aiItems = await recognizeOrderWithAI(message)
+
+    if (aiItems.length > 0) {
+      rawItems = aiItems.map((a) => {
+        const seg = `${a.name} ${a.quantity} ${a.unit}`.trim()
+        return {
+          rawText: seg,
+          name: a.name.trim(),
+          quantity: a.quantity || '1',
+          unit: a.unit || '',
+          hasDashTerminated: false,
+          originalSegment: seg,
+        }
+      })
+      console.log('[ORCH][AI] success items=', rawItems.length, rawItems.map((r) => r.name.slice(0, 15)))
+    } else {
+      console.log('[ORCH][AI] success items=0 (empty)')
+      return { intent: 'unknown' }
+    }
+  } catch (err) {
+    console.log('[ORCH][AI] error fallback=true', err instanceof Error ? err.message : String(err))
+    const segments = segmentNeeds(message)
+    console.log(`[ORCH] segments=${JSON.stringify(segments)}`)
+
+    const aliasMap = await buildAliasToCanonicalMap()
+    const normalizedSegments = preNormalizeLines(segments, aliasMap)
+    rawItems = []
+    for (const seg of normalizedSegments) {
+      const parsed = parseSegment(seg)
+      if (parsed) rawItems.push({ ...parsed, originalSegment: seg })
+    }
   }
 
   const isFallback =
