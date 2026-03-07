@@ -4,6 +4,14 @@ import { withBusinessAccess, getBusinessIdFromPath } from '@/lib/access'
 
 const DEFAULT_CATEGORY = 'Свежая плодоовощная продукция'
 
+/** Безопасный парсинг количества: "0,05" → 0.05, "0,100" → 0.1 */
+function parseQuantity(value: string | null | undefined): number {
+  const s = (value ?? '').trim().replace(',', '.')
+  if (!s) return 0
+  const n = Number(s)
+  return Number.isNaN(n) ? 0 : n
+}
+
 function normalizeForMatch(s: string): string {
   return (s || '')
     .trim()
@@ -117,7 +125,7 @@ export const GET = withBusinessAccess(async (req) => {
       const rows = getRowsFromRequest(r)
       for (const row of rows) {
         const key = `${row.name.toLowerCase().trim()}|${row.unit}`
-        const qty = parseFloat(row.quantity) || 0
+        const qty = parseQuantity(row.quantity)
         const existing = group.agg.get(key)
         if (existing) {
           existing.quantity += qty
