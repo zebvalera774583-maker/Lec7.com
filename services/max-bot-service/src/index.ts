@@ -164,7 +164,11 @@ async function recognizeImageWithYandex(buffer: Buffer, mimeType: string = 'imag
       timeout: 30000,
     }
   )
-  return extractTextFromYandexResponse(res.data)
+  const text = extractTextFromYandexResponse(res.data)
+  if (!text) {
+    console.log('[MAX OCR RAW]', JSON.stringify(res.data).slice(0, 4000))
+  }
+  return text
 }
 
 type WebhookResponse = {
