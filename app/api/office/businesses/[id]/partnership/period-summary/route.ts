@@ -152,9 +152,19 @@ export const GET = withBusinessAccess(async (req) => {
       normToCanonical: Map<string, string>,
       masterToCanonical: Map<string, string>,
       masterToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
-      normTitleToOffers: Map<string, Map<string, { price: number; legalName: string }>>
+      normTitleToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
+      supplierToRows: Map<string, { name: string; norm: string; price: number }[]>,
+      counterparties: { id: string }[]
     ) => {
-      const resultItems: { name: string; originalName?: string; masterItemId: string | null; quantity: string; unit: string; offers: Record<string, number> }[] = []
+      const resultItems: {
+        name: string
+        originalName?: string
+        masterItemId: string | null
+        quantity: string
+        unit: string
+        offers: Record<string, number>
+        analogues?: Record<string, { name: string; price: number }[]>
+      }[] = []
       for (const it of requestItems) {
         const norm = normalizeForMatch(it.name)
         const masterItemId = norm ? (normToId.get(norm) ?? null) : null
@@ -171,6 +181,24 @@ export const GET = withBusinessAccess(async (req) => {
             for (const [sid, { price }] of byNorm) offers[sid] = price
           }
         }
+        const analogues: Record<string, { name: string; price: number }[]> = {}
+        const searchNorm = norm || normalizeForMatch(it.name)
+        if (searchNorm && searchNorm.length >= 2) {
+          for (const c of counterparties) {
+            const sid = c.id
+            if (offers[sid] != null) continue
+            const rows = supplierToRows.get(sid) || []
+            const matches: { name: string; price: number }[] = []
+            for (const row of rows) {
+              if (row.norm === searchNorm) continue
+              if (row.norm.startsWith(searchNorm) || row.norm.includes(' ' + searchNorm) || (searchNorm.length >= 3 && row.norm.includes(searchNorm))) {
+                matches.push({ name: row.name, price: row.price })
+              }
+            }
+            matches.sort((a, b) => a.price - b.price)
+            if (matches.length > 0) analogues[sid] = matches.slice(0, 5)
+          }
+        }
         resultItems.push({
           name: canonicalName,
           ...(canonicalName !== it.name && { originalName: it.name }),
@@ -178,6 +206,7 @@ export const GET = withBusinessAccess(async (req) => {
           quantity: it.quantity,
           unit: it.unit,
           offers,
+          ...(Object.keys(analogues).length > 0 && { analogues }),
         })
       }
       return resultItems
@@ -237,7 +266,19 @@ export const GET = withBusinessAccess(async (req) => {
 
     const masterToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
     const normTitleToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
+    const supplierToRows = new Map<string, { name: string; norm: string; price: number }[]>()
     const counterpartySet = new Map<string, string>()
+
+    const addRowToSupplier = (supplierId: string, name: string, price: number) => {
+      const norm = normalizeForMatch(name)
+      if (!norm) return
+      let rows = supplierToRows.get(supplierId)
+      if (!rows) {
+        rows = []
+        supplierToRows.set(supplierId, rows)
+      }
+      rows.push({ name, norm, price })
+    }
 
     for (const a of assignments) {
       const supplierId = a.priceList.business.id
@@ -280,6 +321,7 @@ export const GET = withBusinessAccess(async (req) => {
           const norm = normalizeForMatch(row.name)
           if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
         }
+        addRowToSupplier(supplierId, row.name, price)
       }
     }
 
@@ -300,6 +342,7 @@ export const GET = withBusinessAccess(async (req) => {
           const norm = normalizeForMatch(row.name)
           if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
         }
+        addRowToSupplier(supplierId, row.name, price)
       }
     }
 
@@ -328,7 +371,9 @@ export const GET = withBusinessAccess(async (req) => {
         normToCanonical,
         masterToCanonical,
         masterToOffers,
-        normTitleToOffers
+        normTitleToOffers,
+        supplierToRows,
+        counterparties
       )
 
       return {

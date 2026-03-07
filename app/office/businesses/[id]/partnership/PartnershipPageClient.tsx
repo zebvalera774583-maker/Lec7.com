@@ -139,7 +139,13 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
   const [periodDateFrom, setPeriodDateFrom] = useState('')
   const [periodDateTo, setPeriodDateTo] = useState('')
   const [periodSummaryData, setPeriodSummaryData] = useState<{
-    sections: { department: string; departmentLabel: string; date: string; requestNumbers: number[]; items: { name: string; quantity: string; unit: string; offers: Record<string, number> }[] }[]
+    sections: {
+      department: string
+      departmentLabel: string
+      date: string
+      requestNumbers: number[]
+      items: { name: string; quantity: string; unit: string; offers: Record<string, number>; analogues?: Record<string, { name: string; price: number }[]> }[]
+    }[]
     counterparties: { id: string; legalName: string }[]
   } | null>(null)
   const [periodSummaryLoading, setPeriodSummaryLoading] = useState(false)
@@ -2653,6 +2659,8 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.unit}</td>
                               {periodSummaryData.counterparties.map((c) => {
                                 const p = r.offers[c.id] ?? null
+                                const analogues = r.analogues?.[c.id] || []
+                                const hasAnalogue = analogues.length > 0 && p == null
                                 const isMin = p != null && rowMin != null && p === rowMin
                                 return (
                                   <td
@@ -2662,9 +2670,22 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                                       border: '1px solid #e5e7eb',
                                       textAlign: 'right',
                                       backgroundColor: isMin ? '#dcfce7' : 'white',
+                                      verticalAlign: 'top',
                                     }}
                                   >
-                                    {p != null ? p.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                                    {p != null ? (
+                                      p.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                                    ) : hasAnalogue ? (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-end' }}>
+                                        {analogues.slice(0, 3).map((a, i) => (
+                                          <div key={i} style={{ fontSize: '0.8125rem', color: '#4b5563' }}>
+                                            {a.name} {a.price.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₽
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      '—'
+                                    )}
                                   </td>
                                 )
                               })}
