@@ -160,6 +160,7 @@ export const GET = withBusinessAccess(async (req) => {
       normToId: Map<string, string>,
       normToCanonical: Map<string, string>,
       masterToCanonical: Map<string, string>,
+      masterItemIdToSearchNorms: Map<string, string[]>,
       masterToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
       normTitleToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
       supplierToRows: Map<string, { name: string; norm: string; price: number }[]>,
@@ -182,6 +183,14 @@ export const GET = withBusinessAccess(async (req) => {
         const masterItemId = norm ? (normToId.get(norm) ?? null) : null
         const canonicalName = masterItemId ? (masterToCanonical.get(masterItemId) ?? it.name) : it.name
 
+        const searchNorms: string[] = [searchNorm]
+        if (masterItemId) {
+          const extra = masterItemIdToSearchNorms.get(masterItemId) ?? []
+          for (const s of extra) {
+            if (s && !searchNorms.includes(s)) searchNorms.push(s)
+          }
+        }
+
         const offers: Record<string, number> = {}
 
         // 1) By masterItemId (catalog-linked rows)
@@ -192,9 +201,10 @@ export const GET = withBusinessAccess(async (req) => {
           }
         }
 
-        // 2) By normTitleToOffers: exact + fuzzy (e.g. "кинза" → "кинза свежая")
+        // 2) By normTitleToOffers: exact + fuzzy, включая синонимы (реган → базилик красный)
         for (const [priceNorm, bySupplier] of normTitleToOffers) {
-          if (!normMatchesPriceKey(searchNorm, priceNorm)) continue
+          const matches = searchNorms.some((sn) => normMatchesPriceKey(sn, priceNorm))
+          if (!matches) continue
           for (const [sid, { price }] of bySupplier) {
             const existing = offers[sid]
             if (existing == null || price < existing) offers[sid] = price
@@ -207,30 +217,33 @@ export const GET = withBusinessAccess(async (req) => {
           if (offers[sid] != null) continue
           const rows = supplierToRows.get(sid) || []
           for (const row of rows) {
-            if (row.norm === searchNorm) {
+            if (searchNorms.includes(row.norm)) {
               offers[sid] = row.price
               break
             }
           }
         }
 
-        // 4) Analogues: fuzzy match when no exact price (e.g. "кинза" → "Кинза свежая")
+        // 4) Analogues: fuzzy match when no exact price (e.g. "кинза" → "Кинза свежая", "реган" → "базилик красный")
         const analogues: Record<string, { name: string; price: number }[]> = {}
-        if (searchNorm.length >= 2) {
-          for (const c of counterparties) {
-            const sid = c.id
-            if (offers[sid] != null) continue
+        for (const c of counterparties) {
+          const sid = c.id
+          if (offers[sid] != null) continue
+          const allMatches: { name: string; price: number }[] = []
+          for (const sn of searchNorms) {
+            if (sn.length < 2) continue
             const rows = supplierToRows.get(sid) || []
-            const matches: { name: string; price: number }[] = []
             for (const row of rows) {
-              if (row.norm === searchNorm) continue // exact already in offers
-              if (row.norm.startsWith(searchNorm) || row.norm.includes(' ' + searchNorm) || (searchNorm.length >= 3 && row.norm.includes(searchNorm))) {
-                matches.push({ name: row.name, price: row.price })
+              if (searchNorms.includes(row.norm)) continue
+              if (row.norm.startsWith(sn) || row.norm.includes(' ' + sn) || (sn.length >= 3 && row.norm.includes(sn))) {
+                if (!allMatches.some((m) => m.name === row.name && m.price === row.price)) {
+                  allMatches.push({ name: row.name, price: row.price })
+                }
               }
             }
-            matches.sort((a, b) => a.price - b.price)
-            if (matches.length > 0) analogues[sid] = matches.slice(0, 5)
           }
+          allMatches.sort((a, b) => a.price - b.price)
+          if (allMatches.length > 0) analogues[sid] = allMatches.slice(0, 5)
         }
 
         // Include row if at least one offer or analogue (including items not in catalog)
@@ -392,8 +405,17 @@ export const GET = withBusinessAccess(async (req) => {
       : partnerCounterparties
 
     const masterToCanonical = new Map<string, string>()
+    const masterItemIdToSearchNorms = new Map<string, string[]>()
     for (const item of catalogItems) {
       masterToCanonical.set(item.id, item.canonicalName)
+      const norms: string[] = []
+      const cn = normalizeForMatch(item.canonicalName)
+      if (cn) norms.push(cn)
+      for (const syn of item.synonyms) {
+        const sn = normalizeForMatch(syn)
+        if (sn && !norms.includes(sn)) norms.push(sn)
+      }
+      if (norms.length > 0) masterItemIdToSearchNorms.set(item.id, norms)
     }
 
     const sections = sortedGroups.map((group) => {
@@ -407,6 +429,7 @@ export const GET = withBusinessAccess(async (req) => {
         normToId,
         normToCanonical,
         masterToCanonical,
+        masterItemIdToSearchNorms,
         masterToOffers,
         normTitleToOffers,
         supplierToRows,
