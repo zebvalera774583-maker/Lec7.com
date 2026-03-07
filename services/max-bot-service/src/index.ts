@@ -2,7 +2,6 @@ import 'dotenv/config'
 import express from 'express'
 import axios from 'axios'
 import { Bot } from '@maxhub/max-bot-api'
-import { createWorker, OEM } from 'tesseract.js'
 
 const PORT = 3005
 const MAX_BOT_TOKEN = process.env.MAX_BOT_TOKEN
@@ -113,19 +112,50 @@ function logRawUpdate(ctx: any, eventType: string) {
   console.log('[MAX raw update]', out)
 }
 
-/** OCR: extract text from image buffer (runs locally in Node, no Next.js bundling) */
-async function extractTextFromImage(buffer: Buffer): Promise<string> {
-  console.log('[OCR] start')
-  const worker = await createWorker('rus+eng', OEM.LSTM_ONLY, { logger: () => {} })
-  try {
-    const imageInput = `data:image/png;base64,${buffer.toString('base64')}`
-    const { data } = await worker.recognize(imageInput)
-    const text = data.text?.trim() ?? ''
-    console.log('[OCR] success')
-    return text
-  } finally {
-    await worker.terminate()
+const YANDEX_OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
+
+function extractTextFromYandexResponse(data: unknown): string {
+  if (!data || typeof data !== 'object') return ''
+  const obj = data as Record<string, unknown>
+  const root = (obj.result ?? obj.textAnnotation ?? obj) as Record<string, unknown> | undefined
+  if (!root) return ''
+  const directText = root.text
+  if (typeof directText === 'string' && directText.trim()) return directText.trim()
+  const blocks = root.blocks as Array<Record<string, unknown>> | undefined
+  if (!Array.isArray(blocks)) return ''
+  const lines: string[] = []
+  for (const block of blocks) {
+    const blockLines = block.lines as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(blockLines)) continue
+    for (const line of blockLines) {
+      const text = line.text
+      if (typeof text === 'string' && text.trim()) lines.push(text.trim())
+    }
   }
+  return lines.join('\n')
+}
+
+/** OCR: Yandex Vision OCR (same as Lec7). Env: YANDEX_API_KEY, YANDEX_FOLDER_ID */
+async function recognizeImageWithYandex(buffer: Buffer): Promise<string> {
+  const apiKey = process.env.YANDEX_API_KEY?.trim()
+  const folderId = process.env.YANDEX_FOLDER_ID?.trim()
+  if (!apiKey || !folderId) {
+    throw new Error('YANDEX_API_KEY and YANDEX_FOLDER_ID are required for Yandex Vision OCR')
+  }
+  const content = buffer.toString('base64')
+  const res = await axios.post(
+    YANDEX_OCR_URL,
+    { mimeType: 'image/png', languageCodes: ['ru'], model: 'table', content },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Api-Key ${apiKey}`,
+        'x-folder-id': folderId,
+      },
+      timeout: 30000,
+    }
+  )
+  return extractTextFromYandexResponse(res.data)
 }
 
 type WebhookResponse = {
@@ -254,14 +284,50 @@ bot.on('message_created', async (ctx: any) => {
     const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
     if (url) {
       try {
+        console.log('[MAX PHOTO] received')
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
         const buffer = Buffer.from(imgRes.data)
-        messageText = await extractTextFromImage(buffer)
-        if (messageText) useOcrSource = true
+        console.log('[MAX PHOTO] downloaded bytes=', buffer.length)
+
+        const ocrText = await recognizeImageWithYandex(buffer)
+        console.log('[MAX OCR TEXT]\n', ocrText)
+
+        if (!ocrText.trim()) {
+          await sendReply(ctx, 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
+          return
+        }
+
+        messageText = ocrText
+        useOcrSource = true
+
+        const normalizedText = messageText
+        const textForBot = normalizedText
+        console.log('[MAX PHOTO] normalizedText=\n', normalizedText)
+        console.log('[MAX PHOTO] textForBot=\n', textForBot)
+        console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', textForBot, 'ocr=true')
+
+        const data = await forwardToWebhook(
+          chatId,
+          userId,
+          textForBot,
+          undefined,
+          messageId,
+          ts,
+          'ocr'
+        )
+
+        console.log('[handleBotEvent -> MAX]', JSON.stringify(data))
+
+        const replyText = data?.replyText ?? 'Спасибо, заявка принята'
+        console.log('[MAX final reply]', replyText)
+        await sendReply(ctx, replyText, data?.replyInlineKeyboard)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         console.log('[OCR] fail:', msg)
+        await sendReply(ctx, 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
+        return
       }
+      return
     }
   }
 
@@ -271,7 +337,7 @@ bot.on('message_created', async (ctx: any) => {
 
   if (!messageText.trim()) return
 
-  console.log('[MAX incoming]', { chatId, userId, text: messageText.slice(0, 50), ocr: useOcrSource })
+  console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', messageText, 'ocr=', useOcrSource)
 
   try {
     const data = await forwardToWebhook(
@@ -284,7 +350,10 @@ bot.on('message_created', async (ctx: any) => {
       useOcrSource ? 'ocr' : undefined
     )
 
+    console.log('[handleBotEvent -> MAX]', JSON.stringify(data))
+
     const replyText = data?.replyText ?? 'Спасибо, заявка принята'
+    console.log('[MAX final reply]', replyText)
     await sendReply(ctx, replyText, data?.replyInlineKeyboard)
     console.log('[MAX outgoing]', { chatId, replyText: replyText.slice(0, 50) })
   } catch (err: any) {
