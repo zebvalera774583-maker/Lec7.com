@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
 import { recognizeImage } from '@/lib/ai/yandexVisionOCR'
+import { normalizeOrderText } from '@/lib/ai/yandexNormalizeOrder'
 
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token'
 const TELEGRAM_API = 'https://api.telegram.org'
@@ -157,12 +158,17 @@ export async function POST(req: NextRequest) {
           await sendTelegramMessage(String(chatId), 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
           return NextResponse.json({ ok: true })
         }
+
+        const normalizedText = await normalizeOrderText(ocrText)
+        const textForBot = normalizedText.trim() || ocrText
+        console.log('[NORMALIZED ORDER TEXT]', textForBot)
+
         const event = {
           channel: 'telegram' as const,
           chatId: String(chatId),
           userId: body?.message?.from?.id != null ? String(body.message.from.id) : undefined,
           username: body?.message?.from?.username,
-          text: ocrText,
+          text: textForBot,
           source: 'ocr' as const,
           raw: body,
         }
