@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
-import { processOrderImage } from '@/lib/ocr/orderImage'
+import { recognizeImage } from '@/lib/ai/yandexVisionOCR'
 
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token'
 const TELEGRAM_API = 'https://api.telegram.org'
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
   if (chatId == null) return NextResponse.json({ ok: true })
 
-  // 2a) Фото — OCR и handleBotEvent с source:'ocr'
+  // 2a) Фото — OCR (Yandex Vision) и handleBotEvent с source:'ocr'
   if (photos?.length) {
     const largest = photos[photos.length - 1]
     const fileId = largest?.file_id
@@ -149,9 +149,12 @@ export async function POST(req: NextRequest) {
         const imgRes = await fetch(fileUrl)
         const arrayBuffer = await imgRes.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
-        const { text: ocrText } = await processOrderImage(buffer)
+
+        const ocrText = await recognizeImage(buffer)
+        console.log('[OCR TEXT]', ocrText)
+
         if (!ocrText.trim()) {
-          await sendTelegramMessage(String(chatId), 'Не удалось распознать текст на изображении.')
+          await sendTelegramMessage(String(chatId), 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
           return NextResponse.json({ ok: true })
         }
         const event = {
