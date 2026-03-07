@@ -120,9 +120,13 @@ function extractTextFromYandexResponse(data: unknown): string {
   const obj = data as Record<string, unknown>
   const root = (obj.result ?? obj.textAnnotation ?? obj) as Record<string, unknown> | undefined
   if (!root) return ''
+  const textAnnotation = root.textAnnotation as Record<string, unknown> | undefined
+  if (textAnnotation && typeof textAnnotation.text === 'string' && textAnnotation.text.trim()) {
+    return textAnnotation.text.trim()
+  }
   const directText = root.text
   if (typeof directText === 'string' && directText.trim()) return directText.trim()
-  const blocks = root.blocks as Array<Record<string, unknown>> | undefined
+  const blocks = (root.blocks ?? textAnnotation?.blocks) as Array<Record<string, unknown>> | undefined
   if (!Array.isArray(blocks)) return ''
   const lines: string[] = []
   for (const block of blocks) {
