@@ -194,6 +194,7 @@ async function forwardToWebhook(
 ) {
   const payload: Record<string, unknown> = { chatId, userId, text, messageId, ts, choice }
   if (source) payload.source = source
+  const timeoutMs = source === 'ocr' ? 60000 : 15000
   const { data } = await axios.post<WebhookResponse>(
     `${LEC7_BASE_URL}/api/integrations/max/webhook`,
     payload,
@@ -202,7 +203,7 @@ async function forwardToWebhook(
         'Content-Type': 'application/json',
         'X-LEC7-MAX-SECRET': LEC7_MAX_SECRET,
       },
-      timeout: 15000,
+      timeout: timeoutMs,
     }
   )
   return data
@@ -300,6 +301,7 @@ bot.on('message_created', async (ctx: any) => {
   if (!messageText.trim() && imageAtt) {
     const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
     if (url) {
+      let textForBot: string
       try {
         console.log('[MAX PHOTO] received')
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
@@ -323,13 +325,20 @@ bot.on('message_created', async (ctx: any) => {
 
         messageText = ocrText
         useOcrSource = true
+        textForBot = messageText
 
         const normalizedText = messageText
-        const textForBot = normalizedText
         console.log('[MAX PHOTO] normalizedText=\n', normalizedText)
         console.log('[MAX PHOTO] textForBot=\n', textForBot)
         console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', textForBot, 'ocr=true')
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.log('[OCR] fail:', msg)
+        await sendReply(ctx, 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
+        return
+      }
 
+      try {
         const data = await forwardToWebhook(
           chatId,
           userId,
@@ -347,9 +356,8 @@ bot.on('message_created', async (ctx: any) => {
         await sendReply(ctx, replyText, data?.replyInlineKeyboard)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
-        console.log('[OCR] fail:', msg)
+        console.log('[MAX OCR -> webhook] fail:', msg)
         await sendReply(ctx, 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
-        return
       }
       return
     }
