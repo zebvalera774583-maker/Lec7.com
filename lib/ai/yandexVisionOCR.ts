@@ -52,7 +52,7 @@ export async function recognizeImage(buffer: Buffer): Promise<string> {
   const body = {
     mimeType: 'image/png',
     languageCodes: ['ru'],
-    model: 'page',
+    model: 'table',
     content,
   }
 
