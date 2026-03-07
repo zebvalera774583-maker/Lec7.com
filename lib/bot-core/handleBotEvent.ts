@@ -223,6 +223,20 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     return { messages: ['Напишите заявку заново.'], removeKeyboard: true }
   }
 
+  // awaiting_ocr_confirm + новое текстовое сообщение (не YES/NO) → сброс и обработка как новая заявка
+  if (
+    stateData?.type === 'awaiting_ocr_confirm' &&
+    event.text.trim() &&
+    choice !== 'YES' &&
+    choice !== 'NO'
+  ) {
+    await prisma.botChatState.update({
+      where: { channel_chatId: { channel, chatId } },
+      data: { stateJson: { type: 'confirmed' } },
+    })
+    stateData = { type: 'confirmed' } as typeof stateData
+  }
+
   // Обработка выбора подразделения (callback set_department|<slug>)
   const setDeptMatch = typeof choice === 'string' ? choice.match(/^set_department\|([a-z_]+)$/) : null
   if (setDeptMatch && stateData?.type === 'awaiting_department' && stateData?.pendingItems) {
