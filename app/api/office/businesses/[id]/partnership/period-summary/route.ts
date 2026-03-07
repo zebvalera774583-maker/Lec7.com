@@ -246,9 +246,7 @@ export const GET = withBusinessAccess(async (req) => {
           if (allMatches.length > 0) analogues[sid] = allMatches.slice(0, 5)
         }
 
-        // Include row if at least one offer or analogue (including items not in catalog)
-        if (Object.keys(offers).length === 0 && Object.keys(analogues).length === 0) continue
-
+        // Include row всегда — показываем позицию даже без цен (Тимьян и т.п.)
         resultItems.push({
           name: canonicalName,
           ...(canonicalName !== it.name && { originalName: it.name }),
