@@ -101,9 +101,10 @@ export const POST = withBusinessAccess(async (req, user) => {
       }),
     ])
 
-    // 3) Build masterItemId -> offers and normTitle -> offers (for rows without masterItemId)
+    // 3) Build masterItemId -> offers, normTitle -> offers, and supplierId -> rows (for analogues)
     const masterToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
     const normTitleToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
+    const supplierToRows = new Map<string, { name: string; norm: string; price: number }[]>()
     const counterpartySet = new Map<string, string>()
 
     for (const a of assignments) {
@@ -131,6 +132,17 @@ export const POST = withBusinessAccess(async (req, user) => {
       counterpartySet.set(supplierId, legalName)
     }
 
+    const addRowToSupplier = (supplierId: string, name: string, price: number) => {
+      const norm = normalizeForMatch(name)
+      if (!norm) return
+      let rows = supplierToRows.get(supplierId)
+      if (!rows) {
+        rows = []
+        supplierToRows.set(supplierId, rows)
+      }
+      rows.push({ name, norm, price })
+    }
+
     for (const a of assignments) {
       const supplierId = a.priceList.business.id
       const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
@@ -147,6 +159,7 @@ export const POST = withBusinessAccess(async (req, user) => {
           const norm = normalizeForMatch(row.name)
           if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
         }
+        addRowToSupplier(supplierId, row.name, price)
       }
     }
 
@@ -167,6 +180,7 @@ export const POST = withBusinessAccess(async (req, user) => {
           const norm = normalizeForMatch(row.name)
           if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
         }
+        addRowToSupplier(supplierId, row.name, price)
       }
     }
 
@@ -220,6 +234,27 @@ export const POST = withBusinessAccess(async (req, user) => {
         }
       }
 
+      // 3) Analogues: для поставщиков без точной цены — похожие позиции (напр. картофель → картофель белый)
+      const analogues: Record<string, { name: string; price: number }[]> = {}
+      const searchNorm = norm || normalizeForMatch(it.name)
+      if (searchNorm && searchNorm.length >= 2) {
+        for (const { id: sid } of counterparties) {
+          if (offers[sid] != null) continue
+          const rows = supplierToRows.get(sid) || []
+          const matches: { name: string; price: number }[] = []
+          for (const row of rows) {
+            if (row.norm === searchNorm) continue
+            if (row.norm.startsWith(searchNorm) || row.norm.includes(' ' + searchNorm) || (searchNorm.length >= 3 && row.norm.includes(searchNorm))) {
+              matches.push({ name: row.name, price: row.price })
+            }
+          }
+          matches.sort((a, b) => a.price - b.price)
+          if (matches.length > 0) {
+            analogues[sid] = matches.slice(0, 5)
+          }
+        }
+      }
+
       resultItems.push({
         name: canonicalName ?? it.name,
         ...(canonicalName && canonicalName !== it.name && { originalName: it.name }),
@@ -227,7 +262,7 @@ export const POST = withBusinessAccess(async (req, user) => {
         quantity: it.quantity,
         unit: it.unit,
         offers,
-        analogues: {}, // No analogues for master-catalog flow
+        analogues: Object.keys(analogues).length > 0 ? analogues : undefined,
       })
     }
 
