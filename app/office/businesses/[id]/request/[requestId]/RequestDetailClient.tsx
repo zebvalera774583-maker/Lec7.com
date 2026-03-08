@@ -120,6 +120,7 @@ export default function RequestDetailClient({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
                 <tr>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500, width: '3rem' }}>№</th>
                   <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Наименование</th>
                   <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #e5e7eb', background: '#f9fafb', fontWeight: 500 }}>Вес</th>
                 </tr>
@@ -132,6 +133,7 @@ export default function RequestDetailClient({
                   const weight = unit ? `${qty} ${unit}` : qty
                   return (
                     <tr key={i}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{title}</td>
                       <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{weight}</td>
                     </tr>
