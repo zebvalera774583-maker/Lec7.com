@@ -24,8 +24,9 @@ ALTER TABLE "ActiveCounterparty" ADD CONSTRAINT "ActiveCounterparty_businessId_f
 ALTER TABLE "ActiveCounterparty" ADD CONSTRAINT "ActiveCounterparty_counterpartyBusinessId_fkey" FOREIGN KEY ("counterpartyBusinessId") REFERENCES "Business"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Backfill: создать записи из существующих ACTIVE PriceAssignment
+-- id via md5 (extension-free, built-in only)
 INSERT INTO "ActiveCounterparty" ("id", "businessId", "counterpartyBusinessId", "createdAt")
-SELECT encode(gen_random_bytes(12), 'hex'), pl."businessId", pa."counterpartyBusinessId", COALESCE(pa."respondedAt", pa."createdAt")
+SELECT md5(random()::text || clock_timestamp()::text || pa.id || pl."businessId" || pa."counterpartyBusinessId"), pl."businessId", pa."counterpartyBusinessId", COALESCE(pa."respondedAt", pa."createdAt")
 FROM "PriceAssignment" pa
 JOIN "PriceList" pl ON pl.id = pa."priceListId"
 WHERE pa.status = 'ACTIVE'
