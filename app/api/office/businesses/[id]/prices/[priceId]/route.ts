@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
+import { parsePriceValue } from '@/lib/parsePrice'
 
 export const GET = withBusinessAccess(async (req, user) => {
   try {
@@ -188,8 +189,8 @@ export const PUT = withBusinessAccess(async (req, user) => {
             order: index + 1,
             name: row.name || '',
             unit: row.unit || null,
-            priceWithVat: row.priceWithVat ? parseFloat(String(row.priceWithVat)) : null,
-            priceWithoutVat: row.priceWithoutVat ? parseFloat(String(row.priceWithoutVat)) : null,
+            priceWithVat: row.priceWithVat != null ? parsePriceValue(row.priceWithVat) : null,
+            priceWithoutVat: row.priceWithoutVat != null ? parsePriceValue(row.priceWithoutVat) : null,
             extra: row.extra || null,
           })),
         })

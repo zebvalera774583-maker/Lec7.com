@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import * as XLSX from 'xlsx'
+import { parsePriceValue } from '@/lib/parsePrice'
 import PriceUploadModal from './PriceUploadModal'
 import PriceImportModal from './PriceImportModal'
 import CreateDerivedPriceModal from './CreateDerivedPriceModal'
@@ -794,18 +795,14 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
           let priceWithVatNum: number | null = null
           let priceWithoutVatNum: number | null = null
           
-          if (priceWithVat && String(priceWithVat).trim() !== '') {
-            const parsed = parseFloat(String(priceWithVat))
-            if (!isNaN(parsed)) {
-              priceWithVatNum = parsed
-            }
+          if (priceWithVat != null && String(priceWithVat).trim() !== '') {
+            const parsed = parsePriceValue(priceWithVat)
+            if (parsed != null) priceWithVatNum = parsed
           }
           
-          if (priceWithoutVat && String(priceWithoutVat).trim() !== '') {
-            const parsed = parseFloat(String(priceWithoutVat))
-            if (!isNaN(parsed)) {
-              priceWithoutVatNum = parsed
-            }
+          if (priceWithoutVat != null && String(priceWithoutVat).trim() !== '') {
+            const parsed = parsePriceValue(priceWithoutVat)
+            if (parsed != null) priceWithoutVatNum = parsed
           }
 
           // Убираем базовые поля из extra
@@ -852,18 +849,14 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
           let priceWithVatNum: number | null = null
           let priceWithoutVatNum: number | null = null
           
-          if (priceWithVat && String(priceWithVat).trim() !== '') {
-            const parsed = parseFloat(String(priceWithVat))
-            if (!isNaN(parsed)) {
-              priceWithVatNum = parsed
-            }
+          if (priceWithVat != null && String(priceWithVat).trim() !== '') {
+            const parsed = parsePriceValue(priceWithVat)
+            if (parsed != null) priceWithVatNum = parsed
           }
           
-          if (priceWithoutVat && String(priceWithoutVat).trim() !== '') {
-            const parsed = parseFloat(String(priceWithoutVat))
-            if (!isNaN(parsed)) {
-              priceWithoutVatNum = parsed
-            }
+          if (priceWithoutVat != null && String(priceWithoutVat).trim() !== '') {
+            const parsed = parsePriceValue(priceWithoutVat)
+            if (parsed != null) priceWithoutVatNum = parsed
           }
 
           // Убираем базовые поля из extra
@@ -946,8 +939,8 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
         return {
           name: name || '',
           unit: unit || null,
-          priceWithVat: priceWithVat ? parseFloat(String(priceWithVat)) : null,
-          priceWithoutVat: priceWithoutVat ? parseFloat(String(priceWithoutVat)) : null,
+          priceWithVat: priceWithVat != null ? parsePriceValue(priceWithVat) : null,
+          priceWithoutVat: priceWithoutVat != null ? parsePriceValue(priceWithoutVat) : null,
           extra: extra || null,
         }
       })

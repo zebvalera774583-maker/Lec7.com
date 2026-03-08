@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
+import { parsePriceValue } from '@/lib/parsePrice'
 
 export const GET = withBusinessAccess(async (req, user) => {
   try {
@@ -119,18 +120,14 @@ export const POST = withBusinessAccess(async (req, user) => {
           let priceWithVatNum: number | null = null
           let priceWithoutVatNum: number | null = null
 
-          if (row.priceWithVat && String(row.priceWithVat).trim() !== '') {
-            const parsed = parseFloat(String(row.priceWithVat))
-            if (!isNaN(parsed)) {
-              priceWithVatNum = parsed
-            }
+          if (row.priceWithVat != null && String(row.priceWithVat).trim() !== '') {
+            const parsed = parsePriceValue(row.priceWithVat)
+            if (parsed != null) priceWithVatNum = parsed
           }
 
-          if (row.priceWithoutVat && String(row.priceWithoutVat).trim() !== '') {
-            const parsed = parseFloat(String(row.priceWithoutVat))
-            if (!isNaN(parsed)) {
-              priceWithoutVatNum = parsed
-            }
+          if (row.priceWithoutVat != null && String(row.priceWithoutVat).trim() !== '') {
+            const parsed = parsePriceValue(row.priceWithoutVat)
+            if (parsed != null) priceWithoutVatNum = parsed
           }
 
           return {
