@@ -46,12 +46,12 @@ function matchHeader(h: string, patterns: RegExp): boolean {
 
 function parsePrice(val: unknown): number | null {
   if (val == null || val === '') return null
+  if (typeof val === 'number' && !Number.isNaN(val)) return val
   let s = String(val).trim()
   if (!s) return null
-  s = s.replace(/\s/g, '')
+  s = s.replace(/[\s\u00A0\u202F]/g, '')
   s = s.replace(',', '.')
-  // Убираем точки как разделители тысяч: 1.030 → 1030 (Excel/европейский формат)
-  s = s.replace(/\.(\d{3})(?=$|[^\d])/g, '$1')
+  s = s.replace(/\.(\d{3})/g, '$1')
   const num = parseFloat(s)
   return Number.isNaN(num) ? null : num
 }
@@ -164,7 +164,7 @@ export function parseFileToItems(
     const firstSheet = wb.SheetNames[0]
     if (!firstSheet) throw new Error('В файле нет листов')
     const ws = wb.Sheets[firstSheet]
-    const aoa = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: false })
+    const aoa = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: '', raw: true })
     rows = aoa as string[][]
   } else {
     throw new Error(`Неподдерживаемый формат файла. Используйте .xlsx, .xls или .csv`)
@@ -332,6 +332,9 @@ export function parseFileToItems(
   if (items.length > 0 && noPriceCount / items.length >= 0.7) {
     warnings.push('⚠ Возможно, файл имеет сложную структуру. Проверьте, что в таблице есть колонки «Наименование» и «Цена».')
   }
+
+  // Сортируем позиции по наименованию (алфавитный порядок)
+  items.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ru'))
 
   return { items, warnings }
 }

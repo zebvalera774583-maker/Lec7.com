@@ -6,12 +6,12 @@
  */
 export function parsePriceValue(val: unknown): number | null {
   if (val == null || val === '') return null
+  if (typeof val === 'number' && !Number.isNaN(val)) return val
   let s = String(val).trim()
   if (!s) return null
-  s = s.replace(/\s/g, '')
+  s = s.replace(/[\s\u00A0\u202F]/g, '')
   s = s.replace(',', '.')
-  // Убираем точки как разделители тысяч: 1.030 → 1030 (точка перед ровно 3 цифрами)
-  s = s.replace(/\.(\d{3})(?=$|[^\d])/g, '$1')
+  s = s.replace(/\.(\d{3})/g, '$1')
   const num = parseFloat(s)
   return Number.isNaN(num) ? null : num
 }
