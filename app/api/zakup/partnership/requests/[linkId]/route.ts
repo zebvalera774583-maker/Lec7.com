@@ -70,6 +70,11 @@ export async function POST(
       },
     })
 
+    if (action === 'accept') {
+      const { ensureActiveCounterparty } = await import('@/lib/activeCounterparty')
+      await ensureActiveCounterparty(assignment.priceList.businessId, assignment.counterpartyBusinessId)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Zakup partnership request error:', error)

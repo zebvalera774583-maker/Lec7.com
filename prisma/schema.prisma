@@ -77,6 +77,8 @@ model Business {
   agentConversations AgentConversation[] @relation("AgentConversations")
   priceLists      PriceList[]
   assignedPrices  PriceAssignment[] @relation("AssignedPrices")
+  activeCounterpartiesAsBusiness ActiveCounterparty[] @relation("ActiveCounterpartyBusiness")
+  activeCounterpartiesAsCounterparty ActiveCounterparty[] @relation("ActiveCounterpartyCounterparty")
   incomingRequestsReceived IncomingRequest[] @relation("IncomingRequestRecipient")
   incomingRequestsSent     IncomingRequest[] @relation("IncomingRequestSender")
   telegramConnectTokens    TelegramConnectToken[]
@@ -783,4 +785,19 @@ model PriceAssignment {
   @@index([priceListId])
   @@index([counterpartyBusinessId])
   @@index([status])
+}
+
+// Связь «действующий контрагент» — не привязана к прайсу, сохраняется при удалении прайса
+model ActiveCounterparty {
+  id                    String   @id @default(cuid())
+  businessId            String
+  counterpartyBusinessId String
+  createdAt             DateTime @default(now())
+
+  business          Business @relation("ActiveCounterpartyBusiness", fields: [businessId], references: [id], onDelete: Cascade)
+  counterpartyBusiness Business @relation("ActiveCounterpartyCounterparty", fields: [counterpartyBusinessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, counterpartyBusinessId])
+  @@index([businessId])
+  @@index([counterpartyBusinessId])
 }

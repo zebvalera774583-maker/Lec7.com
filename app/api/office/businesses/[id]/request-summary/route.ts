@@ -76,12 +76,21 @@ export const POST = withBusinessAccess(async (req, user) => {
       normToCanonical.delete(k)
     }
 
-    // 2) Load ALL price rows — действующий контрагент = видит все прайсы поставщика (не только назначенные)
-    const activeAssignments = await prisma.priceAssignment.findMany({
-      where: { counterpartyBusinessId: businessId, status: 'ACTIVE' },
-      select: { priceList: { select: { businessId: true } } },
+    // 2) Load ALL price rows — действующий контрагент = видит все прайсы поставщика (связь из ActiveCounterparty)
+    const activeCounterparties = await prisma.activeCounterparty.findMany({
+      where: {
+        OR: [
+          { counterpartyBusinessId: businessId },
+          { businessId },
+        ],
+      },
+      select: { businessId: true, counterpartyBusinessId: true },
     })
-    const activeSupplierIds = [...new Set(activeAssignments.map((a) => a.priceList.businessId))]
+    const activeSupplierIds = [...new Set(
+      activeCounterparties.map((a) =>
+        a.counterpartyBusinessId === businessId ? a.businessId : a.counterpartyBusinessId
+      )
+    )]
 
     const [ownPriceLists, counterpartyPriceLists] = await Promise.all([
       prisma.priceList.findMany({

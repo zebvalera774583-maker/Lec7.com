@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 import { parsePriceValue } from '@/lib/parsePrice'
+import { ensureActiveCounterparty } from '@/lib/activeCounterparty'
 
 export const GET = withBusinessAccess(async (req, user) => {
   try {
@@ -112,6 +113,9 @@ export const POST = withBusinessAccess(async (req, user) => {
           })),
           skipDuplicates: true,
         })
+        for (const a of existingAssignments) {
+          await ensureActiveCounterparty(businessId, a.counterpartyBusinessId)
+        }
       }
 
       // Если есть строки, создаём их

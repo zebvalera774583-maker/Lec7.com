@@ -20,78 +20,53 @@ export const GET = withBusinessAccess(async (req, user) => {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
-    // 1) Активные контрагенты, где мы получатель: кто нам назначил прайс и мы приняли
-    const activeAsRecipient = await prisma.priceAssignment.findMany({
-      where: {
-        counterpartyBusinessId: businessId,
-        status: 'ACTIVE',
-      },
-      include: {
-        priceList: {
-          include: {
-            business: {
-              select: {
-                id: true,
-                legalName: true,
-                name: true,
-                slug: true,
-                profile: {
-                  select: {
-                    residentNumber: true,
-                  },
-                },
-              },
+    // Активные контрагенты — из таблицы ActiveCounterparty (связь не привязана к прайсу, сохраняется при удалении)
+    const [asBusiness, asCounterparty] = await Promise.all([
+      prisma.activeCounterparty.findMany({
+        where: { businessId },
+        include: {
+          counterpartyBusiness: {
+            select: {
+              id: true,
+              legalName: true,
+              name: true,
+              slug: true,
+              profile: { select: { residentNumber: true } },
             },
           },
         },
-      },
-    })
-
-    // 2) Активные контрагенты, где мы отправитель: кому мы назначили прайс и они приняли
-    const activeAsSender = await prisma.priceAssignment.findMany({
-      where: {
-        status: 'ACTIVE',
-        priceList: {
-          businessId,
-        },
-      },
-      include: {
-        counterpartyBusiness: {
-          select: {
-            id: true,
-            legalName: true,
-            name: true,
-            slug: true,
-            profile: {
-              select: {
-                residentNumber: true,
-              },
+      }),
+      prisma.activeCounterparty.findMany({
+        where: { counterpartyBusinessId: businessId },
+        include: {
+          business: {
+            select: {
+              id: true,
+              legalName: true,
+              name: true,
+              slug: true,
+              profile: { select: { residentNumber: true } },
             },
           },
         },
-      },
-    })
+      }),
+    ])
 
-    // Уникализируем по partnerBusinessId (один контрагент = одна запись), объединяя обе стороны
     const activeCounterpartiesMap = new Map()
-    activeAsRecipient.forEach((assignment) => {
-      const partnerBusinessId = assignment.priceList.businessId
-      if (!activeCounterpartiesMap.has(partnerBusinessId)) {
-        const partner = assignment.priceList.business
-        activeCounterpartiesMap.set(partnerBusinessId, {
-          partnerBusinessId: partner.id,
-          legalName: partner.legalName,
-          name: partner.name,
-          slug: partner.slug,
-          residentNumber: partner.profile?.residentNumber || null,
-        })
-      }
+    asBusiness.forEach((ac) => {
+      const partner = ac.counterpartyBusiness
+      activeCounterpartiesMap.set(partner.id, {
+        partnerBusinessId: partner.id,
+        legalName: partner.legalName,
+        name: partner.name,
+        slug: partner.slug,
+        residentNumber: partner.profile?.residentNumber || null,
+      })
     })
-    activeAsSender.forEach((assignment) => {
-      const partnerBusinessId = assignment.counterpartyBusinessId
-      if (!activeCounterpartiesMap.has(partnerBusinessId)) {
-        const partner = assignment.counterpartyBusiness
-        activeCounterpartiesMap.set(partnerBusinessId, {
+    asCounterparty.forEach((ac) => {
+      const partner = ac.business
+      if (!activeCounterpartiesMap.has(partner.id)) {
+        activeCounterpartiesMap.set(partner.id, {
           partnerBusinessId: partner.id,
           legalName: partner.legalName,
           name: partner.name,

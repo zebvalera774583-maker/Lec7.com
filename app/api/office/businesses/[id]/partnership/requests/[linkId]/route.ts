@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
+import { ensureActiveCounterparty } from '@/lib/activeCounterparty'
 
 export const POST = withBusinessAccess(async (req, user) => {
   try {
@@ -64,6 +65,10 @@ export const POST = withBusinessAccess(async (req, user) => {
         respondedAt: new Date(),
       },
     })
+
+    if (action === 'accept') {
+      await ensureActiveCounterparty(assignment.priceList.businessId, assignment.counterpartyBusinessId)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

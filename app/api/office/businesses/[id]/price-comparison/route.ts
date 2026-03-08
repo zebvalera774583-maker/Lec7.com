@@ -4,11 +4,9 @@ import { withBusinessAccess } from '@/lib/access'
 
 const ROWS_SQL = `
 WITH active_counterparties AS (
-  SELECT DISTINCT pl."businessId" AS "supplierBusinessId"
-  FROM "PriceAssignment" pa
-  JOIN "PriceList" pl ON pl.id = pa."priceListId"
-  WHERE pa."counterpartyBusinessId" = $1
-    AND pa.status = 'ACTIVE'::"PartnerLinkStatus"
+  SELECT ac."businessId" AS "supplierBusinessId"
+  FROM "ActiveCounterparty" ac
+  WHERE ac."counterpartyBusinessId" = $1
 ),
 accepted_prices AS (
   SELECT
@@ -125,11 +123,18 @@ export const GET = withBusinessAccess(async (req, user) => {
 
     const categoryFilter = { OR: [{ category: categoryParam }, { category: null }] }
 
-    const activeAssignments = await prisma.priceAssignment.findMany({
-      where: { counterpartyBusinessId: businessId, status: 'ACTIVE' },
-      select: { priceList: { select: { businessId: true } } },
+    const activeCounterparties = await prisma.activeCounterparty.findMany({
+      where: {
+        OR: [
+          { counterpartyBusinessId: businessId },
+          { businessId },
+        ],
+      },
+      select: { businessId: true, counterpartyBusinessId: true },
     })
-    const activeSupplierIds = [...new Set(activeAssignments.map((a) => a.priceList.businessId))]
+    const activeSupplierIds = [...new Set(
+      activeCounterparties.map((a) => (a.counterpartyBusinessId === businessId ? a.businessId : a.counterpartyBusinessId))
+    )]
 
     const [ownPriceLists, counterpartyPriceLists] = await Promise.all([
       prisma.priceList.findMany({
