@@ -30,6 +30,16 @@ export const DELETE = withBusinessAccess(async (req, user) => {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
+    // Удаляем из ActiveCounterparty (связи в обе стороны: A↔B и B↔A)
+    await prisma.activeCounterparty.deleteMany({
+      where: {
+        OR: [
+          { businessId, counterpartyBusinessId: partnerBusinessId },
+          { businessId: partnerBusinessId, counterpartyBusinessId: businessId },
+        ],
+      },
+    })
+
     // Переводим все активные связи между бизнесами в DECLINED (в обе стороны)
     await prisma.priceAssignment.updateMany({
       where: {
