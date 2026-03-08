@@ -46,28 +46,24 @@ function matchHeader(h: string, patterns: RegExp): boolean {
 
 function parsePrice(val: unknown): number | null {
   if (val == null || val === '') return null
-  const s = String(val).trim()
+  let s = String(val).trim()
   if (!s) return null
-  const normalized = s.replace(/\s/g, '').replace(',', '.')
-  const num = parseFloat(normalized)
+  s = s.replace(/\s/g, '')
+  s = s.replace(',', '.')
+  // Убираем точки как разделители тысяч: 1.030 → 1030 (Excel/европейский формат)
+  s = s.replace(/\.(\d{3})(?=$|[^\d])/g, '$1')
+  const num = parseFloat(s)
   return Number.isNaN(num) ? null : num
 }
 
 function looksNumeric(val: unknown): boolean {
-  if (val == null || val === '') return false
-  const s = String(val).trim()
-  if (!s) return false
-  const normalized = s.replace(/\s/g, '').replace(',', '.')
-  const num = parseFloat(normalized)
-  return !Number.isNaN(num)
+  return parsePrice(val) != null
 }
 
 function isPureNumber(val: string): boolean {
   const s = val.trim()
   if (!s) return false
-  const norm = s.replace(/\s/g, '').replace(',', '.')
-  const num = parseFloat(norm)
-  if (Number.isNaN(num)) return false
+  if (parsePrice(s) == null) return false
   return /^[\d\s.,\-]+$/.test(s)
 }
 
