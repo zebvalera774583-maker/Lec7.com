@@ -1,7 +1,12 @@
 import { prisma } from '@/lib/prisma'
 
-function normalizeForMatch(s: string): string {
-  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
+/** Normalize for catalog match: trim, lowercase, remove punctuation, collapse spaces. Must match SQL in rematch/price-comparison. */
+export function normalizeForMatch(s: string): string {
+  return (s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[.,;:()\[\]{}"'`]/g, '')
+    .replace(/\s+/g, ' ')
 }
 
 /** Build norm -> masterItemId map (only unique matches). Call once per request batch. */

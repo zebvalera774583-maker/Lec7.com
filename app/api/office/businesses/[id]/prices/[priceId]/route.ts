@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 import { parsePriceValue } from '@/lib/parsePrice'
+import { buildCatalogNormMap, normalizeForMatch } from '@/lib/catalog-match'
 
 export const GET = withBusinessAccess(async (req, user) => {
   try {
@@ -152,6 +153,8 @@ export const PUT = withBusinessAccess(async (req, user) => {
     const body = await req.json()
     const { name, category, columns, rows } = body
 
+    const catalogNormMap = rows?.length ? await buildCatalogNormMap() : null
+
     // Проверяем существование прайса
     const existingPrice = await prisma.priceList.findFirst({
       where: {
@@ -184,15 +187,20 @@ export const PUT = withBusinessAccess(async (req, user) => {
       // Вставляем новые строки
       if (rows && Array.isArray(rows)) {
         await tx.priceListRow.createMany({
-          data: rows.map((row: any, index: number) => ({
-            priceListId: priceId,
-            order: index + 1,
-            name: row.name || '',
-            unit: row.unit || null,
-            priceWithVat: row.priceWithVat != null ? parsePriceValue(row.priceWithVat) : null,
-            priceWithoutVat: row.priceWithoutVat != null ? parsePriceValue(row.priceWithoutVat) : null,
-            extra: row.extra || null,
-          })),
+          data: rows.map((row: any, index: number) => {
+            const normName = normalizeForMatch(row.name || '')
+            const masterItemId = catalogNormMap && normName ? (catalogNormMap.get(normName) ?? null) : null
+            return {
+              priceListId: priceId,
+              order: index + 1,
+              name: row.name || '',
+              unit: row.unit || null,
+              priceWithVat: row.priceWithVat != null ? parsePriceValue(row.priceWithVat) : null,
+              priceWithoutVat: row.priceWithoutVat != null ? parsePriceValue(row.priceWithoutVat) : null,
+              extra: row.extra || null,
+              masterItemId,
+            }
+          }),
         })
       }
 

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 import { parsePriceValue } from '@/lib/parsePrice'
 import { ensureActiveCounterparty } from '@/lib/activeCounterparty'
+import { buildCatalogNormMap, normalizeForMatch } from '@/lib/catalog-match'
 
 export const GET = withBusinessAccess(async (req, user) => {
   try {
@@ -74,6 +75,8 @@ export const POST = withBusinessAccess(async (req, user) => {
     const body = await req.json()
     const { name, kind, category, derivedFromId, modifierType, percent, columns, rows } = body
 
+    const catalogNormMap = rows?.length ? await buildCatalogNormMap() : null
+
     // Создаём прайс в транзакции
     const result = await prisma.$transaction(async (tx) => {
       const priceList = await tx.priceList.create({
@@ -134,6 +137,8 @@ export const POST = withBusinessAccess(async (req, user) => {
             if (parsed != null) priceWithoutVatNum = parsed
           }
 
+          const normName = normalizeForMatch(row.name || '')
+          const masterItemId = catalogNormMap && normName ? (catalogNormMap.get(normName) ?? null) : null
           return {
             priceListId: priceList.id,
             order: index + 1,
@@ -142,6 +147,7 @@ export const POST = withBusinessAccess(async (req, user) => {
             priceWithVat: priceWithVatNum,
             priceWithoutVat: priceWithoutVatNum,
             extra: row.extra || null,
+            masterItemId,
           }
         })
 

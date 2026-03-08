@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import { withBusinessAccess } from '@/lib/access'
 import { prisma } from '@/lib/prisma'
 import { getBusinessIdFromPath } from '@/lib/price-import'
-
-function normalizeForMatch(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ')
-}
+import { normalizeForMatch, buildCatalogNormMap } from '@/lib/catalog-match'
 
 export const POST = withBusinessAccess(async (req, user) => {
   try {
@@ -43,28 +40,8 @@ export const POST = withBusinessAccess(async (req, user) => {
         ? name.trim()
         : `Импорт прайса (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`
 
-    // Загружаем Master Catalog для автопривязки masterItemId (один запрос)
-    const catalogItems = await prisma.botCatalogItem.findMany({
-      where: { scope: 'GLOBAL' },
-      select: { id: true, canonicalName: true, synonyms: true },
-    })
-    const nameToId = new Map<string, string>()
-    const ambiguous = new Set<string>()
-    for (const item of catalogItems) {
-      const addMapping = (norm: string) => {
-        if (!norm) return
-        if (nameToId.has(norm)) {
-          if (nameToId.get(norm) !== item.id) ambiguous.add(norm)
-        } else {
-          nameToId.set(norm, item.id)
-        }
-      }
-      addMapping(normalizeForMatch(item.canonicalName))
-      for (const syn of item.synonyms) {
-        addMapping(normalizeForMatch(syn))
-      }
-    }
-    for (const k of ambiguous) nameToId.delete(k)
+    // Загружаем Master Catalog для автопривязки masterItemId (canonicalName + synonyms)
+    const nameToId = await buildCatalogNormMap()
 
     const result = await prisma.$transaction(async (tx) => {
       const mappedRows = validItems.map(
