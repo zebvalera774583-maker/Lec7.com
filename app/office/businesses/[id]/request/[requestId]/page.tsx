@@ -16,6 +16,15 @@ interface PageProps {
 }
 
 export default async function RequestDetailPage({ params }: PageProps) {
+  const perfTotal = 'PERF:request-detail:total'
+  const perfAuth = 'PERF:request-detail:auth'
+  const perfRequest = 'PERF:request-detail:request'
+  const perfIncoming = 'PERF:request-detail:incoming+items'
+  const perfMaxLink = 'PERF:request-detail:maxRequestLink'
+  const perfParse = 'PERF:request-detail:parseFallback'
+  console.time(perfTotal)
+
+  console.time(perfAuth)
   const user = getAuthUserFromContext({
     headers: { get: (name: string) => headers().get(name) },
     cookies: {
@@ -25,20 +34,26 @@ export default async function RequestDetailPage({ params }: PageProps) {
       },
     },
   })
+  console.timeEnd(perfAuth)
   if (!user) notFound()
 
-  const request = await prisma.request.findUnique({
-    where: { id: params.requestId },
-    include: { business: { select: { id: true, name: true, ownerId: true } } },
-  })
+  // PERF: request и incomingRequest параллельно — независимые запросы по params.requestId
+  console.time(perfRequest)
+  console.time(perfIncoming)
+  const [request, incoming] = await Promise.all([
+    prisma.request.findUnique({
+      where: { id: params.requestId },
+      include: { business: { select: { id: true, name: true, ownerId: true } } },
+    }),
+    prisma.incomingRequest.findFirst({
+      where: { requestId: params.requestId },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    }),
+  ])
+  console.timeEnd(perfRequest)
+  console.timeEnd(perfIncoming)
   if (!request || request.businessId !== params.id) notFound()
   if (user.role !== 'LEC7_ADMIN' && request.business?.ownerId !== user.id) notFound()
-
-  // Сначала пробуем IncomingRequest (заявки из бота MAX/Telegram)
-  const incoming = await prisma.incomingRequest.findFirst({
-    where: { requestId: params.requestId },
-    include: { items: { orderBy: { sortOrder: 'asc' } } },
-  })
   let itemsJson: unknown = null
   const commentsText = incoming?.commentsText ?? null
   const departmentSlug = incoming?.department ?? null
@@ -58,20 +73,27 @@ export default async function RequestDetailPage({ params }: PageProps) {
       unit: it.unit,
     }))
   } else {
+    // PERF: выполняется только если incoming.items пусто — дополнительный round-trip к БД
+    console.time(perfMaxLink)
     const link = await prisma.maxRequestLink.findFirst({
       where: { requestId: params.requestId },
       select: { itemsJson: true },
     })
+    console.timeEnd(perfMaxLink)
     itemsJson = link?.itemsJson ?? null
   }
   // Если нет распарсенных позиций — парсим description (legacy, поддержка дефиса: Картофель-5кг)
   // Таблица строится ТОЛЬКО из items (Orchestrator/MaxRequestLink). Comments — только в блоке «Комментарий».
   if ((!itemsJson || (Array.isArray(itemsJson) && itemsJson.length === 0)) && request.description) {
+    console.time(perfParse)
     const parsed = parseMaxRequestToRows(request.title || '', request.description)
     if (parsed.length > 0) {
       itemsJson = parsed.map((r) => ({ title: r.name, qty: r.quantity, unit: r.unit }))
     }
+    console.timeEnd(perfParse)
   }
+
+  console.timeEnd(perfTotal)
 
   return (
     <RequestDetailClient
