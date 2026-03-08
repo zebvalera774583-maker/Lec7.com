@@ -3,19 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 
 const ROWS_SQL = `
-WITH accepted_prices AS (
-  SELECT
-    pl.id AS "priceListId",
-    pl."businessId" AS "supplierBusinessId",
-    COALESCE(NULLIF(s."legalName", ''), s.name) AS "supplierLegalName",
-    pl."updatedAt" AS "priceListUpdatedAt"
+WITH active_counterparties AS (
+  SELECT DISTINCT pl."businessId" AS "supplierBusinessId"
   FROM "PriceAssignment" pa
   JOIN "PriceList" pl ON pl.id = pa."priceListId"
-  JOIN "Business" s ON s.id = pl."businessId"
   WHERE pa."counterpartyBusinessId" = $1
     AND pa.status = 'ACTIVE'::"PartnerLinkStatus"
-    AND (pl.category = $2 OR pl.category IS NULL)
-  UNION
+),
+accepted_prices AS (
   SELECT
     pl.id AS "priceListId",
     pl."businessId" AS "supplierBusinessId",
@@ -25,6 +20,16 @@ WITH accepted_prices AS (
   JOIN "Business" s ON s.id = pl."businessId"
   WHERE pl."businessId" = $1
     AND (pl.category = $2 OR pl.category IS NULL)
+  UNION
+  SELECT
+    pl.id AS "priceListId",
+    pl."businessId" AS "supplierBusinessId",
+    COALESCE(NULLIF(s."legalName", ''), s.name) AS "supplierLegalName",
+    pl."updatedAt" AS "priceListUpdatedAt"
+  FROM "PriceList" pl
+  JOIN "Business" s ON s.id = pl."businessId"
+  JOIN active_counterparties ac ON ac."supplierBusinessId" = pl."businessId"
+  WHERE (pl.category = $2 OR pl.category IS NULL)
 ),
 items AS (
   SELECT
@@ -120,50 +125,47 @@ export const GET = withBusinessAccess(async (req, user) => {
 
     const categoryFilter = { OR: [{ category: categoryParam }, { category: null }] }
 
-    const [assignments, ownPriceLists] = await Promise.all([
-      prisma.priceAssignment.findMany({
-        where: {
-          counterpartyBusinessId: businessId,
-          status: 'ACTIVE',
-          priceList: categoryFilter,
-        },
-        include: {
-          priceList: {
-            select: {
-              id: true,
-              updatedAt: true,
-              business: {
-                select: { id: true, name: true, legalName: true },
-              },
-            },
-          },
-        },
-      }),
+    const activeAssignments = await prisma.priceAssignment.findMany({
+      where: { counterpartyBusinessId: businessId, status: 'ACTIVE' },
+      select: { priceList: { select: { businessId: true } } },
+    })
+    const activeSupplierIds = [...new Set(activeAssignments.map((a) => a.priceList.businessId))]
+
+    const [ownPriceLists, counterpartyPriceLists] = await Promise.all([
       prisma.priceList.findMany({
         where: { businessId, ...categoryFilter },
         select: {
           id: true,
           updatedAt: true,
-          business: {
-            select: { id: true, name: true, legalName: true },
-          },
+          business: { select: { id: true, name: true, legalName: true } },
         },
       }),
+      activeSupplierIds.length > 0
+        ? prisma.priceList.findMany({
+            where: { businessId: { in: activeSupplierIds }, ...categoryFilter },
+            select: {
+              id: true,
+              updatedAt: true,
+              business: { select: { id: true, name: true, legalName: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+          })
+        : Promise.resolve([]),
     ])
 
     const supplierMap = new Map<string, { supplierBusinessId: string; supplierLegalName: string; priceListId: string; priceListUpdatedAt: Date }>()
-    for (const a of assignments) {
-      const bid = a.priceList.business.id
+    for (const pl of ownPriceLists) {
+      const bid = pl.business.id
       if (supplierMap.has(bid)) continue
-      const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
+      const legalName = (pl.business.legalName || '').trim() || pl.business.name
       supplierMap.set(bid, {
         supplierBusinessId: bid,
         supplierLegalName: legalName,
-        priceListId: a.priceList.id,
-        priceListUpdatedAt: a.priceList.updatedAt,
+        priceListId: pl.id,
+        priceListUpdatedAt: pl.updatedAt,
       })
     }
-    for (const pl of ownPriceLists) {
+    for (const pl of counterpartyPriceLists) {
       const bid = pl.business.id
       if (supplierMap.has(bid)) continue
       const legalName = (pl.business.legalName || '').trim() || pl.business.name

@@ -87,6 +87,32 @@ export const POST = withBusinessAccess(async (req, user) => {
         },
       })
 
+      // Копируем ACTIVE назначения с других прайсов поставщика (той же категории) —
+      // чтобы новый прайс сразу был виден покупателям, у которых был принят старый
+      const categoryVal = category || null
+      const existingAssignments = await tx.priceAssignment.findMany({
+        where: {
+          status: 'ACTIVE',
+          priceList: {
+            businessId,
+            id: { not: priceList.id },
+            category: categoryVal,
+          },
+        },
+        select: { counterpartyBusinessId: true },
+        distinct: ['counterpartyBusinessId'],
+      })
+      if (existingAssignments.length > 0) {
+        await tx.priceAssignment.createMany({
+          data: existingAssignments.map((a) => ({
+            priceListId: priceList.id,
+            counterpartyBusinessId: a.counterpartyBusinessId,
+            status: 'ACTIVE' as const,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
       // Если есть строки, создаём их
       if (rows && Array.isArray(rows) && rows.length > 0) {
         const rowsToCreate = rows.map((row: any, index: number) => {

@@ -76,29 +76,29 @@ export const POST = withBusinessAccess(async (req, user) => {
       normToCanonical.delete(k)
     }
 
-    // 2) Load ALL price rows (with and without masterItemId) — same logic as table 3 (price-comparison)
-    const [assignments, ownPriceLists] = await Promise.all([
-      prisma.priceAssignment.findMany({
-        where: {
-          counterpartyBusinessId: businessId,
-          status: 'ACTIVE',
-          priceList: categoryFilter,
-        },
-        include: {
-          priceList: {
-            include: {
-              business: { select: { id: true, legalName: true, name: true } },
-              rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
-            },
-          },
-        },
-      }),
+    // 2) Load ALL price rows — действующий контрагент = видит все прайсы поставщика (не только назначенные)
+    const activeAssignments = await prisma.priceAssignment.findMany({
+      where: { counterpartyBusinessId: businessId, status: 'ACTIVE' },
+      select: { priceList: { select: { businessId: true } } },
+    })
+    const activeSupplierIds = [...new Set(activeAssignments.map((a) => a.priceList.businessId))]
+
+    const [ownPriceLists, counterpartyPriceLists] = await Promise.all([
       prisma.priceList.findMany({
         where: { businessId, kind: 'BASE', ...categoryFilter },
         include: {
           rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
         },
       }),
+      activeSupplierIds.length > 0
+        ? prisma.priceList.findMany({
+            where: { businessId: { in: activeSupplierIds }, ...categoryFilter },
+            include: {
+              business: { select: { id: true, legalName: true, name: true } },
+              rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
+            },
+          })
+        : Promise.resolve([]),
     ])
 
     // 3) Build masterItemId -> offers, normTitle -> offers, and supplierId -> rows (for analogues)
@@ -107,9 +107,9 @@ export const POST = withBusinessAccess(async (req, user) => {
     const supplierToRows = new Map<string, { name: string; norm: string; price: number }[]>()
     const counterpartySet = new Map<string, string>()
 
-    for (const a of assignments) {
-      const supplierId = a.priceList.business.id
-      const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
+    for (const pl of counterpartyPriceLists) {
+      const supplierId = pl.business.id
+      const legalName = (pl.business.legalName || '').trim() || pl.business.name
       counterpartySet.set(supplierId, legalName)
     }
 
@@ -143,10 +143,10 @@ export const POST = withBusinessAccess(async (req, user) => {
       rows.push({ name, norm, price })
     }
 
-    for (const a of assignments) {
-      const supplierId = a.priceList.business.id
-      const legalName = (a.priceList.business.legalName || '').trim() || a.priceList.business.name
-      for (const row of a.priceList.rows) {
+    for (const pl of counterpartyPriceLists) {
+      const supplierId = pl.business.id
+      const legalName = (pl.business.legalName || '').trim() || pl.business.name
+      for (const row of pl.rows) {
         const price = row.priceWithVat != null
           ? Number(row.priceWithVat)
           : row.priceWithoutVat != null
