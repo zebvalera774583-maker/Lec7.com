@@ -8,6 +8,21 @@ WITH active_counterparties AS (
   FROM "ActiveCounterparty" ac
   WHERE ac."counterpartyBusinessId" = $1
 ),
+norm_to_master AS (
+  SELECT norm, max(id) AS id
+  FROM (
+    SELECT lower(trim(regexp_replace(regexp_replace(b."canonicalName", '[\\.,;:()\\[\\]{}"''\`]', '', 'g'), '\\s+', ' ', 'g'))) AS norm, b.id
+    FROM "BotCatalogItem" b
+    WHERE b.scope = 'GLOBAL'
+    UNION ALL
+    SELECT lower(trim(regexp_replace(regexp_replace(s, '[\\.,;:()\\[\\]{}"''\`]', '', 'g'), '\\s+', ' ', 'g'))) AS norm, b.id
+    FROM "BotCatalogItem" b, unnest(b.synonyms) AS s
+    WHERE b.scope = 'GLOBAL'
+  ) t
+  WHERE norm IS NOT NULL AND norm <> ''
+  GROUP BY norm
+  HAVING count(DISTINCT id) = 1
+),
 accepted_prices AS (
   SELECT
     pl.id AS "priceListId",
@@ -35,20 +50,23 @@ items AS (
     ap."supplierLegalName",
     ap."priceListId",
     ap."priceListUpdatedAt",
+    COALESCE(r."masterItemId", nm.id) AS "resolvedMasterId",
     r."masterItemId" AS "masterItemId",
     r.name AS "rawName",
     r.unit AS "unit",
     COALESCE(r."priceWithVat", r."priceWithoutVat")::numeric AS "price",
     lower(trim(regexp_replace(regexp_replace(r.name, '[\\.,;:()\\[\\]{}"''\`]', '', 'g'), '\\s+', ' ', 'g'))) AS "normTitle",
-    b."canonicalName" AS "canonicalName"
+    COALESCE(b."canonicalName", b2."canonicalName") AS "canonicalName"
   FROM accepted_prices ap
   JOIN "PriceListRow" r ON r."priceListId" = ap."priceListId"
   LEFT JOIN "BotCatalogItem" b ON r."masterItemId" = b."id"
+  LEFT JOIN norm_to_master nm ON nm.norm = lower(trim(regexp_replace(regexp_replace(r.name, '[\\.,;:()\\[\\]{}"''\`]', '', 'g'), '\\s+', ' ', 'g')))
+  LEFT JOIN "BotCatalogItem" b2 ON nm.id = b2."id"
 ),
 items_with_key AS (
   SELECT *,
     CASE
-      WHEN "masterItemId" IS NOT NULL THEN 'm:' || "masterItemId"
+      WHEN "resolvedMasterId" IS NOT NULL THEN 'm:' || "resolvedMasterId"
       ELSE 'u:' || COALESCE("normTitle", '')
     END AS "groupKey"
   FROM items
@@ -57,11 +75,11 @@ titles AS (
   SELECT
     "groupKey",
     CASE
-      WHEN bool_or("masterItemId" IS NOT NULL) THEN MIN("canonicalName")
+      WHEN bool_or("resolvedMasterId" IS NOT NULL) THEN MIN("canonicalName")
       ELSE MIN("rawName")
     END AS "displayTitle",
-    bool_or("masterItemId" IS NOT NULL) AS "isMapped",
-    MAX("masterItemId") AS "masterItemId"
+    bool_or("resolvedMasterId" IS NOT NULL) AS "isMapped",
+    MAX("resolvedMasterId") AS "masterItemId"
   FROM items_with_key
   GROUP BY "groupKey"
 ),
