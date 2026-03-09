@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess, getBusinessIdFromPath } from '@/lib/access'
+import {
+  buildCatalogMaps,
+  buildOfferMaps,
+  processRequestItemsToResult,
+  getAggregationKey,
+  normalizeUnitForComparison,
+} from '@/lib/summary-pipeline'
+import { normalizeForMatch } from '@/lib/catalog-match'
 
 const DEFAULT_CATEGORY = 'Свежая плодоовощная продукция'
 
@@ -12,20 +20,7 @@ function parseQuantity(value: string | null | undefined): number {
   return Number.isNaN(n) ? 0 : n
 }
 
-function normalizeForMatch(s: string): string {
-  return (s || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[.,;:()\[\]{}"'`]/g, '')
-    .replace(/\s+/g, ' ')
-}
-
-/** Единица для сопоставления: игнорировать точку в конце (кг = кг.) */
-function normalizeUnitForComparison(unit: string): string {
-  return (unit || '').trim().toLowerCase().replace(/\.$/, '') || ''
-}
-
-/** Парсинг позиций из description/title заявки MAX (как parseMaxRequestToRows) */
+/** Парсинг позиций из description/title заявки MAX */
 function parseMaxRequestToRows(title: string, description: string): { name: string; quantity: string; unit: string }[] {
   const text = (description || title || '').trim()
   if (!text) return []
@@ -101,31 +96,12 @@ export const GET = withBusinessAccess(async (req) => {
       },
     })
 
-    // normToId для ключа агрегации: masterItemId ?? norm (синонимы объединяются)
-    const catalogItemsForAgg = await prisma.botCatalogItem.findMany({
-      where: { scope: 'GLOBAL' },
-      select: { id: true, canonicalName: true, synonyms: true },
-    })
-    const normToIdForAgg = new Map<string, string>()
-    const ambiguousForAgg = new Set<string>()
-    for (const item of catalogItemsForAgg) {
-      const addMapping = (norm: string) => {
-        if (!norm) return
-        if (normToIdForAgg.has(norm)) {
-          if (normToIdForAgg.get(norm) !== item.id) ambiguousForAgg.add(norm)
-        } else {
-          normToIdForAgg.set(norm, item.id)
-        }
-      }
-      addMapping(normalizeForMatch(item.canonicalName))
-      for (const syn of item.synonyms) {
-        addMapping(normalizeForMatch(syn))
-      }
-    }
-    for (const k of ambiguousForAgg) normToIdForAgg.delete(k)
+    const catalogMaps = await buildCatalogMaps()
+    const { normToId, masterToCanonical } = catalogMaps
 
+    type AggRow = { masterItemId: string | null; norm: string; displayName: string; quantity: number; unit: string }
     type GroupKey = string
-    const groups = new Map<GroupKey, { department: string; date: string; requestNumbers: number[]; agg: Map<string, { name: string; quantity: number; unit: string }> }>()
+    const groups = new Map<GroupKey, { department: string; date: string; requestNumbers: number[]; agg: Map<string, AggRow> }>()
 
     function getRowsFromRequest(r: (typeof requests)[0]): { name: string; quantity: string; unit: string }[] {
       const ir = r.incomingRequest
@@ -133,6 +109,14 @@ export const GET = withBusinessAccess(async (req) => {
         return ir.items.map((it) => ({ name: it.name, quantity: it.quantity, unit: it.unit }))
       }
       return parseMaxRequestToRows(r.title || '', r.description || '')
+    }
+
+    function rowToAggData(row: { name: string; unit: string }): { masterItemId: string | null; norm: string; displayName: string; unit: string } {
+      const norm = normalizeForMatch(row.name)
+      const masterItemId = norm ? (normToId.get(norm) ?? null) : null
+      const displayName = masterItemId ? (masterToCanonical.get(masterItemId) ?? row.name.trim()) : row.name.trim()
+      const unit = normalizeUnitForComparison(row.unit) || (row.unit || 'шт').toLowerCase()
+      return { masterItemId, norm: norm || '', displayName, unit }
     }
 
     for (const r of requests) {
@@ -152,15 +136,14 @@ export const GET = withBusinessAccess(async (req) => {
 
       const rows = getRowsFromRequest(r)
       for (const row of rows) {
-        const norm = normalizeForMatch(row.name)
-        const masterItemId = norm ? (normToIdForAgg.get(norm) ?? null) : null
-        const aggKey = `${masterItemId ?? norm ?? row.name.toLowerCase().trim()}|${normalizeUnitForComparison(row.unit)}`
+        const aggKey = getAggregationKey(row.name, row.unit, normToId)
         const qty = parseQuantity(row.quantity)
         const existing = group.agg.get(aggKey)
         if (existing) {
           existing.quantity += qty
         } else {
-          group.agg.set(aggKey, { name: row.name.trim(), quantity: qty, unit: row.unit })
+          const { masterItemId, norm, displayName, unit } = rowToAggData(row)
+          group.agg.set(aggKey, { masterItemId, norm, displayName, quantity: qty, unit })
         }
       }
     }
@@ -182,299 +165,23 @@ export const GET = withBusinessAccess(async (req) => {
       })
     }
 
-    const categoryFilter = { OR: [{ category: DEFAULT_CATEGORY }, { category: null }] }
-
-    /** Fuzzy match: key from price list matches search norm (e.g. "кинза" matches "кинза свежая") */
-    function normMatchesPriceKey(searchNorm: string, priceNorm: string): boolean {
-      if (!searchNorm || !priceNorm) return false
-      if (searchNorm === priceNorm) return true
-      if (priceNorm.startsWith(searchNorm) || searchNorm.startsWith(priceNorm)) return true
-      if (searchNorm.length >= 2 && (priceNorm.includes(searchNorm) || searchNorm.includes(priceNorm))) return true
-      return false
-    }
-
-    const processGroupToResultItems = (
-      requestItems: { name: string; quantity: string; unit: string }[],
-      normToId: Map<string, string>,
-      normToCanonical: Map<string, string>,
-      masterToCanonical: Map<string, string>,
-      masterItemIdToSearchNorms: Map<string, string[]>,
-      masterToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
-      normTitleToOffers: Map<string, Map<string, { price: number; legalName: string }>>,
-      supplierToRows: Map<string, { name: string; norm: string; price: number }[]>,
-      counterparties: { id: string }[]
-    ) => {
-      const resultItems: {
-        name: string
-        originalName?: string
-        masterItemId: string | null
-        quantity: string
-        unit: string
-        offers: Record<string, number>
-        analogues?: Record<string, { name: string; price: number }[]>
-      }[] = []
-      for (const it of requestItems) {
-        const norm = normalizeForMatch(it.name)
-        const searchNorm = norm || normalizeForMatch(it.name)
-        if (!searchNorm) continue
-
-        const masterItemId = norm ? (normToId.get(norm) ?? null) : null
-        const canonicalName = masterItemId ? (masterToCanonical.get(masterItemId) ?? it.name) : it.name
-
-        const searchNorms: string[] = [searchNorm]
-        if (masterItemId) {
-          const extra = masterItemIdToSearchNorms.get(masterItemId) ?? []
-          for (const s of extra) {
-            if (s && !searchNorms.includes(s)) searchNorms.push(s)
-          }
-        }
-
-        const offers: Record<string, number> = {}
-
-        // 1) By masterItemId (catalog-linked rows)
-        if (masterItemId) {
-          const bySupplier = masterToOffers.get(masterItemId)
-          if (bySupplier) {
-            for (const [sid, { price }] of bySupplier) offers[sid] = price
-          }
-        }
-
-        // 2) By normTitleToOffers: exact + fuzzy, включая синонимы (реган → базилик красный)
-        for (const [priceNorm, bySupplier] of normTitleToOffers) {
-          const matches = searchNorms.some((sn) => normMatchesPriceKey(sn, priceNorm))
-          if (!matches) continue
-          for (const [sid, { price }] of bySupplier) {
-            const existing = offers[sid]
-            if (existing == null || price < existing) offers[sid] = price
-          }
-        }
-
-        // 3) Exact match from supplierToRows (row.norm === searchNorm) — прайс без masterItemId
-        for (const c of counterparties) {
-          const sid = c.id
-          if (offers[sid] != null) continue
-          const rows = supplierToRows.get(sid) || []
-          for (const row of rows) {
-            if (searchNorms.includes(row.norm)) {
-              offers[sid] = row.price
-              break
-            }
-          }
-        }
-
-        // 4) Analogues: fuzzy match when no exact price (e.g. "кинза" → "Кинза свежая", "реган" → "базилик красный")
-        const analogues: Record<string, { name: string; price: number }[]> = {}
-        for (const c of counterparties) {
-          const sid = c.id
-          if (offers[sid] != null) continue
-          const allMatches: { name: string; price: number }[] = []
-          for (const sn of searchNorms) {
-            if (sn.length < 2) continue
-            const rows = supplierToRows.get(sid) || []
-            for (const row of rows) {
-              if (searchNorms.includes(row.norm)) continue
-              if (row.norm.startsWith(sn) || row.norm.includes(' ' + sn) || (sn.length >= 3 && row.norm.includes(sn))) {
-                if (!allMatches.some((m) => m.name === row.name && m.price === row.price)) {
-                  allMatches.push({ name: row.name, price: row.price })
-                }
-              }
-            }
-          }
-          allMatches.sort((a, b) => a.price - b.price)
-          if (allMatches.length > 0) analogues[sid] = allMatches.slice(0, 5)
-        }
-
-        // Include row всегда — показываем позицию даже без цен (Тимьян и т.п.)
-        resultItems.push({
-          name: canonicalName,
-          ...(canonicalName !== it.name && { originalName: it.name }),
-          masterItemId: masterItemId ?? null,
-          quantity: it.quantity,
-          unit: it.unit,
-          offers,
-          ...(Object.keys(analogues).length > 0 && { analogues }),
-        })
-      }
-      return resultItems
-    }
-
-    const catalogItems = catalogItemsForAgg
-    const normToId = new Map<string, string>()
-    const normToCanonical = new Map<string, string>()
-    const ambiguous = new Set<string>()
-    for (const item of catalogItems) {
-      const addMapping = (norm: string) => {
-        if (!norm) return
-        if (normToId.has(norm)) {
-          if (normToId.get(norm) !== item.id) ambiguous.add(norm)
-        } else {
-          normToId.set(norm, item.id)
-          normToCanonical.set(norm, item.canonicalName)
-        }
-      }
-      addMapping(normalizeForMatch(item.canonicalName))
-      for (const syn of item.synonyms) {
-        addMapping(normalizeForMatch(syn))
-      }
-    }
-    for (const k of ambiguous) {
-      normToId.delete(k)
-      normToCanonical.delete(k)
-    }
-
-    // Загружаем ВСЕ строки прайсов — действующий контрагент = видит все прайсы поставщика (связь из ActiveCounterparty)
-    const activeCounterparties = await prisma.activeCounterparty.findMany({
-      where: {
-        OR: [
-          { counterpartyBusinessId: businessId },
-          { businessId },
-        ],
-      },
-      select: { businessId: true, counterpartyBusinessId: true },
-    })
-    const activeSupplierIds = [...new Set(
-      activeCounterparties.map((a) =>
-        a.counterpartyBusinessId === businessId ? a.businessId : a.counterpartyBusinessId
-      )
-    )]
-
-    const [ownPriceLists, counterpartyPriceLists] = await Promise.all([
-      prisma.priceList.findMany({
-        where: { businessId, kind: 'BASE', ...categoryFilter },
-        include: {
-          rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
-        },
-      }),
-      activeSupplierIds.length > 0
-        ? prisma.priceList.findMany({
-            where: { businessId: { in: activeSupplierIds }, ...categoryFilter },
-            include: {
-              business: { select: { id: true, legalName: true, name: true } },
-              rows: { select: { masterItemId: true, name: true, priceWithVat: true, priceWithoutVat: true } },
-            },
-          })
-        : Promise.resolve([]),
-    ])
-
-    const masterToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
-    const normTitleToOffers = new Map<string, Map<string, { price: number; legalName: string }>>()
-    const supplierToRows = new Map<string, { name: string; norm: string; price: number }[]>()
-    const counterpartySet = new Map<string, string>()
-
-    const addRowToSupplier = (supplierId: string, name: string, price: number) => {
-      const norm = normalizeForMatch(name)
-      if (!norm) return
-      let rows = supplierToRows.get(supplierId)
-      if (!rows) {
-        rows = []
-        supplierToRows.set(supplierId, rows)
-      }
-      rows.push({ name, norm, price })
-    }
-
-    for (const pl of counterpartyPriceLists) {
-      const supplierId = pl.business.id
-      const legalName = (pl.business.legalName || '').trim() || pl.business.name
-      counterpartySet.set(supplierId, legalName)
-    }
-
-    const addOfferToMap = (
-      map: Map<string, Map<string, { price: number; legalName: string }>>,
-      key: string,
-      supplierId: string,
-      legalName: string,
-      price: number
-    ) => {
-      let bySupplier = map.get(key)
-      if (!bySupplier) {
-        bySupplier = new Map()
-        map.set(key, bySupplier)
-      }
-      const existing = bySupplier.get(supplierId)
-      if (existing == null || price < existing.price) {
-        bySupplier.set(supplierId, { price, legalName })
-      }
-      counterpartySet.set(supplierId, legalName)
-    }
-
-    for (const pl of counterpartyPriceLists) {
-      const supplierId = pl.business.id
-      const legalName = (pl.business.legalName || '').trim() || pl.business.name
-      for (const row of pl.rows) {
-        const price = row.priceWithVat != null
-          ? Number(row.priceWithVat)
-          : row.priceWithoutVat != null
-            ? Number(row.priceWithoutVat)
-            : null
-        if (price == null || Number.isNaN(price)) continue
-        if (row.masterItemId) {
-          addOfferToMap(masterToOffers, row.masterItemId, supplierId, legalName, price)
-        } else {
-          const norm = normalizeForMatch(row.name)
-          if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
-        }
-        addRowToSupplier(supplierId, row.name, price)
-      }
-    }
-
-    const hasOwnPrice = ownPriceLists.length > 0
-    for (const pl of ownPriceLists) {
-      const supplierId = '__OWN_PRICE__'
-      const legalName = 'Мой прайс'
-      for (const row of pl.rows) {
-        const price = row.priceWithVat != null
-          ? Number(row.priceWithVat)
-          : row.priceWithoutVat != null
-            ? Number(row.priceWithoutVat)
-            : null
-        if (price == null || Number.isNaN(price)) continue
-        if (row.masterItemId) {
-          addOfferToMap(masterToOffers, row.masterItemId, supplierId, legalName, price)
-        } else {
-          const norm = normalizeForMatch(row.name)
-          if (norm) addOfferToMap(normTitleToOffers, norm, supplierId, legalName, price)
-        }
-        addRowToSupplier(supplierId, row.name, price)
-      }
-    }
-
-    const partnerCounterparties = Array.from(counterpartySet.entries())
-      .filter(([id]) => id !== '__OWN_PRICE__')
-      .map(([id, legalName]) => ({ id, legalName }))
-      .sort((a, b) => a.legalName.localeCompare(b.legalName, 'ru'))
-    const counterparties = hasOwnPrice
-      ? [{ id: '__OWN_PRICE__', legalName: 'Мой прайс' }, ...partnerCounterparties]
-      : partnerCounterparties
-
-    const masterToCanonical = new Map<string, string>()
-    const masterItemIdToSearchNorms = new Map<string, string[]>()
-    for (const item of catalogItems) {
-      masterToCanonical.set(item.id, item.canonicalName)
-      const norms: string[] = []
-      const cn = normalizeForMatch(item.canonicalName)
-      if (cn) norms.push(cn)
-      for (const syn of item.synonyms) {
-        const sn = normalizeForMatch(syn)
-        if (sn && !norms.includes(sn)) norms.push(sn)
-      }
-      if (norms.length > 0) masterItemIdToSearchNorms.set(item.id, norms)
-    }
+    const { offerMaps, counterparties } = await buildOfferMaps(businessId, DEFAULT_CATEGORY)
 
     const sections = sortedGroups.map((group) => {
       const requestItems = Array.from(group.agg.values())
-        .filter((it) => it.name.length > 0 && it.quantity > 0)
-        .map((it) => ({ name: it.name, quantity: String(it.quantity), unit: it.unit }))
+        .filter((it) => it.displayName.length > 0 && it.quantity > 0)
+        .map((it) => ({
+          name: it.displayName,
+          quantity: String(it.quantity),
+          unit: it.unit,
+          masterItemId: it.masterItemId,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 
-      const items = processGroupToResultItems(
+      const items = processRequestItemsToResult(
         requestItems,
-        normToId,
-        normToCanonical,
-        masterToCanonical,
-        masterItemIdToSearchNorms,
-        masterToOffers,
-        normTitleToOffers,
-        supplierToRows,
+        catalogMaps,
+        offerMaps,
         counterparties
       )
 
