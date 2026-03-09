@@ -464,11 +464,16 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     if (orchestratorResult?.intent === 'create_needs' && orchestratorResult.items?.length && businessId) {
-      const parsedItems = orchestratorResult.items.map((r) => ({
-        name: r.canonicalName,
-        quantity: r.quantity ?? '',
-        unit: r.unit || '',
-      }))
+      const needsUnit = new Set(orchestratorResult.needsUnitClarification ?? [])
+      const needsQty = new Set(orchestratorResult.needsQtyClarification ?? [])
+      const userTypedNoDigit = !/\d/.test(needText)
+      const parsedItems = orchestratorResult.items.map((r, i) => {
+        let qty = r.quantity ?? ''
+        let unit = r.unit || ''
+        if (userTypedNoDigit || needsQty.has(i)) qty = ''
+        if (userTypedNoDigit || needsUnit.has(i)) unit = ''
+        return { name: r.canonicalName, quantity: qty, unit }
+      })
       const commentsText = orchestratorResult.comments?.join('\n') ?? null
 
       // OCR: подтверждение перед созданием заявки
