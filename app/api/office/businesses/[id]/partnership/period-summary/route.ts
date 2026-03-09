@@ -20,6 +20,11 @@ function normalizeForMatch(s: string): string {
     .replace(/\s+/g, ' ')
 }
 
+/** Единица для сопоставления: игнорировать точку в конце (кг = кг.) */
+function normalizeUnitForComparison(unit: string): string {
+  return (unit || '').trim().toLowerCase().replace(/\.$/, '') || ''
+}
+
 /** Парсинг позиций из description/title заявки MAX (как parseMaxRequestToRows) */
 function parseMaxRequestToRows(title: string, description: string): { name: string; quantity: string; unit: string }[] {
   const text = (description || title || '').trim()
@@ -149,7 +154,7 @@ export const GET = withBusinessAccess(async (req) => {
       for (const row of rows) {
         const norm = normalizeForMatch(row.name)
         const masterItemId = norm ? (normToIdForAgg.get(norm) ?? null) : null
-        const aggKey = `${masterItemId ?? norm ?? row.name.toLowerCase().trim()}|${row.unit}`
+        const aggKey = `${masterItemId ?? norm ?? row.name.toLowerCase().trim()}|${normalizeUnitForComparison(row.unit)}`
         const qty = parseQuantity(row.quantity)
         const existing = group.agg.get(aggKey)
         if (existing) {
