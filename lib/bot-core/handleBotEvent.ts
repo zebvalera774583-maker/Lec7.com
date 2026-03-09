@@ -1,9 +1,15 @@
 import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
-import { getCatalogNormMap, matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
+import { getCatalogNormMap, matchToCatalogSync, matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
 import { recognizeNeedsForChat } from '@/lib/orchestrator/recognizeNeedsForChat'
 import { notifyAdminAboutRequest } from '@/lib/notify-admin'
+import {
+  loadClarificationMaps,
+  findIndicesNeedingClarification,
+  parseClarificationOptions,
+  type ClarificationItem,
+} from '@/lib/clarification-flow'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
 const UNIT_ONLY_PATTERN = /^(кг|г|гр|т|шт\.?|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
@@ -198,8 +204,65 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     pendingIndex?: number
   } | null
 
-  // awaiting_ocr_confirm + YES → awaiting_department (выбор подразделения)
+  // awaiting_ocr_confirm + YES → проверка уточнений или awaiting_department
   if (choice === 'YES' && stateData?.type === 'awaiting_ocr_confirm' && stateData?.pendingItems) {
+    const { needText, parsedItems, commentsText } = stateData.pendingItems
+    const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
+      title: p.name,
+      qty: p.quantity,
+      unit: p.unit,
+    }))
+    if (itemsForClarification.length === 0) {
+      await prisma.botChatState.update({
+        where: { channel_chatId: { channel, chatId } },
+        data: { stateJson: { type: 'confirmed' } },
+      })
+      return { messages: ['Нет позиций для заявки. Напишите заявку заново.'], removeKeyboard: true }
+    }
+    if (channel === 'max') {
+      const { catalogMaps, clarificationMap } = await loadClarificationMaps()
+      const { indices: clarifyIndices, questionByIndex } = findIndicesNeedingClarification(
+        itemsForClarification,
+        catalogMaps,
+        clarificationMap
+      )
+      if (clarifyIndices.length > 0) {
+        await prisma.clarificationSession.deleteMany({ where: { chatId } }).catch(() => {})
+        const firstClarifyIdx = clarifyIndices[0]
+        const firstClarifyItem = itemsForClarification[firstClarifyIdx]
+        const question = questionByIndex.get(firstClarifyIdx) ?? ''
+        const options = parseClarificationOptions(question)
+        const rows: { text: string; callback_data: string }[][] = []
+        const session = await prisma.clarificationSession.create({
+          data: {
+            chatId,
+            userId: event.userId ?? null,
+            itemsJson: itemsForClarification,
+            pendingItemIndex: firstClarifyIdx,
+            needText,
+            commentsText,
+          },
+        })
+        if (options.length > 0) {
+          rows.push(
+            options.slice(0, 4).map((opt) => ({
+              text: opt,
+              callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}`,
+            }))
+          )
+        }
+        rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: { stateJson: { type: 'confirmed' } },
+        })
+        const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
+        return {
+          messages: [`${displayTitle} — какой именно?`],
+          replyInlineKeyboard: { rows },
+        }
+      }
+    }
     await prisma.botChatState.update({
       where: { channel_chatId: { channel, chatId } },
       data: {
@@ -238,7 +301,205 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     stateData = { type: 'confirmed' } as typeof stateData
   }
 
-  // Обработка выбора подразделения (callback set_department|<slug>)
+  // Обработка clarify_choice|sessionId|itemIndex|canonicalName
+  const clarifyChoiceMatch = typeof choice === 'string' ? choice.match(/^clarify_choice\|([^|]+)\|(\d+)\|(.+)$/) : null
+  if (clarifyChoiceMatch) {
+    const [, sessionId, itemIndexStr, canonicalName] = clarifyChoiceMatch
+    const session = await prisma.clarificationSession.findUnique({ where: { id: sessionId } })
+    if (!session || session.chatId !== chatId) {
+      return { messages: ['Сессия не найдена. Напишите заявку заново.'], removeKeyboard: true }
+    }
+    if (event.userId && session.userId && session.userId !== event.userId) {
+      return { messages: ['Доступ запрещён.'] }
+    }
+    const items = (session.itemsJson as ClarificationItem[]) || []
+    const idx = parseInt(itemIndexStr!, 10)
+    if (idx < 0 || idx >= items.length) {
+      return { messages: ['Ошибка индекса.'] }
+    }
+    const normName = (canonicalName || '').trim().toLowerCase()
+    if (!normName) return { messages: ['Неверный вариант.'] }
+    let inCatalog = false
+    try {
+      const normToId = await getCatalogNormMap()
+      inCatalog = matchToCatalogSync(normToId, canonicalName)
+    } catch {
+      /* ignore */
+    }
+    if (!inCatalog) {
+      return { messages: ['Вариант не найден в каталоге. Выберите из списка.'] }
+    }
+    const updated = [...items]
+    updated[idx] = { ...updated[idx], title: canonicalName.trim() }
+    const { catalogMaps, clarificationMap } = await loadClarificationMaps()
+    const { indices, questionByIndex } = findIndicesNeedingClarification(updated, catalogMaps, clarificationMap)
+    const nextIdx = indices.find((i) => i > idx) ?? indices[0]
+    if (nextIdx == null) {
+      await prisma.clarificationSession.update({
+        where: { id: sessionId },
+        data: { itemsJson: updated, pendingItemIndex: null, needDepartment: true },
+      })
+      return {
+        messages: ['Выберите подразделение:'],
+        replyInlineKeyboard: { rows: departmentKeyboardRows() },
+      }
+    }
+    const nextItem = updated[nextIdx]
+    const question = questionByIndex.get(nextIdx) ?? null
+    const options = question ? parseClarificationOptions(question) : []
+    const rows: { text: string; callback_data: string }[][] = []
+    if (options.length > 0) {
+      const choiceRow = options.slice(0, 4).map((opt) => ({
+        text: opt,
+        callback_data: `clarify_choice|${sessionId}|${nextIdx}|${opt}`,
+      }))
+      rows.push(choiceRow)
+    }
+    rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${sessionId}|${nextIdx}` }])
+    await prisma.clarificationSession.update({
+      where: { id: sessionId },
+      data: { itemsJson: updated, pendingItemIndex: nextIdx },
+    })
+    const displayTitle = nextItem.title.charAt(0).toUpperCase() + nextItem.title.slice(1).toLowerCase()
+    return {
+      messages: [`${displayTitle} — какой именно?`],
+      replyInlineKeyboard: { rows },
+    }
+  }
+
+  // Обработка clarify_delete|sessionId|itemIndex
+  const clarifyDeleteMatch = typeof choice === 'string' ? choice.match(/^clarify_delete\|([^|]+)\|(\d+)$/) : null
+  if (clarifyDeleteMatch) {
+    const [, sessionId, itemIndexStr] = clarifyDeleteMatch
+    const session = await prisma.clarificationSession.findUnique({ where: { id: sessionId } })
+    if (!session || session.chatId !== chatId) {
+      return { messages: ['Сессия не найдена. Напишите заявку заново.'], removeKeyboard: true }
+    }
+    if (event.userId && session.userId && session.userId !== event.userId) {
+      return { messages: ['Доступ запрещён.'] }
+    }
+    const items = (session.itemsJson as ClarificationItem[]) || []
+    const idx = parseInt(itemIndexStr!, 10)
+    if (idx < 0 || idx >= items.length) {
+      return { messages: ['Ошибка индекса.'] }
+    }
+    const deletedTitle = items[idx].title
+    const updated = items.filter((_, i) => i !== idx)
+    if (updated.length === 0) {
+      await prisma.clarificationSession.delete({ where: { id: sessionId } })
+      return {
+        messages: ['Все позиции удалены. Заявка не создана.'],
+        removeKeyboard: true,
+      }
+    }
+    const { catalogMaps, clarificationMap } = await loadClarificationMaps()
+    const { indices, questionByIndex } = findIndicesNeedingClarification(updated, catalogMaps, clarificationMap)
+    const nextIdx = indices[0]
+    if (nextIdx == null) {
+      await prisma.clarificationSession.update({
+        where: { id: sessionId },
+        data: { itemsJson: updated, pendingItemIndex: null, needDepartment: true },
+      })
+      return {
+        messages: [`Позиция удалена: ${deletedTitle}`, 'Выберите подразделение:'],
+        replyInlineKeyboard: { rows: departmentKeyboardRows() },
+      }
+    }
+    const nextItem = updated[nextIdx]
+    const question = questionByIndex.get(nextIdx) ?? null
+    const options = question ? parseClarificationOptions(question) : []
+    const rows: { text: string; callback_data: string }[][] = []
+    if (options.length > 0) {
+      rows.push(
+        options.slice(0, 4).map((opt) => ({
+          text: opt,
+          callback_data: `clarify_choice|${sessionId}|${nextIdx}|${opt}`,
+        }))
+      )
+    }
+    rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${sessionId}|${nextIdx}` }])
+    await prisma.clarificationSession.update({
+      where: { id: sessionId },
+      data: { itemsJson: updated, pendingItemIndex: nextIdx },
+    })
+    const displayTitle = nextItem.title.charAt(0).toUpperCase() + nextItem.title.slice(1).toLowerCase()
+    return {
+      messages: [`Позиция удалена: ${deletedTitle}`, `${displayTitle} — какой именно?`],
+      replyInlineKeyboard: { rows },
+    }
+  }
+
+  // Обработка set_department из ClarificationSession (все уточнены)
+  const setDeptFromSessionMatch = typeof choice === 'string' ? choice.match(/^set_department\|([a-z_]+)$/) : null
+  if (setDeptFromSessionMatch) {
+    const session = await prisma.clarificationSession.findUnique({
+      where: { chatId },
+    })
+    if (session?.needDepartment) {
+      const slug = setDeptFromSessionMatch[1]
+      const dept = DEPARTMENTS.find((d) => d.slug === slug)
+      if (!dept) {
+        return { messages: ['Неизвестное подразделение. Выберите из списка.'] }
+      }
+      const businessId = process.env.BOT_BUSINESS_ID?.trim()
+      if (!businessId) {
+        await prisma.clarificationSession.delete({ where: { id: session.id } }).catch(() => {})
+        return { messages: ['Ошибка: BOT_BUSINESS_ID не настроен'], removeKeyboard: true }
+      }
+      const items = (session.itemsJson as ClarificationItem[]) || []
+      const needText = session.needText || items.map((i) => `${i.title} ${i.qty} ${i.unit}`.trim()).join(', ')
+      try {
+        const { number } = await prisma.$transaction(async (tx) => {
+          const num = await getNextRequestNumber(tx)
+          const request = await tx.request.create({
+            data: {
+              businessId,
+              number: num,
+              title: `Заявка из MAX: ${needText.slice(0, 80) || 'Новое сообщение'}`,
+              description: needText,
+              source: 'max_integration',
+              status: 'NEW',
+            },
+          })
+          await tx.incomingRequest.create({
+            data: {
+              senderBusinessId: businessId,
+              recipientBusinessId: businessId,
+              requestId: request.id,
+              status: 'NEW',
+              commentsText: session.commentsText,
+              department: slug,
+              items: {
+                create: items.map((p, i) => ({
+                  name: p.title,
+                  quantity: p.qty,
+                  unit: p.unit || 'шт',
+                  price: new Decimal(0),
+                  sum: new Decimal(0),
+                  sortOrder: i,
+                })),
+              },
+            },
+            include: { items: true },
+          })
+          return { number: num }
+        })
+        await prisma.clarificationSession.delete({ where: { id: session.id } }).catch(() => {})
+        notifyAdminAboutRequest(channel, dept.label, number, items.length).catch((e) =>
+          console.warn('[handleBotEvent] notifyAdmin error:', e)
+        )
+        return {
+          messages: [`Ок, подразделение: ${dept.label}. Заявка принята. Номер заявки: ${number}`],
+          removeKeyboard: true,
+        }
+      } catch (e) {
+        console.error('[handleBotEvent] create request (clarification session) error:', e)
+        return { messages: ['Ошибка при создании заявки. Попробуйте ещё раз.'], removeKeyboard: true }
+      }
+    }
+  }
+
+  // Обработка выбора подразделения (callback set_department|<slug>) — BotChatState
   const setDeptMatch = typeof choice === 'string' ? choice.match(/^set_department\|([a-z_]+)$/) : null
   if (setDeptMatch && stateData?.type === 'awaiting_department' && stateData?.pendingItems) {
     const slug = setDeptMatch[1]
@@ -352,6 +613,23 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
   }
 
+  // Новое текстовое сообщение при активной ClarificationSession — отменить сессию
+  if (event.text.trim() && !choice && channel === 'max') {
+    const existingSession = await prisma.clarificationSession.findUnique({ where: { chatId } })
+    if (existingSession) {
+      await prisma.clarificationSession.delete({ where: { id: existingSession.id } }).catch(() => {})
+      await prisma.botChatState.upsert({
+        where: { channel_chatId: { channel, chatId } },
+        create: { channel, chatId, stateJson: { type: 'confirmed' } },
+        update: { stateJson: { type: 'confirmed' } },
+      })
+      return {
+        messages: ['Предыдущая заявка отменена. Напишите заявку заново.'],
+        removeKeyboard: true,
+      }
+    }
+  }
+
   // Нет состояния — создаём confirmed, чтобы сразу принять потребность (без "Вы делаете заявки в компании X" Да/Нет)
   if (!state) {
     await prisma.botChatState.upsert({
@@ -392,6 +670,53 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       parsedItems[idx].unit = (parsed.unit ?? '').trim() || (item.unit ?? '').trim() || 'шт'
       const nextIdx = findNextIncompleteIndex(parsedItems)
       if (nextIdx < 0) {
+        const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
+          title: p.name,
+          qty: p.quantity,
+          unit: p.unit,
+        }))
+        const { catalogMaps, clarificationMap } = await loadClarificationMaps()
+        const { indices: clarifyIndices, questionByIndex } = findIndicesNeedingClarification(
+          itemsForClarification,
+          catalogMaps,
+          clarificationMap
+        )
+        if (clarifyIndices.length > 0 && channel === 'max') {
+          await prisma.clarificationSession.deleteMany({ where: { chatId } }).catch(() => {})
+          const firstClarifyIdx = clarifyIndices[0]
+          const firstClarifyItem = itemsForClarification[firstClarifyIdx]
+          const question = questionByIndex.get(firstClarifyIdx) ?? ''
+          const options = parseClarificationOptions(question)
+          const rows: { text: string; callback_data: string }[][] = []
+          const session = await prisma.clarificationSession.create({
+            data: {
+              chatId,
+              userId: event.userId ?? null,
+              itemsJson: itemsForClarification,
+              pendingItemIndex: firstClarifyIdx,
+              needText,
+              commentsText,
+            },
+          })
+          if (options.length > 0) {
+            rows.push(
+              options.slice(0, 4).map((opt) => ({
+                text: opt,
+                callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}`,
+              }))
+            )
+          }
+          rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
+          await prisma.botChatState.update({
+            where: { channel_chatId: { channel, chatId } },
+            data: { stateJson: { type: 'confirmed' } },
+          })
+          const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
+          return {
+            messages: [`${displayTitle} — какой именно?`],
+            replyInlineKeyboard: { rows },
+          }
+        }
         await prisma.botChatState.update({
           where: { channel_chatId: { channel, chatId } },
           data: {
@@ -520,6 +845,51 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         })
         return {
           messages: [clarificationMessage(firstItem)],
+        }
+      }
+
+      // Проверка позиций, требующих уточнения (ClarificationQuestion)
+      const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
+        title: p.name,
+        qty: p.quantity,
+        unit: p.unit,
+      }))
+      const { catalogMaps, clarificationMap } = await loadClarificationMaps()
+      const { indices: clarifyIndices, questionByIndex } = findIndicesNeedingClarification(
+        itemsForClarification,
+        catalogMaps,
+        clarificationMap
+      )
+      if (clarifyIndices.length > 0 && channel === 'max') {
+        await prisma.clarificationSession.deleteMany({ where: { chatId } }).catch(() => {})
+        const firstClarifyIdx = clarifyIndices[0]
+        const firstClarifyItem = itemsForClarification[firstClarifyIdx]
+        const question = questionByIndex.get(firstClarifyIdx) ?? ''
+        const options = parseClarificationOptions(question)
+        const rows: { text: string; callback_data: string }[][] = []
+        const session = await prisma.clarificationSession.create({
+          data: {
+            chatId,
+            userId: event.userId ?? null,
+            itemsJson: itemsForClarification,
+            pendingItemIndex: firstClarifyIdx,
+            needText,
+            commentsText,
+          },
+        })
+        if (options.length > 0) {
+          rows.push(
+            options.slice(0, 4).map((opt) => ({
+              text: opt,
+              callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}`,
+            }))
+          )
+        }
+        rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
+        const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
+        return {
+          messages: [`${displayTitle} — какой именно?`],
+          replyInlineKeyboard: { rows },
         }
       }
 

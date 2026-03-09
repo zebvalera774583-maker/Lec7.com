@@ -266,6 +266,24 @@ model ClarificationQuestion {
   updatedAt DateTime @updatedAt
 }
 
+// Сессия уточнения позиций до создания заявки (MAX бот). Одна активная на chatId.
+model ClarificationSession {
+  id                 String   @id @default(cuid())
+  chatId             String
+  userId             String?
+  department         String?  // null до выбора подразделения
+  itemsJson          Json     // [{ title, qty, unit }]
+  pendingItemIndex   Int?     // индекс текущей позиции для уточнения; null = все уточнены, ждём department
+  needDepartment     Boolean  @default(false) // true когда все уточнены, показываем выбор подразделения
+  needText           String?  @db.Text // исходный текст заявки
+  commentsText       String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([chatId])
+  @@index([chatId])
+}
+
 // Выученные алиасы (Orchestrator 2.1 Learning Loop)
 model BotLearnedAlias {
   id             String   @id @default(cuid())
