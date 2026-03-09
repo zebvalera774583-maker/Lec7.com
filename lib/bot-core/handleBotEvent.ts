@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
 import { getCatalogNormMap, matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
 import { recognizeNeedsForChat } from '@/lib/orchestrator/recognizeNeedsForChat'
+import { notifyAdminAboutRequest } from '@/lib/notify-admin'
 
 const NON_NEED_PATTERNS = /^(привет|старт|ок|hello|hi|здравствуй|хай|да|нет|пока|bye|спасибо|благодарю)$/i
 const UNIT_ONLY_PATTERN = /^(кг|г|гр|т|шт\.?|л|мл|уп|упак|кор|меш|ящ|пак|бан|мешок|короб|ящик|бутыл|бутылка|kg)$/iu
@@ -290,6 +291,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         })
         return { number: num }
       })
+      notifyAdminAboutRequest(channel, dept.label, number, parsedItems.length).catch((e) =>
+        console.warn('[handleBotEvent] notifyAdmin error:', e)
+      )
       await prisma.botChatState.update({
         where: { channel_chatId: { channel, chatId } },
         data: { stateJson: { type: 'confirmed' } },
