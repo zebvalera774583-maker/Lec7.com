@@ -1,11 +1,8 @@
 import { prisma } from '@/lib/prisma'
-import { matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
+import { matchToCatalogSyncWithNorm, normalizeForMatch } from '@/lib/catalog-match'
 import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
 import { buildTokenIndex, tokenMatchCatalog } from '@/lib/orchestrator/tokenMatchCatalog'
-
-function normalizeForMatch(s: string): string {
-  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ')
-}
+import { getClarificationMap } from '@/lib/summary-pipeline'
 
 /**
  * Нормализация названия позиции перед сопоставлением с каталогом:
@@ -33,6 +30,8 @@ export interface ResolvedItem {
   matchType?: 'alias' | 'learned' | 'token' | 'none'
   /** Score совпадения (alias=1, learned=1, token=0.6..1, none=0) */
   matchScore?: number
+  /** Общее слово из ClarificationQuestion — не матчить, запустить уточнение */
+  requiresClarification?: boolean
 }
 
 /**
@@ -45,7 +44,7 @@ export async function resolveCatalogItems(
   items: { name: string; quantity: string; unit: string }[],
   businessId: string
 ): Promise<ResolvedItem[]> {
-  const [catalogItems, learnedAliases] = await Promise.all([
+  const [catalogItems, learnedAliases, clarificationMap] = await Promise.all([
     prisma.botCatalogItem.findMany({
       where: { scope: 'GLOBAL', isActive: true },
       select: { id: true, canonicalName: true, synonyms: true },
@@ -54,6 +53,7 @@ export async function resolveCatalogItems(
       where: { businessId },
       select: { aliasText: true, canonicalName: true },
     }),
+    getClarificationMap(),
   ])
 
   const normToId = new Map<string, string>()
@@ -97,6 +97,24 @@ export async function resolveCatalogItems(
   const resolved: ResolvedItem[] = []
   for (const item of items) {
     const normalizedName = normalizeItemName(item.name)
+    const norm = normalizeForMatch(item.name)
+    const words = norm.split(/\s+/).filter(Boolean)
+    if (words.length === 1 && !normToId.has(norm) && clarificationMap.has(norm)) {
+      resolved.push({
+        catalogItemId: null,
+        canonicalName: item.name,
+        confidence: 0,
+        needsUserChoice: true,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        matchType: 'none',
+        matchScore: 0,
+        requiresClarification: true,
+      })
+      continue
+    }
+
     let catalogItemId: string | null = null
     let canonicalName = item.name
     let matchType: 'alias' | 'learned' | 'token' | 'none' = 'none'

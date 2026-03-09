@@ -1,7 +1,7 @@
 import { Decimal } from '@prisma/client/runtime/library'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
-import { getCatalogNormMap, matchToCatalogSync, matchToCatalogSyncWithNorm } from '@/lib/catalog-match'
+import { getCatalogNormMap, matchToCatalogSync, matchToCatalogSyncWithNorm, normalizeForMatch } from '@/lib/catalog-match'
 import { recognizeNeedsForChat } from '@/lib/orchestrator/recognizeNeedsForChat'
 import { notifyAdminAboutRequest } from '@/lib/notify-admin'
 import {
@@ -830,36 +830,30 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         }
       }
 
-      const firstIdx = findNextIncompleteIndex(parsedItems)
-      if (firstIdx >= 0) {
-        const firstItem = parsedItems[firstIdx]
-        await prisma.botChatState.update({
-          where: { channel_chatId: { channel, chatId } },
-          data: {
-            stateJson: {
-              type: 'awaiting_item_clarification',
-              pendingItems: { needText, parsedItems, commentsText },
-              pendingIndex: firstIdx,
-            },
-          },
-        })
-        return {
-          messages: [clarificationMessage(firstItem)],
-        }
-      }
-
-      // Проверка позиций, требующих уточнения (ClarificationQuestion)
+      const needsClarification = orchestratorResult.needsClarification ?? []
       const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
         title: p.name,
         qty: p.quantity,
         unit: p.unit,
       }))
-      const { catalogMaps, clarificationMap } = await loadClarificationMaps()
-      const { indices: clarifyIndices, questionByIndex } = findIndicesNeedingClarification(
-        itemsForClarification,
-        catalogMaps,
-        clarificationMap
-      )
+      let clarifyIndices: number[]
+      let questionByIndex: Map<number, string>
+      if (needsClarification.length > 0) {
+        clarifyIndices = needsClarification
+        const { clarificationMap } = await loadClarificationMaps()
+        questionByIndex = new Map()
+        for (const idx of clarifyIndices) {
+          const item = itemsForClarification[idx]
+          const norm = normalizeForMatch(item?.title || '').split(/\s+/)[0]
+          const q = norm ? clarificationMap.get(norm) : null
+          if (q) questionByIndex.set(idx, q)
+        }
+      } else {
+        const { catalogMaps, clarificationMap } = await loadClarificationMaps()
+        const result = findIndicesNeedingClarification(itemsForClarification, catalogMaps, clarificationMap)
+        clarifyIndices = result.indices
+        questionByIndex = result.questionByIndex
+      }
       if (clarifyIndices.length > 0 && channel === 'max') {
         await prisma.clarificationSession.deleteMany({ where: { chatId } }).catch(() => {})
         const firstClarifyIdx = clarifyIndices[0]
@@ -890,6 +884,24 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         return {
           messages: [`${displayTitle} — какой именно?`],
           replyInlineKeyboard: { rows },
+        }
+      }
+
+      const firstIdx = findNextIncompleteIndex(parsedItems)
+      if (firstIdx >= 0) {
+        const firstItem = parsedItems[firstIdx]
+        await prisma.botChatState.update({
+          where: { channel_chatId: { channel, chatId } },
+          data: {
+            stateJson: {
+              type: 'awaiting_item_clarification',
+              pendingItems: { needText, parsedItems, commentsText },
+              pendingIndex: firstIdx,
+            },
+          },
+        })
+        return {
+          messages: [clarificationMessage(firstItem)],
         }
       }
 

@@ -31,6 +31,8 @@ export interface RecognizeResult {
   needsUnitClarification?: number[]
   /** Индексы items, для которых нужна уточнение quantity */
   needsQtyClarification?: number[]
+  /** Индексы items, требующих уточнения (ClarificationQuestion) */
+  needsClarification?: number[]
 }
 
 /**

@@ -40,6 +40,8 @@ export interface NormalizeResult {
   comments?: string[]
   needsUnitClarification?: number[]
   needsQtyClarification?: number[]
+  /** Индексы items, требующих уточнения (ClarificationQuestion) */
+  needsClarification?: number[]
 }
 
 type RawItem = {
@@ -145,6 +147,7 @@ export async function normalizeIncomingOrder(
   const comments: string[] = []
   const needsUnitClarificationFiltered: number[] = []
   const needsQtyClarificationFiltered: number[] = []
+  const needsClarificationFiltered: number[] = []
   let itemIndex = 0
 
   const HIGH = ORCHESTRATOR_CONFIG.highConfidenceThreshold
@@ -154,6 +157,16 @@ export async function normalizeIncomingOrder(
     const raw = rawItems[i]
     const segment = raw.originalSegment
     const matchScore = r.matchScore ?? 0
+
+    if (r.requiresClarification) {
+      r.canonicalName = sanitizeTitle(r.canonicalName)
+      r.name = sanitizeTitle(r.name)
+      r.unit = itemsWithUnit[i].unit
+      items.push(r)
+      needsClarificationFiltered.push(itemIndex)
+      itemIndex++
+      continue
+    }
 
     if (isGarbageSegment(segment, raw)) {
       comments.push(segment)
@@ -216,7 +229,7 @@ export async function normalizeIncomingOrder(
       items.push(r)
       itemIndex++
 
-      if (verdict === 'ITEM' || verdict === 'ITEM_AUTO') {
+      if ((verdict === 'ITEM' || verdict === 'ITEM_AUTO') && !r.requiresClarification) {
         maybeLearnAlias(
           businessId,
           raw.name,
@@ -242,5 +255,7 @@ export async function normalizeIncomingOrder(
       needsUnitClarificationFiltered.length > 0 ? needsUnitClarificationFiltered : undefined,
     needsQtyClarification:
       needsQtyClarificationFiltered.length > 0 ? needsQtyClarificationFiltered : undefined,
+    needsClarification:
+      needsClarificationFiltered.length > 0 ? needsClarificationFiltered : undefined,
   }
 }
