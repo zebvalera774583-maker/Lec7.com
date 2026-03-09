@@ -151,6 +151,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
   } | null>(null)
   const [periodSummaryLoading, setPeriodSummaryLoading] = useState(false)
   const [periodSummaryError, setPeriodSummaryError] = useState<string | null>(null)
+  const [periodSummarySelectedPrice, setPeriodSummarySelectedPrice] = useState<Record<string, string>>({})
 
   // Назначить исполнителя: панель справа
   const [assignPerformerOpen, setAssignPerformerOpen] = useState(false)
@@ -2553,6 +2554,7 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                     const data = await res.json()
                     if (!res.ok) throw new Error(data.error || 'Ошибка загрузки')
                     setPeriodSummaryData(data)
+                    setPeriodSummarySelectedPrice({})
                   } catch (e) {
                     setPeriodSummaryError(e instanceof Error ? e.message : 'Ошибка')
                   } finally {
@@ -2573,21 +2575,64 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                 {periodSummaryLoading ? 'Загрузка...' : 'Показать'}
               </button>
               {periodSummaryData && periodSummaryData.sections.some((s) => s.items.length > 0) && (
-                <button
-                  type="button"
-                  onClick={() => downloadPeriodSummaryAsExcel(periodSummaryData, periodDateFrom, periodDateTo)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#059669',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  Скачать (Excel)
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const partners = periodSummaryData.counterparties.filter((c) => c.id !== '__OWN_PRICE__')
+                      const items = periodSummaryData.sections.flatMap((s) => s.items)
+                      const selectedPriceByItem: Record<string, string | null> = {}
+                      let globalIdx = 0
+                      periodSummaryData.sections.forEach((section, sectionIdx) => {
+                        section.items.forEach((_, idx) => {
+                          const key = `${sectionIdx}-${idx}`
+                          const sel = periodSummarySelectedPrice[key]
+                          selectedPriceByItem[String(globalIdx)] = sel ?? null
+                          globalIdx++
+                        })
+                      })
+                      const useForRequest = Object.fromEntries(partners.map((c) => [c.id, true]))
+                      const payload = {
+                        items: items.map((r) => ({ name: r.name, quantity: r.quantity, unit: r.unit, offers: r.offers, analogues: r.analogues })),
+                        counterparties: periodSummaryData.counterparties,
+                        selectedPriceByItem,
+                        useForRequest,
+                        fromPeriodSummary: true,
+                      }
+                      if (typeof sessionStorage !== 'undefined') {
+                        sessionStorage.setItem('lec7_period_summary_request', JSON.stringify(payload))
+                      }
+                      router.push(`/office/businesses/${businessId}/requests?section=create&fromPeriodSummary=1`)
+                      setIsPeriodSummaryOpen(false)
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Сформировать заявку
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadPeriodSummaryAsExcel(periodSummaryData, periodDateFrom, periodDateTo)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#059669',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Скачать (Excel)
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -2638,13 +2683,16 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                           </td>
                         </tr>
                         {section.items.map((r, idx) => {
+                          const itemKey = `${sectionIdx}-${idx}`
+                          const selectedCid = periodSummarySelectedPrice[itemKey]
                           const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
                           const minPrice = prices.filter((p): p is number => p != null)
                           const rowMin = minPrice.length > 0 ? Math.min(...minPrice) : null
+                          const effectivePrice = selectedCid ? (r.offers[selectedCid] ?? null) : rowMin
                           const qty = parseFloat(r.quantity) || 0
-                          const rowSum = rowMin != null ? rowMin * qty : null
+                          const rowSum = effectivePrice != null ? effectivePrice * qty : null
                           return (
-                            <tr key={`${sectionIdx}-${idx}`}>
+                            <tr key={itemKey}>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }} />
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{idx + 1}</td>
                               <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.name}</td>
@@ -2654,16 +2702,21 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                                 const p = r.offers[c.id] ?? null
                                 const analogues = r.analogues?.[c.id] || []
                                 const hasAnalogue = analogues.length > 0 && p == null
-                                const isMin = p != null && rowMin != null && p === rowMin
+                                const isSelected = selectedCid ? p != null && c.id === selectedCid : p != null && rowMin != null && p === rowMin
                                 return (
                                   <td
                                     key={c.id}
+                                    onClick={() => p != null && setPeriodSummarySelectedPrice((prev) => ({ ...prev, [itemKey]: c.id }))}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => p != null && (e.key === 'Enter' || e.key === ' ') && setPeriodSummarySelectedPrice((prev) => ({ ...prev, [itemKey]: c.id }))}
                                     style={{
                                       padding: '0.75rem',
                                       border: '1px solid #e5e7eb',
                                       textAlign: 'right',
-                                      backgroundColor: isMin ? '#dcfce7' : 'white',
+                                      backgroundColor: isSelected ? '#dcfce7' : 'white',
                                       verticalAlign: 'top',
+                                      cursor: p != null ? 'pointer' : 'default',
                                     }}
                                   >
                                     {p != null ? (
@@ -2688,32 +2741,72 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                             </tr>
                           )
                         })}
+                        <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                          <td colSpan={5} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                          {periodSummaryData.counterparties.map((c) => {
+                            const sectionSum = section.items.reduce((a, r, idx) => {
+                              const itemKey = `${sectionIdx}-${idx}`
+                              const selectedCid = periodSummarySelectedPrice[itemKey]
+                              const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
+                              const minP = prices.filter((x): x is number => x != null)
+                              const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                              const effectivePrice = selectedCid ? (r.offers[selectedCid] ?? null) : rowMin
+                              const qty = parseFloat(r.quantity) || 0
+                              const isThisSelected = selectedCid ? c.id === selectedCid : effectivePrice != null && rowMin != null && r.offers[c.id] === rowMin
+                              if (effectivePrice != null && isThisSelected) return a + effectivePrice * qty
+                              return a
+                            }, 0)
+                            return (
+                              <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                {sectionSum > 0 ? sectionSum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '—'}
+                              </td>
+                            )
+                          })}
+                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                            {section.items.reduce((a, r, idx) => {
+                              const itemKey = `${sectionIdx}-${idx}`
+                              const selectedCid = periodSummarySelectedPrice[itemKey]
+                              const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
+                              const minP = prices.filter((x): x is number => x != null)
+                              const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                              const effectivePrice = selectedCid ? (r.offers[selectedCid] ?? null) : rowMin
+                              const qty = parseFloat(r.quantity) || 0
+                              return a + (effectivePrice != null ? effectivePrice * qty : 0)
+                            }, 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
                       </React.Fragment>
                     ))}
                   </tbody>
                   <tfoot>
                     {(() => {
-                      const allItems = periodSummaryData.sections.flatMap((s) => s.items)
-                      const totalSum = allItems.reduce((a, r) => {
+                      const allItemsWithKeys = periodSummaryData.sections.flatMap((s, sectionIdx) =>
+                        s.items.map((r, idx) => ({ r, key: `${sectionIdx}-${idx}` }))
+                      )
+                      const totalSum = allItemsWithKeys.reduce((a, { r, key }) => {
+                        const selectedCid = periodSummarySelectedPrice[key]
                         const prices = periodSummaryData.counterparties.map((c) => r.offers[c.id] ?? null)
                         const minP = prices.filter((x): x is number => x != null)
                         const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                        const effectivePrice = selectedCid ? (r.offers[selectedCid] ?? null) : rowMin
                         const qty = parseFloat(r.quantity) || 0
-                        return a + (rowMin != null ? rowMin * qty : 0)
+                        return a + (effectivePrice != null ? effectivePrice * qty : 0)
                       }, 0)
                       const sumByCounterparty = periodSummaryData.counterparties.map((c) =>
-                        allItems.reduce((a, r) => {
-                          const p = r.offers[c.id] ?? null
+                        allItemsWithKeys.reduce((a, { r, key }) => {
+                          const selectedCid = periodSummarySelectedPrice[key]
                           const prices = periodSummaryData.counterparties.map((cc) => r.offers[cc.id] ?? null)
                           const minP = prices.filter((x): x is number => x != null)
                           const rowMin = minP.length > 0 ? Math.min(...minP) : null
+                          const effectiveCid = selectedCid ?? (rowMin != null ? periodSummaryData.counterparties.find((cc) => r.offers[cc.id] === rowMin)?.id : null)
+                          const effectivePrice = effectiveCid ? (r.offers[effectiveCid] ?? null) : rowMin
                           const qty = parseFloat(r.quantity) || 0
-                          if (rowMin != null && p != null && p === rowMin) return a + p * qty
+                          if (effectivePrice != null && effectiveCid === c.id) return a + effectivePrice * qty
                           return a
                         }, 0)
                       )
                       const fullOrderByCounterparty = periodSummaryData.counterparties.map((c) =>
-                        allItems.reduce((a, r) => {
+                        allItemsWithKeys.reduce((a, { r, key }) => {
                           let p = r.offers[c.id] ?? null
                           if (p == null) {
                             const others = periodSummaryData.counterparties.filter((cc) => cc.id !== c.id)

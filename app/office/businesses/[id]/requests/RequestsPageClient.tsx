@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import * as XLSX from 'xlsx'
 
 const SUMMARY_STORAGE_KEY = 'lec7_request_summary'
+const PERIOD_SUMMARY_STORAGE_KEY = 'lec7_period_summary_request'
 
 interface RequestsPageClientProps {
   businessId: string
@@ -666,6 +667,43 @@ export default function RequestsPageClient({ businessId, initialSection, initial
         setUseForRequest(Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true])))
         setViewSection('create')
         setViewMode('summary')
+        setShowCreateBlock(true)
+        window.history.replaceState(null, '', `/office/businesses/${businessId}/requests?section=create`)
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [searchParams, businessId])
+
+  useEffect(() => {
+    if (searchParams.get('fromPeriodSummary') !== '1' || typeof sessionStorage === 'undefined') return
+    try {
+      const raw = sessionStorage.getItem(PERIOD_SUMMARY_STORAGE_KEY)
+      if (!raw) return
+      const data = JSON.parse(raw)
+      sessionStorage.removeItem(PERIOD_SUMMARY_STORAGE_KEY)
+      const counterparties = data.counterparties || []
+      const items = data.items || []
+      const selectedPriceByItem = data.selectedPriceByItem ?? {}
+      const useForRequest = data.useForRequest ?? Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true]))
+      if (items.length > 0 && counterparties.length > 0) {
+        const partners = counterparties.filter((c: Counterparty) => isPartnerCounterparty(c))
+        const selected = partners.filter((c: Counterparty) => useForRequest[c.id])
+        const newEntry: SummaryEntry = {
+          id: crypto.randomUUID(),
+          summaryData: { items: [...items], counterparties: [...counterparties] },
+          createdRequest: {
+            category: DEFAULT_CATEGORY,
+            createdAt: new Date(),
+            counterpartyCards: selected.length > 0 ? selected.map((c: Counterparty) => ({ id: c.id, legalName: c.legalName })) : partners.map((c: Counterparty) => ({ id: c.id, legalName: c.legalName })),
+            department: null,
+          },
+          appliedAnalogue: {},
+          selectedPriceByItem,
+        }
+        setSummaries((prev) => [newEntry, ...prev])
+        setViewSection('create')
+        setViewMode('created')
         setShowCreateBlock(true)
         window.history.replaceState(null, '', `/office/businesses/${businessId}/requests?section=create`)
       }
