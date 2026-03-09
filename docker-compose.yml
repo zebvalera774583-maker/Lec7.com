@@ -51,7 +51,7 @@ services:
       BOT_COMPANY_NAME: ${BOT_COMPANY_NAME:-Блины Юга}
       BOT_BUSINESS_ID: ${BOT_BUSINESS_ID:-}
       MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:-}
-      MAX_API_URL: ${MAX_API_URL:-https://botapi.max.ru}
+      MAX_API_URL: ${MAX_API_URL:-https://platform-api.max.ru}
     depends_on:
       postgres:
         condition: service_healthy

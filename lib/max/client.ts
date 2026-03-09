@@ -1,9 +1,11 @@
 /**
  * MAX client for sending messages.
- * Endpoint and token from env: MAX_API_URL, MAX_BOT_TOKEN.
+ * API: https://dev.max.ru/docs-api/methods/POST/messages
+ * Endpoint: POST /messages?user_id={id} (or ?chat_id={id})
+ * Base URL from env: MAX_API_URL (default platform-api.max.ru)
  */
 
-const MAX_API_URL = process.env.MAX_API_URL || 'https://botapi.max.ru'
+const MAX_API_URL = process.env.MAX_API_URL || 'https://platform-api.max.ru'
 const MAX_BOT_TOKEN = process.env.MAX_BOT_TOKEN || ''
 
 export interface SendMessageResult {
@@ -16,16 +18,17 @@ export interface InlineKeyboardButton {
   callback_data: string
 }
 
+export type MaxRecipientType = 'user_id' | 'chat_id'
+
 /**
- * Send message to MAX chat.
- * If replyInlineKeyboard is provided, adds attachments with inline_keyboard (2 buttons Да/Нет as callback).
- * MAX API format: attachments: [{ type: 'inline_keyboard', payload: { buttons: [[{ type:'callback', text, payload }]] } }]
- * Returns { ok: true } on success, { ok: false, error } on failure.
+ * Send message to MAX. recipientId + recipientType: user_id (direct) or chat_id (group).
+ * MAX API: POST /messages?user_id={id} или ?chat_id={id}
  */
 export async function sendMessage(
-  chatId: string,
+  recipientId: string,
   text: string,
-  replyInlineKeyboard?: { buttons: InlineKeyboardButton[] }
+  replyInlineKeyboard?: { buttons: InlineKeyboardButton[] },
+  recipientType: MaxRecipientType = 'user_id'
 ): Promise<SendMessageResult> {
   if (!MAX_BOT_TOKEN) {
     console.warn('[max/client] MAX_BOT_TOKEN not configured, skip send')
@@ -33,7 +36,9 @@ export async function sendMessage(
   }
 
   try {
-    const url = `${MAX_API_URL.replace(/\/$/, '')}/chats/${chatId}/messages`
+    const base = MAX_API_URL.replace(/\/$/, '')
+    const param = recipientType === 'chat_id' ? 'chat_id' : 'user_id'
+    const url = `${base}/messages?${param}=${encodeURIComponent(recipientId)}`
     console.log('[max/client] POST', url)
     const body: {
       text: string

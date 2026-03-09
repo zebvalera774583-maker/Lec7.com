@@ -25,7 +25,7 @@ export async function notifyAdminAboutRequest(
   try {
     if (channel === 'max') {
       console.log('[notifyAdmin] sending to MAX', { chatId: ADMIN_MAX_CHAT_ID, hasToken: !!process.env.MAX_BOT_TOKEN })
-      const res = await sendMaxMessage(ADMIN_MAX_CHAT_ID, text)
+      const res = await sendMaxMessage(ADMIN_MAX_CHAT_ID, text, undefined, 'chat_id')
       if (res.ok) {
         console.log('[notifyAdmin] MAX send OK')
       } else {
