@@ -71,7 +71,7 @@ export async function sendMessage(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${MAX_BOT_TOKEN}`,
+        Authorization: `${MAX_BOT_TOKEN}`,
       },
       body: JSON.stringify(body),
     })
