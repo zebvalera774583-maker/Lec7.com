@@ -291,6 +291,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         })
         return { number: num }
       })
+      console.log('[handleBotEvent] request created, calling notifyAdmin', { channel, department: dept.label, number, itemsCount: parsedItems.length })
       notifyAdminAboutRequest(channel, dept.label, number, parsedItems.length).catch((e) =>
         console.warn('[handleBotEvent] notifyAdmin error:', e)
       )

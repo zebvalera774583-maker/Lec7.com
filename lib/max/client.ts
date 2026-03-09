@@ -28,11 +28,13 @@ export async function sendMessage(
   replyInlineKeyboard?: { buttons: InlineKeyboardButton[] }
 ): Promise<SendMessageResult> {
   if (!MAX_BOT_TOKEN) {
+    console.warn('[max/client] MAX_BOT_TOKEN not configured, skip send')
     return { ok: false, error: 'MAX_BOT_TOKEN not configured' }
   }
 
   try {
     const url = `${MAX_API_URL.replace(/\/$/, '')}/chats/${chatId}/messages`
+    console.log('[max/client] POST', url)
     const body: {
       text: string
       attachments?: Array<{

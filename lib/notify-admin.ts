@@ -15,6 +15,7 @@ export async function notifyAdminAboutRequest(
   number: number,
   itemsCount: number
 ): Promise<void> {
+  console.log('[notifyAdmin] entry', { channel, department, number, itemsCount })
   const text = `🔔 Заявка отправлена
 
 От: ${department}
@@ -23,8 +24,11 @@ export async function notifyAdminAboutRequest(
 
   try {
     if (channel === 'max') {
+      console.log('[notifyAdmin] sending to MAX', { chatId: ADMIN_MAX_CHAT_ID, hasToken: !!process.env.MAX_BOT_TOKEN })
       const res = await sendMaxMessage(ADMIN_MAX_CHAT_ID, text)
-      if (!res.ok) {
+      if (res.ok) {
+        console.log('[notifyAdmin] MAX send OK')
+      } else {
         console.warn('[notifyAdmin] MAX send failed:', res.error)
       }
     } else {
