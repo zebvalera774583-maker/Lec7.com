@@ -155,7 +155,7 @@ export default function RequestDetailClient({
         {itemsNeedingQuestion.length > 0 && (
           <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
             <div style={{ marginBottom: '0.75rem', fontSize: '0.9375rem', fontWeight: 600, color: '#92400e' }}>
-              Позиции, требующие уточнения
+              Таблица №6: Позиции, требующие уточнения
             </div>
             <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fffbeb' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
