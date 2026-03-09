@@ -257,6 +257,15 @@ model BotCatalogItem {
   @@index([scope])
 }
 
+// Таблица №6: позиции, требующие уточнения. Слово → вопрос (перец → перец красный, перец желтый, перец зеленый?)
+model ClarificationQuestion {
+  id        String   @id @default(cuid())
+  word      String   @unique
+  question  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Выученные алиасы (Orchestrator 2.1 Learning Loop)
 model BotLearnedAlias {
   id             String   @id @default(cuid())

@@ -12,12 +12,19 @@ function formatUnit(unit: string | undefined): string {
   return UNIT_RU[unit.toLowerCase()] ?? unit
 }
 
+interface ItemNeedingQuestion {
+  itemName: string
+  question: string
+}
+
 interface RequestDetailClientProps {
   businessId: string
   itemsJson: unknown
   descriptionFallback?: string | null
   commentsText?: string | null
   department?: string | null
+  requestNumber?: number | null
+  itemsNeedingQuestion?: ItemNeedingQuestion[]
 }
 
 export default function RequestDetailClient({
@@ -26,6 +33,8 @@ export default function RequestDetailClient({
   descriptionFallback,
   commentsText,
   department,
+  requestNumber,
+  itemsNeedingQuestion = [],
 }: RequestDetailClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -141,6 +150,35 @@ export default function RequestDetailClient({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {itemsNeedingQuestion.length > 0 && (
+          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+            <div style={{ marginBottom: '0.75rem', fontSize: '0.9375rem', fontWeight: 600, color: '#92400e' }}>
+              Позиции, требующие уточнения
+            </div>
+            <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: '#fffbeb' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#fef3c7', fontWeight: 500 }}>№ заявки</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#fef3c7', fontWeight: 500 }}>Наименование в заявке</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #e5e7eb', background: '#fef3c7', fontWeight: 500 }}>Вопрос</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemsNeedingQuestion.map((row, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{requestNumber ?? '—'}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{row.itemName}</td>
+                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', fontStyle: 'italic', color: '#92400e' }}>
+                        {row.question}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

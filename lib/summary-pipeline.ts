@@ -103,6 +103,47 @@ export async function buildCatalogMaps(): Promise<CatalogMaps> {
   return { catalogItems, normToId, masterToCanonical, masterItemIdToSearchNorms }
 }
 
+export type ItemNeedingQuestion = { itemName: string; question: string }
+
+/** Загрузить справочник таблицы №6: слово → вопрос */
+export async function getClarificationMap(): Promise<Map<string, string>> {
+  const rows = await prisma.clarificationQuestion.findMany({
+    select: { word: true, question: true },
+  })
+  const map = new Map<string, string>()
+  for (const r of rows) {
+    const norm = normalizeForMatch(r.word)
+    if (norm) map.set(norm, r.question)
+  }
+  return map
+}
+
+/**
+ * Позиции, по которым нужен вопрос. Справочник (таблица №6): слово → вопрос.
+ * «перец красный» → точное совпадение в каталоге → не вопрос.
+ * «перец 6 кг» → название «перец», в справочнике → показываем вопрос.
+ */
+export function getItemsNeedingQuestion(
+  items: { name: string }[],
+  catalogMaps: CatalogMaps,
+  clarificationMap: Map<string, string>
+): ItemNeedingQuestion[] {
+  const { normToId } = catalogMaps
+  const result: ItemNeedingQuestion[] = []
+  for (const it of items) {
+    const name = (it.name || '').trim()
+    if (!name) continue
+    const norm = normalizeForMatch(name)
+    if (!norm) continue
+    if (normToId.has(norm)) continue
+    const firstWord = norm.split(/\s+/)[0]
+    const question = clarificationMap.get(firstWord)
+    if (!question) continue
+    result.push({ itemName: name, question })
+  }
+  return result
+}
+
 /** Fuzzy match: key from price list matches search norm */
 function normMatchesPriceKey(searchNorm: string, priceNorm: string): boolean {
   if (!searchNorm || !priceNorm) return false
@@ -256,7 +297,7 @@ export function processRequestItemsToResult(
   const resultItems: ResultItem[] = []
 
   for (const it of requestItems) {
-    const masterItemId = it.masterItemId !== undefined ? it.masterItemId : (() => {
+    const masterItemId = it.masterItemId != null ? it.masterItemId : (() => {
       const n = normalizeForMatch(it.name)
       return n ? (normToId.get(n) ?? null) : null
     })()

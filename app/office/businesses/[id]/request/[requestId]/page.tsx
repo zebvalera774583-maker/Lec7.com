@@ -9,6 +9,7 @@ import { notFound } from 'next/navigation'
 import { getAuthUserFromContext } from '@/lib/middleware'
 import { headers, cookies } from 'next/headers'
 import { parseMaxRequestToRows } from '@/lib/parseMaxRequest'
+import { buildCatalogMaps, getClarificationMap, getItemsNeedingQuestion } from '@/lib/summary-pipeline'
 import RequestDetailClient from './RequestDetailClient'
 
 interface PageProps {
@@ -93,6 +94,11 @@ export default async function RequestDetailPage({ params }: PageProps) {
     console.timeEnd(perfParse)
   }
 
+  const itemsForQuestion = Array.isArray(itemsJson) ? itemsJson : []
+  const requestItems = itemsForQuestion.map((it: { title?: string }) => ({ name: (it.title || '').trim() })).filter((it) => it.name.length > 0)
+  const [catalogMaps, clarificationMap] = await Promise.all([buildCatalogMaps(), getClarificationMap()])
+  const itemsNeedingQuestion = getItemsNeedingQuestion(requestItems, catalogMaps, clarificationMap)
+
   console.timeEnd(perfTotal)
 
   return (
@@ -102,6 +108,8 @@ export default async function RequestDetailPage({ params }: PageProps) {
       descriptionFallback={request.description}
       commentsText={commentsText}
       department={department}
+      requestNumber={request.number}
+      itemsNeedingQuestion={itemsNeedingQuestion}
     />
   )
 }
