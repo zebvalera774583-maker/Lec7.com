@@ -96,6 +96,29 @@ export const GET = withBusinessAccess(async (req) => {
       },
     })
 
+    // normToId для ключа агрегации: masterItemId ?? norm (синонимы объединяются)
+    const catalogItemsForAgg = await prisma.botCatalogItem.findMany({
+      where: { scope: 'GLOBAL' },
+      select: { id: true, canonicalName: true, synonyms: true },
+    })
+    const normToIdForAgg = new Map<string, string>()
+    const ambiguousForAgg = new Set<string>()
+    for (const item of catalogItemsForAgg) {
+      const addMapping = (norm: string) => {
+        if (!norm) return
+        if (normToIdForAgg.has(norm)) {
+          if (normToIdForAgg.get(norm) !== item.id) ambiguousForAgg.add(norm)
+        } else {
+          normToIdForAgg.set(norm, item.id)
+        }
+      }
+      addMapping(normalizeForMatch(item.canonicalName))
+      for (const syn of item.synonyms) {
+        addMapping(normalizeForMatch(syn))
+      }
+    }
+    for (const k of ambiguousForAgg) normToIdForAgg.delete(k)
+
     type GroupKey = string
     const groups = new Map<GroupKey, { department: string; date: string; requestNumbers: number[]; agg: Map<string, { name: string; quantity: number; unit: string }> }>()
 
@@ -124,13 +147,15 @@ export const GET = withBusinessAccess(async (req) => {
 
       const rows = getRowsFromRequest(r)
       for (const row of rows) {
-        const key = `${row.name.toLowerCase().trim()}|${row.unit}`
+        const norm = normalizeForMatch(row.name)
+        const masterItemId = norm ? (normToIdForAgg.get(norm) ?? null) : null
+        const aggKey = `${masterItemId ?? norm ?? row.name.toLowerCase().trim()}|${row.unit}`
         const qty = parseQuantity(row.quantity)
-        const existing = group.agg.get(key)
+        const existing = group.agg.get(aggKey)
         if (existing) {
           existing.quantity += qty
         } else {
-          group.agg.set(key, { name: row.name.trim(), quantity: qty, unit: row.unit })
+          group.agg.set(aggKey, { name: row.name.trim(), quantity: qty, unit: row.unit })
         }
       }
     }
@@ -268,10 +293,7 @@ export const GET = withBusinessAccess(async (req) => {
       return resultItems
     }
 
-    const catalogItems = await prisma.botCatalogItem.findMany({
-      where: { scope: 'GLOBAL' },
-      select: { id: true, canonicalName: true, synonyms: true },
-    })
+    const catalogItems = catalogItemsForAgg
     const normToId = new Map<string, string>()
     const normToCanonical = new Map<string, string>()
     const ambiguous = new Set<string>()
