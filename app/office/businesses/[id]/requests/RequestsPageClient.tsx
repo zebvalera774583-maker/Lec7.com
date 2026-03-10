@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import * as XLSX from 'xlsx'
@@ -29,6 +29,14 @@ interface SummaryItem {
   analogues?: Record<string, { name: string; price: number }[]>
 }
 
+interface SummarySection {
+  department: string
+  departmentLabel: string
+  date: string
+  requestNumbers: number[]
+  items: SummaryItem[]
+}
+
 interface Counterparty {
   id: string
   legalName: string
@@ -36,7 +44,7 @@ interface Counterparty {
 
 interface SummaryEntry {
   id: string
-  summaryData: { items: SummaryItem[]; counterparties: Counterparty[] }
+  summaryData: { items: SummaryItem[]; counterparties: Counterparty[]; sections?: SummarySection[] }
   createdRequest: { category: string; createdAt: Date; counterpartyCards: { id: string; legalName: string }[]; department?: string | null }
   appliedAnalogue: Record<string, Record<string, { name: string; price: number }>>
   /** Ручной выбор поставщика по позиции: itemKey -> counterpartyId. null = авто (мин. цена). Позволяет включать позиции без цены (цена 0). */
@@ -149,7 +157,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     }
     return [{}]
   })
-  const [summaryData, setSummaryData] = useState<{ items: SummaryItem[]; counterparties: Counterparty[] } | null>(null)
+  const [summaryData, setSummaryData] = useState<{ items: SummaryItem[]; counterparties: Counterparty[]; sections?: SummarySection[] } | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [appliedAnalogue, setAppliedAnalogue] = useState<Record<string, Record<string, { name: string; price: number }>>>({})
@@ -186,10 +194,20 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     if (!summaryData || !createdRequest) return
     setMenuOpenCardId(null)
     const partners = summaryData.counterparties.filter(isPartnerCounterparty)
+    const items = summaryData.sections ? summaryData.sections.flatMap((s) => s.items) : summaryData.items
+    const getItemKey = (sectionIdx: number, itemIdx: number) => summaryData.sections ? `${sectionIdx}-${itemIdx}` : String(itemIdx)
     const sumByCounterparty: Record<string, number> = {}
     summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
-    summaryData.items.forEach((item, idx) => {
-      const itemKey = String(idx)
+    const iterateItems = (fn: (item: SummaryItem, itemKey: string, sectionIdx: number, itemIdx: number) => void) => {
+      if (summaryData.sections) {
+        summaryData.sections.forEach((section, sectionIdx) => {
+          section.items.forEach((item, itemIdx) => fn(item, getItemKey(sectionIdx, itemIdx), sectionIdx, itemIdx))
+        })
+      } else {
+        items.forEach((item, idx) => fn(item, String(idx), 0, idx))
+      }
+    }
+    iterateItems((item, itemKey) => {
       const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
       const s = selectedPriceByItem[itemKey]
       if (s != null) {
@@ -216,30 +234,31 @@ export default function RequestsPageClient({ businessId, initialSection, initial
         sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qty
       }
     })
-    const rowTotals = summaryData.items.map((item, idx) => {
-      const itemKey = String(idx)
+    const rowTotals: number[] = []
+    iterateItems((item, itemKey) => {
       const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
       const s = selectedPriceByItem[itemKey]
+      let val = 0
       if (s != null) {
         const exact = item.offers[s]
         const applied = appliedAnalogue[itemKey]?.[s]?.price
-        const p = exact ?? applied ?? 0
-        return p * qty
+        val = (exact ?? applied ?? 0) * qty
+      } else {
+        let rowMin: number | null = null
+        partners.forEach((c) => {
+          const exact = item.offers[c.id]
+          const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+          const p = exact ?? applied ?? null
+          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+        })
+        val = rowMin != null ? rowMin * qty : 0
       }
-      let rowMin: number | null = null
-      partners.forEach((c) => {
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        const p = exact ?? applied ?? null
-        if (p != null && (rowMin == null || p < rowMin)) rowMin = p
-      })
-      return rowMin != null ? rowMin * qty : 0
+      rowTotals.push(val)
     })
     const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
     const fullOrderBySupplier: Record<string, number> = {}
     summaryData.counterparties.forEach((c) => { fullOrderBySupplier[c.id] = 0 })
-    summaryData.items.forEach((item, idx) => {
-      const itemKey = String(idx)
+    iterateItems((item, itemKey) => {
       const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
       summaryData.counterparties.forEach((c) => {
         const exact = item.offers[c.id]
@@ -260,11 +279,13 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       })
     })
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...summaryData.counterparties.map((c) => c.legalName), 'Итоговая сумма']
-    const dataRows = summaryData.items.map((item, idx) => {
-      const itemKey = String(idx)
-      const rowTotalSum = rowTotals[idx] ?? 0
-      return [
-        idx + 1,
+    let rowIdx = 0
+    const dataRows: (string | number)[][] = []
+    iterateItems((item, itemKey) => {
+      const rowTotalSum = rowTotals[rowIdx] ?? 0
+      rowIdx++
+      dataRows.push([
+        rowIdx,
         item.name,
         item.quantity || '',
         item.unit || '',
@@ -275,7 +296,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
           return p != null ? p : ''
         }),
         rowTotalSum > 0 ? rowTotalSum : '',
-      ]
+      ])
     })
     const footerRow1 = ['Итого (по выбранным позициям)', '', '', '', ...summaryData.counterparties.map((c) => sumByCounterparty[c.id] > 0 ? sumByCounterparty[c.id] : ''), totalMinSum > 0 ? totalMinSum : '']
     const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...summaryData.counterparties.map((c) => fullOrderBySupplier[c.id] > 0 ? fullOrderBySupplier[c.id] : ''), '']
@@ -351,33 +372,89 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
     if (!c) return []
     const partners = summaryData.counterparties.filter(isPartnerCounterparty)
-    return summaryData.items
-      .map((item, idx) => {
-        const itemKey = String(idx)
-        const sel = selectedPriceByItem[itemKey]
-        const exact = item.offers[c.id]
-        const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-        const price = exact ?? applied ?? null
-        const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-        if (sel === counterpartyId) {
-          const p = price ?? 0
-          return { item, price: p, qty, sum: p * qty }
-        }
-        if (sel != null && sel !== counterpartyId) return null
-        if (price == null || !Number.isFinite(price)) return null
-        let rowMin: number | null = null
-        partners.forEach((cc) => {
-          const ex = item.offers[cc.id]
-          const app = appliedAnalogue[itemKey]?.[cc.id]?.price
-          const pp = ex ?? app ?? null
-          if (pp != null && (rowMin == null || pp < rowMin)) rowMin = pp
+    const iterateItems = (fn: (item: SummaryItem, itemKey: string) => { item: SummaryItem; price: number; qty: number; sum: number } | null) => {
+      if (summaryData.sections) {
+        const result: { item: SummaryItem; price: number; qty: number; sum: number }[] = []
+        summaryData.sections.forEach((section, sectionIdx) => {
+          section.items.forEach((item, itemIdx) => {
+            const itemKey = `${sectionIdx}-${itemIdx}`
+            const r = fn(item, itemKey)
+            if (r) result.push(r)
+          })
         })
-        if (rowMin != null && Math.abs((price ?? 0) - rowMin) < 1e-6) {
-          return { item, price, qty, sum: price * qty }
-        }
-        return null
+        return result
+      }
+      return summaryData.items
+        .map((item, idx) => fn(item, String(idx)))
+        .filter((r): r is NonNullable<typeof r> => r != null)
+    }
+    return iterateItems((item, itemKey) => {
+      const sel = selectedPriceByItem[itemKey]
+      const exact = item.offers[c.id]
+      const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+      const price = exact ?? applied ?? null
+      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+      if (sel === counterpartyId) {
+        const p = price ?? 0
+        return { item, price: p, qty, sum: p * qty }
+      }
+      if (sel != null && sel !== counterpartyId) return null
+      if (price == null || !Number.isFinite(price)) return null
+      let rowMin: number | null = null
+      partners.forEach((cc) => {
+        const ex = item.offers[cc.id]
+        const app = appliedAnalogue[itemKey]?.[cc.id]?.price
+        const pp = ex ?? app ?? null
+        if (pp != null && (rowMin == null || pp < rowMin)) rowMin = pp
       })
-      .filter((r): r is NonNullable<typeof r> => r != null)
+      if (rowMin != null && Math.abs((price ?? 0) - rowMin) < 1e-6) {
+        return { item, price, qty, sum: price * qty }
+      }
+      return null
+    })
+  }
+
+  const getRowsForCounterpartyBySection = (entry: SummaryEntry, counterpartyId: string): { sectionLabel: string; rows: { item: SummaryItem; price: number; qty: number; sum: number }[] }[] | null => {
+    const { summaryData } = entry
+    if (!summaryData?.sections) return null
+    const { appliedAnalogue, selectedPriceByItem = {} } = entry
+    const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
+    if (!c) return null
+    const partners = summaryData.counterparties.filter(isPartnerCounterparty)
+    return summaryData.sections.map((section, sectionIdx) => {
+      const sectionRows = section.items
+        .map((item, itemIdx) => {
+          const itemKey = `${sectionIdx}-${itemIdx}`
+          const sel = selectedPriceByItem[itemKey]
+          const exact = item.offers[c.id]
+          const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+          const price = exact ?? applied ?? null
+          const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+          if (sel === counterpartyId) {
+            const p = price ?? 0
+            return { item, price: p, qty, sum: p * qty }
+          }
+          if (sel != null && sel !== counterpartyId) return null
+          if (price == null || !Number.isFinite(price)) return null
+          let rowMin: number | null = null
+          partners.forEach((cc) => {
+            const ex = item.offers[cc.id]
+            const app = appliedAnalogue[itemKey]?.[cc.id]?.price
+            const pp = ex ?? app ?? null
+            if (pp != null && (rowMin == null || pp < rowMin)) rowMin = pp
+          })
+          if (rowMin != null && Math.abs((price ?? 0) - rowMin) < 1e-6) {
+            return { item, price, qty, sum: price * qty }
+          }
+          return null
+        })
+        .filter((r): r is NonNullable<typeof r> => r != null)
+      const fmtDate = section.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3.$2.$1')
+      const sectionLabel = section.requestNumbers.length > 1
+        ? `${section.departmentLabel} — ${fmtDate} (объединено из №${section.requestNumbers.join(', №')})`
+        : `${section.departmentLabel} — ${fmtDate}${section.requestNumbers.length ? ` (№${section.requestNumbers[0]})` : ''}`
+      return { sectionLabel, rows: sectionRows }
+    }).filter((s) => s.rows.length > 0)
   }
 
   const handleSendRequest = async (entry: SummaryEntry, counterpartyId: string) => {
@@ -570,7 +647,11 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     setSummaryError(null)
     const newEntry: SummaryEntry = {
       id: crypto.randomUUID(),
-      summaryData: { items: [...summaryData.items], counterparties: [...summaryData.counterparties] },
+      summaryData: {
+        items: [...summaryData.items],
+        counterparties: [...summaryData.counterparties],
+        ...(summaryData.sections && { sections: summaryData.sections.map((s) => ({ ...s, items: [...s.items] })) }),
+      },
       createdRequest: {
         category: DEFAULT_CATEGORY,
         createdAt: new Date(),
@@ -683,15 +764,19 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       const data = JSON.parse(raw)
       sessionStorage.removeItem(PERIOD_SUMMARY_STORAGE_KEY)
       const counterparties = data.counterparties || []
-      const items = data.items || []
+      const sections = data.sections || []
       const selectedPriceByItem = data.selectedPriceByItem ?? {}
       const useForRequest = data.useForRequest ?? Object.fromEntries(counterparties.filter((c: Counterparty) => isPartnerCounterparty(c)).map((c: Counterparty) => [c.id, true]))
-      if (items.length > 0 && counterparties.length > 0) {
+      if (sections.length > 0 && counterparties.length > 0) {
         const partners = counterparties.filter((c: Counterparty) => isPartnerCounterparty(c))
         const selected = partners.filter((c: Counterparty) => useForRequest[c.id])
         const newEntry: SummaryEntry = {
           id: crypto.randomUUID(),
-          summaryData: { items: [...items], counterparties: [...counterparties] },
+          summaryData: {
+            items: sections.flatMap((s: SummarySection) => s.items),
+            counterparties: [...counterparties],
+            sections: sections.length > 0 ? sections : undefined,
+          },
           createdRequest: {
             category: DEFAULT_CATEGORY,
             createdAt: new Date(),
@@ -1143,6 +1228,7 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                   if (!c) return null
                   const rowsForCounterparty = getRowsForCounterparty(entry, selectedCounterpartyId)
                   const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
+                  const sectionsByCounterparty = getRowsForCounterpartyBySection(entry, selectedCounterpartyId)
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -1177,23 +1263,51 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                             </tr>
                           </thead>
                           <tbody>
-                            {rowsForCounterparty.map((r, i) => (
-                              <tr key={i}>
-                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
-                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.name}</td>
-                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.item.quantity || '—'}</td>
-                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.unit || '—'}</td>
-                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.price)}</td>
-                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.sum)}</td>
-                              </tr>
-                            ))}
+                            {sectionsByCounterparty ? (
+                              sectionsByCounterparty.map((sec, secIdx) => (
+                                <React.Fragment key={secIdx}>
+                                  <tr style={{ background: '#f0f9ff' }}>
+                                    <td colSpan={6} style={{ padding: '0.5rem 0.75rem', border: '1px solid #e5e7eb', fontWeight: 600, color: '#111827' }}>
+                                      {sec.sectionLabel}
+                                    </td>
+                                  </tr>
+                                  {sec.rows.map((r, i) => (
+                                    <tr key={`${secIdx}-${i}`}>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.name}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.item.quantity || '—'}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.unit || '—'}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.price)}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.sum)}</td>
+                                    </tr>
+                                  ))}
+                                  <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                                    <td colSpan={5} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                                    <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(sec.rows.reduce((a, r) => a + r.sum, 0))}</td>
+                                  </tr>
+                                </React.Fragment>
+                              ))
+                            ) : (
+                              rowsForCounterparty.map((r, i) => (
+                                <tr key={i}>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{i + 1}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.name}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{r.item.quantity || '—'}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{r.item.unit || '—'}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.price)}</td>
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(r.sum)}</td>
+                                </tr>
+                              ))
+                            )}
                           </tbody>
-                          <tfoot>
-                            <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
-                              <td colSpan={5} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(total)}</td>
-                            </tr>
-                          </tfoot>
+                          {!sectionsByCounterparty && (
+                            <tfoot>
+                              <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                                <td colSpan={5} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого</td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{formatPrice(total)}</td>
+                              </tr>
+                            </tfoot>
+                          )}
                         </table>
                       </div>
                     </div>
@@ -1302,18 +1416,45 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                       })()
                   const partners = entry.summaryData.counterparties.filter(isPartnerCounterparty)
                   const sel = entry.selectedPriceByItem ?? {}
-                  const sumByCounterparty: Record<string, number> = {}
-                  entry.summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
-                  entry.summaryData.items.forEach((item, idx) => {
-                    const itemKey = String(idx)
-                    const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-                    const s = sel[itemKey]
-                    if (s != null) {
-                      const exact = item.offers[s]
-                      const applied = entry.appliedAnalogue[itemKey]?.[s]?.price
-                      const p = exact ?? applied ?? 0
-                      sumByCounterparty[s] += p * qty
-                    } else {
+                  const sections = entry.summaryData.sections
+                  const computeSectionTotals = (items: SummaryItem[], itemKeys: string[]) => {
+                    const sumByCounterparty: Record<string, number> = {}
+                    entry.summaryData.counterparties.forEach((c) => { sumByCounterparty[c.id] = 0 })
+                    items.forEach((item, idx) => {
+                      const itemKey = itemKeys[idx]
+                      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                      const s = sel[itemKey]
+                      if (s != null) {
+                        const exact = item.offers[s]
+                        const applied = entry.appliedAnalogue[itemKey]?.[s]?.price
+                        const p = exact ?? applied ?? 0
+                        sumByCounterparty[s] += p * qty
+                      } else {
+                        let rowMin: number | null = null
+                        partners.forEach((c) => {
+                          const exact = item.offers[c.id]
+                          const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                          const p = exact ?? applied ?? null
+                          if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+                        })
+                        partners.forEach((c) => {
+                          const exact = item.offers[c.id]
+                          const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                          const p = exact ?? applied ?? null
+                          if (p != null && rowMin != null && p === rowMin) sumByCounterparty[c.id] += p * qty
+                        })
+                      }
+                      if (item.offers[OWN_PRICE_ID] != null) sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qty
+                    })
+                    const rowTotals = items.map((item, idx) => {
+                      const itemKey = itemKeys[idx]
+                      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                      const s = sel[itemKey]
+                      if (s != null) {
+                        const exact = item.offers[s]
+                        const applied = entry.appliedAnalogue[itemKey]?.[s]?.price
+                        return (exact ?? applied ?? 0) * qty
+                      }
                       let rowMin: number | null = null
                       partners.forEach((c) => {
                         const exact = item.offers[c.id]
@@ -1321,63 +1462,40 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                         const p = exact ?? applied ?? null
                         if (p != null && (rowMin == null || p < rowMin)) rowMin = p
                       })
-                      partners.forEach((c) => {
+                      return rowMin != null ? rowMin * qty : 0
+                    })
+                    const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
+                    const fullOrderBySupplier: Record<string, number> = {}
+                    entry.summaryData.counterparties.forEach((c) => { fullOrderBySupplier[c.id] = 0 })
+                    items.forEach((item, idx) => {
+                      const itemKey = itemKeys[idx]
+                      const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                      entry.summaryData.counterparties.forEach((c) => {
                         const exact = item.offers[c.id]
                         const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                        const p = exact ?? applied ?? null
-                        if (p != null && rowMin != null && p === rowMin) {
-                          sumByCounterparty[c.id] += p * qty
-                        }
+                        let p = exact ?? applied ?? null
+                        if (p == null && c.id !== OWN_PRICE_ID) {
+                          const others = partners.filter((x) => x.id !== c.id)
+                          let minOther: number | null = null
+                          others.forEach((o) => {
+                            const op = item.offers[o.id] ?? entry.appliedAnalogue[itemKey]?.[o.id]?.price ?? null
+                            if (op != null && (minOther == null || op < minOther)) minOther = op
+                          })
+                          p = minOther ?? 0
+                        } else if (p == null) p = 0
+                        fullOrderBySupplier[c.id] += p * qty
                       })
-                    }
-                    if (item.offers[OWN_PRICE_ID] != null) {
-                      sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qty
-                    }
-                  })
-                  const rowTotals = entry.summaryData.items.map((item, idx) => {
-                    const itemKey = String(idx)
-                    const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-                    const s = sel[itemKey]
-                    if (s != null) {
-                      const exact = item.offers[s]
-                      const applied = entry.appliedAnalogue[itemKey]?.[s]?.price
-                      const p = exact ?? applied ?? 0
-                      return p * qty
-                    }
-                    let rowMin: number | null = null
-                    partners.forEach((c) => {
-                      const exact = item.offers[c.id]
-                      const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                      const p = exact ?? applied ?? null
-                      if (p != null && (rowMin == null || p < rowMin)) rowMin = p
                     })
-                    return rowMin != null ? rowMin * qty : 0
-                  })
-                  const totalMinSum = rowTotals.reduce((a, b) => a + b, 0)
-                  const fullOrderBySupplier: Record<string, number> = {}
-                  entry.summaryData.counterparties.forEach((c) => { fullOrderBySupplier[c.id] = 0 })
-                  entry.summaryData.items.forEach((item, idx) => {
-                    const itemKey = String(idx)
-                    const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-                    entry.summaryData.counterparties.forEach((c) => {
-                      const exact = item.offers[c.id]
-                      const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                      let p = exact ?? applied ?? null
-                      if (p == null && c.id !== OWN_PRICE_ID) {
-                        const others = partners.filter((x) => x.id !== c.id)
-                        let minOther: number | null = null
-                        others.forEach((o) => {
-                          const op = item.offers[o.id] ?? entry.appliedAnalogue[itemKey]?.[o.id]?.price ?? null
-                          if (op != null && (minOther == null || op < minOther)) minOther = op
-                        })
-                        p = minOther ?? 0
-                      } else if (p == null) {
-                        p = 0
-                      }
-                      fullOrderBySupplier[c.id] += p * qty
-                    })
-                  })
-                  const isViewOnly = !summaryData
+                    return { sumByCounterparty, rowTotals, totalMinSum, fullOrderBySupplier }
+                  }
+                  const flatItems = sections ? sections.flatMap((s) => s.items) : entry.summaryData.items
+                  const flatItemKeys = sections ? sections.flatMap((s, si) => s.items.map((_, ii) => `${si}-${ii}`)) : entry.summaryData.items.map((_, i) => String(i))
+                  const { sumByCounterparty, rowTotals, totalMinSum, fullOrderBySupplier } = computeSectionTotals(flatItems, flatItemKeys)
+                  const sectionTotals = sections ? sections.map((sec, si) => {
+                    const keys = sec.items.map((_, ii) => `${si}-${ii}`)
+                    return computeSectionTotals(sec.items, keys)
+                  }) : null
+                  const isViewOnly = !summaryData || !!sections
                   return (
                   <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
@@ -1426,203 +1544,212 @@ export default function RequestsPageClient({ businessId, initialSection, initial
                         </tr>
                       </thead>
                       <tbody>
-                        {entry.summaryData.items.map((item, idx) => {
-                          const itemKey = String(idx)
-                          const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
-                          const selC = sel[itemKey]
-                          const partnerPrices = partners.map((c) => {
-                            const exact = item.offers[c.id]
-                            const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
-                            return exact ?? applied ?? null
-                          }).filter((p): p is number => p != null)
-                          const minPrice = partnerPrices.length > 0 ? Math.min(...partnerPrices) : null
-                          const rowTotalSum = rowTotals[idx] ?? 0
-                          return (
-                            <tr key={idx}>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb', verticalAlign: 'middle' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                                  {!isViewOnly && entry.summaryData.items.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => removeSummaryItem(idx)}
-                                      aria-label="Удалить строку"
-                                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: '#9ca3af', fontSize: '1rem' }}
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                  <span>{idx + 1}</span>
-                                </div>
-                              </td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                                {isViewOnly ? (
-                                  <>
-                                    {item.name}
-                                    {item.originalName && (
-                                      <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.15rem' }}>
-                                        {item.originalName}
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <input
-                                    value={item.name}
-                                    onChange={(e) => updateSummaryItem(idx, { name: e.target.value })}
-                                    style={{ width: '100%', minWidth: '120px', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem' }}
-                                  />
-                                )}
-                              </td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>
-                                {isViewOnly ? (
-                                  item.quantity || '—'
-                                ) : (
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={item.quantity}
-                                    onChange={(e) => updateSummaryItem(idx, { quantity: e.target.value })}
-                                    style={{ width: '4em', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem', textAlign: 'center' }}
-                                  />
-                                )}
-                              </td>
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
-                                {isViewOnly ? (
-                                  item.unit || '—'
-                                ) : (
-                                  <input
-                                    value={item.unit}
-                                    onChange={(e) => updateSummaryItem(idx, { unit: e.target.value })}
-                                    placeholder="кг"
-                                    style={{ width: '3.5em', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem' }}
-                                  />
-                                )}
-                              </td>
-                              {entry.summaryData.counterparties.map((c) => {
-                                const exactPrice = item.offers[c.id]
-                                const appliedVal = entry.appliedAnalogue[itemKey]?.[c.id]
-                                const effectivePrice = exactPrice ?? appliedVal?.price ?? null
-                                const isSelected = selC === c.id
-                                const isMin = selC == null && minPrice != null && effectivePrice === minPrice
-                                const isGreen = isSelected || isMin
-                                const analogues = item.analogues?.[c.id] || []
-                                const hasAnalogue = analogues.length > 0 && exactPrice == null && !appliedVal
-                                const isPartner = c.id !== OWN_PRICE_ID
-                                const canClick = !isViewOnly && isPartner
-                                return (
-                                  <td
-                                    key={c.id}
-                                    role={canClick ? 'button' : undefined}
-                                    tabIndex={canClick ? 0 : undefined}
-                                    onClick={canClick ? () => setSelectedPriceByItem((prev) => ({ ...prev, [itemKey]: prev[itemKey] === c.id ? null : c.id })) : undefined}
-                                    onKeyDown={canClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPriceByItem((prev) => ({ ...prev, [itemKey]: prev[itemKey] === c.id ? null : c.id })) } } : undefined}
-                                    style={{
-                                      padding: '0.75rem',
-                                      border: '1px solid #e5e7eb',
-                                      textAlign: 'right',
-                                      backgroundColor: isGreen ? '#dcfce7' : 'white',
-                                      fontWeight: isGreen ? 600 : 400,
-                                      verticalAlign: 'top',
-                                      cursor: canClick ? 'pointer' : 'default',
-                                    }}
-                                  >
-                                    {effectivePrice != null ? (
-                                      formatPrice(effectivePrice)
-                                    ) : hasAnalogue ? (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-end' }}>
-                                        {analogues.slice(0, 3).map((a, i) => (
-                                          <div key={i} style={{ fontSize: '0.8125rem' }}>
-                                            <span style={{ color: '#4b5563' }}>{a.name}</span>
-                                            <span style={{ marginLeft: '0.35rem' }}>{formatPrice(a.price)}</span>
-                                            <button
-                                              type="button"
-                                              onClick={(e) => { e.stopPropagation(); setAppliedAnalogue((prev) => ({ ...prev, [itemKey]: { ...(prev[itemKey] || {}), [c.id]: { name: a.name, price: a.price } } })) }}
-                                              style={{
-                                                marginLeft: '0.35rem',
-                                                padding: '0.2rem 0.5rem',
-                                                fontSize: '0.75rem',
-                                                background: '#e0f2fe',
-                                                color: '#0369a1',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer',
-                                              }}
-                                            >
-                                              Применить аналог
-                                            </button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      canClick ? (isSelected ? '✓ (в заявку)' : '—') : '—'
-                                    )}
+                        {sections ? (
+                          sections.map((section, sectionIdx) => {
+                            const st = sectionTotals![sectionIdx]
+                            const fmtDate = section.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3.$2.$1')
+                            const sectionLabel = section.requestNumbers.length > 1
+                              ? `${section.departmentLabel} — ${fmtDate} (объединено из №${section.requestNumbers.join(', №')})`
+                              : `${section.departmentLabel} — ${fmtDate}${section.requestNumbers.length ? ` (№${section.requestNumbers[0]})` : ''}`
+                            return (
+                              <React.Fragment key={sectionIdx}>
+                                <tr style={{ background: '#f0f9ff' }}>
+                                  <td colSpan={4 + entry.summaryData.counterparties.length + 1} style={{ padding: '0.5rem 0.75rem', border: '1px solid #e5e7eb', fontWeight: 600, color: '#111827' }}>
+                                    {sectionLabel}
                                   </td>
-                                )
-                              })}
-                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: rowTotalSum > 0 ? 600 : 400 }}>
-                                {rowTotalSum > 0 ? formatPrice(rowTotalSum) : '—'}
-                              </td>
-                            </tr>
-                          )
-                        })}
+                                </tr>
+                                {section.items.map((item, itemIdx) => {
+                                  const itemKey = `${sectionIdx}-${itemIdx}`
+                                  const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                                  const selC = sel[itemKey]
+                                  const partnerPrices = partners.map((c) => {
+                                    const exact = item.offers[c.id]
+                                    const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                                    return exact ?? applied ?? null
+                                  }).filter((p): p is number => p != null)
+                                  const minPrice = partnerPrices.length > 0 ? Math.min(...partnerPrices) : null
+                                  const rowTotalSum = st.rowTotals[itemIdx] ?? 0
+                                  return (
+                                    <tr key={itemKey}>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb' }}>{itemIdx + 1}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.name}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>{item.quantity || '—'}</td>
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>{item.unit || '—'}</td>
+                                      {entry.summaryData.counterparties.map((c) => {
+                                        const exactPrice = item.offers[c.id]
+                                        const appliedVal = entry.appliedAnalogue[itemKey]?.[c.id]
+                                        const effectivePrice = exactPrice ?? appliedVal?.price ?? null
+                                        const isSelected = selC === c.id
+                                        const isMin = selC == null && minPrice != null && effectivePrice === minPrice
+                                        const isGreen = isSelected || isMin
+                                        return (
+                                          <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: isGreen ? '#dcfce7' : 'white', fontWeight: isGreen ? 600 : 400 }}>
+                                            {effectivePrice != null ? formatPrice(effectivePrice) : '—'}
+                                          </td>
+                                        )
+                                      })}
+                                      <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: rowTotalSum > 0 ? 600 : 400 }}>
+                                        {rowTotalSum > 0 ? formatPrice(rowTotalSum) : '—'}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                                <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                                  <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                                  {entry.summaryData.counterparties.map((c) => (
+                                    <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                      {st.sumByCounterparty[c.id] > 0 ? formatPrice(st.sumByCounterparty[c.id]) : '—'}
+                                    </td>
+                                  ))}
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                    {st.totalMinSum > 0 ? formatPrice(st.totalMinSum) : '—'}
+                                  </td>
+                                </tr>
+                                <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                                  <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                                  {entry.summaryData.counterparties.map((c) => (
+                                    <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                      {st.fullOrderBySupplier[c.id] > 0 ? formatPrice(st.fullOrderBySupplier[c.id]) : '—'}
+                                    </td>
+                                  ))}
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                                </tr>
+                                <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                                  <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                                  {entry.summaryData.counterparties.map((c) => {
+                                    const saving = st.totalMinSum - st.fullOrderBySupplier[c.id]
+                                    const isPositive = saving > 0
+                                    const isNegative = saving < 0
+                                    return (
+                                      <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: isPositive ? '#15803d' : isNegative ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                                        {saving !== 0 ? (saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`) : '0'}
+                                      </td>
+                                    )
+                                  })}
+                                  <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                                </tr>
+                              </React.Fragment>
+                            )
+                          })
+                        ) : (
+                          flatItems.map((item, idx) => {
+                            const itemKey = flatItemKeys[idx]
+                            const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+                            const selC = sel[itemKey]
+                            const partnerPrices = partners.map((c) => {
+                              const exact = item.offers[c.id]
+                              const applied = entry.appliedAnalogue[itemKey]?.[c.id]?.price
+                              return exact ?? applied ?? null
+                            }).filter((p): p is number => p != null)
+                            const minPrice = partnerPrices.length > 0 ? Math.min(...partnerPrices) : null
+                            const rowTotalSum = rowTotals[idx] ?? 0
+                            return (
+                              <tr key={idx}>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center', background: '#f9fafb', verticalAlign: 'middle' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                                    {!isViewOnly && flatItems.length > 1 && (
+                                      <button type="button" onClick={() => removeSummaryItem(idx)} aria-label="Удалить строку" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', color: '#9ca3af', fontSize: '1rem' }}>✕</button>
+                                    )}
+                                    <span>{idx + 1}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                                  {isViewOnly ? <>{item.name}{item.originalName && <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.15rem' }}>{item.originalName}</div>}</> : (
+                                    <input value={item.name} onChange={(e) => updateSummaryItem(idx, { name: e.target.value })} style={{ width: '100%', minWidth: '120px', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem' }} />
+                                  )}
+                                </td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'center' }}>
+                                  {isViewOnly ? (item.quantity || '—') : (
+                                    <input type="text" inputMode="decimal" value={item.quantity} onChange={(e) => updateSummaryItem(idx, { quantity: e.target.value })} style={{ width: '4em', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem', textAlign: 'center' }} />
+                                  )}
+                                </td>
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb' }}>
+                                  {isViewOnly ? (item.unit || '—') : (
+                                    <input value={item.unit} onChange={(e) => updateSummaryItem(idx, { unit: e.target.value })} placeholder="кг" style={{ width: '3.5em', padding: '0.35rem 0.5rem', border: '1px solid #e5e7eb', borderRadius: '4px', fontSize: '0.875rem' }} />
+                                  )}
+                                </td>
+                                {entry.summaryData.counterparties.map((c) => {
+                                  const exactPrice = item.offers[c.id]
+                                  const appliedVal = entry.appliedAnalogue[itemKey]?.[c.id]
+                                  const effectivePrice = exactPrice ?? appliedVal?.price ?? null
+                                  const isSelected = selC === c.id
+                                  const isMin = selC == null && minPrice != null && effectivePrice === minPrice
+                                  const isGreen = isSelected || isMin
+                                  const analogues = item.analogues?.[c.id] || []
+                                  const hasAnalogue = analogues.length > 0 && exactPrice == null && !appliedVal
+                                  const isPartner = c.id !== OWN_PRICE_ID
+                                  const canClick = !isViewOnly && isPartner
+                                  return (
+                                    <td key={c.id} role={canClick ? 'button' : undefined} tabIndex={canClick ? 0 : undefined}
+                                      onClick={canClick ? () => setSelectedPriceByItem((prev) => ({ ...prev, [itemKey]: prev[itemKey] === c.id ? null : c.id })) : undefined}
+                                      onKeyDown={canClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPriceByItem((prev) => ({ ...prev, [itemKey]: prev[itemKey] === c.id ? null : c.id })) } } : undefined}
+                                      style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', backgroundColor: isGreen ? '#dcfce7' : 'white', fontWeight: isGreen ? 600 : 400, verticalAlign: 'top', cursor: canClick ? 'pointer' : 'default' }}
+                                    >
+                                      {effectivePrice != null ? formatPrice(effectivePrice) : hasAnalogue ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-end' }}>
+                                          {analogues.slice(0, 3).map((a, i) => (
+                                            <div key={i} style={{ fontSize: '0.8125rem' }}>
+                                              <span style={{ color: '#4b5563' }}>{a.name}</span>
+                                              <span style={{ marginLeft: '0.35rem' }}>{formatPrice(a.price)}</span>
+                                              <button type="button" onClick={(e) => { e.stopPropagation(); setAppliedAnalogue((prev) => ({ ...prev, [itemKey]: { ...(prev[itemKey] || {}), [c.id]: { name: a.name, price: a.price } } })) }} style={{ marginLeft: '0.35rem', padding: '0.2rem 0.5rem', fontSize: '0.75rem', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Применить аналог</button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (canClick ? (isSelected ? '✓ (в заявку)' : '—') : '—')}
+                                    </td>
+                                  )
+                                })}
+                                <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', fontWeight: rowTotalSum > 0 ? 600 : 400 }}>
+                                  {rowTotalSum > 0 ? formatPrice(rowTotalSum) : '—'}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
                       </tbody>
                       <tfoot>
-                        {!isViewOnly && (
+                        {!sections && !isViewOnly && (
                           <tr>
                             <td colSpan={4} style={{ padding: '0.5rem', border: '1px solid #e5e7eb' }}>
-                              <button
-                                type="button"
-                                onClick={addSummaryItem}
-                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8125rem', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '4px', cursor: 'pointer' }}
-                              >
-                                + Добавить позицию
-                              </button>
+                              <button type="button" onClick={addSummaryItem} style={{ padding: '0.35rem 0.75rem', fontSize: '0.8125rem', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '4px', cursor: 'pointer' }}>+ Добавить позицию</button>
                             </td>
                             <td colSpan={entry.summaryData.counterparties.length + 1} style={{ padding: '0.5rem', border: '1px solid #e5e7eb' }} />
                           </tr>
                         )}
-                        <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
-                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
-                          {entry.summaryData.counterparties.map((c) => (
-                            <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                              {sumByCounterparty[c.id] > 0 ? formatPrice(sumByCounterparty[c.id]) : '—'}
-                            </td>
-                          ))}
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                            {totalMinSum > 0 ? formatPrice(totalMinSum) : '—'}
-                          </td>
-                        </tr>
-                        <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
-                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
-                          {entry.summaryData.counterparties.map((c) => (
-                            <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
-                              {fullOrderBySupplier[c.id] > 0 ? formatPrice(fullOrderBySupplier[c.id]) : '—'}
-                            </td>
-                          ))}
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
-                        </tr>
-                        <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
-                          <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
-                          {entry.summaryData.counterparties.map((c) => {
-                            const saving = totalMinSum - fullOrderBySupplier[c.id]
-                            const isPositive = saving > 0
-                            const isNegative = saving < 0
-                            return (
-                              <td
-                                key={c.id}
-                                style={{
-                                  padding: '0.75rem',
-                                  border: '1px solid #e5e7eb',
-                                  textAlign: 'right',
-                                  color: isPositive ? '#15803d' : isNegative ? '#dc2626' : '#6b7280',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {saving !== 0 ? (saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`) : '0'}
-                              </td>
-                            )
-                          })}
-                          <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
-                        </tr>
+                        {!sections && (
+                          <>
+                            <tr style={{ background: '#f3f4f6', fontWeight: 600 }}>
+                              <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Итого (по выбранным позициям)</td>
+                              {entry.summaryData.counterparties.map((c) => (
+                                <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>
+                                  {sumByCounterparty[c.id] > 0 ? formatPrice(sumByCounterparty[c.id]) : '—'}
+                                </td>
+                              ))}
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{totalMinSum > 0 ? formatPrice(totalMinSum) : '—'}</td>
+                            </tr>
+                            <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                              <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Сумма заказа у поставщика</td>
+                              {entry.summaryData.counterparties.map((c) => (
+                                <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>{fullOrderBySupplier[c.id] > 0 ? formatPrice(fullOrderBySupplier[c.id]) : '—'}</td>
+                              ))}
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                            </tr>
+                            <tr style={{ background: '#f9fafb', fontWeight: 500 }}>
+                              <td colSpan={4} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>Экономия</td>
+                              {entry.summaryData.counterparties.map((c) => {
+                                const saving = totalMinSum - fullOrderBySupplier[c.id]
+                                const isPositive = saving > 0
+                                const isNegative = saving < 0
+                                return (
+                                  <td key={c.id} style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right', color: isPositive ? '#15803d' : isNegative ? '#dc2626' : '#6b7280', fontWeight: 600 }}>
+                                    {saving !== 0 ? (saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`) : '0'}
+                                  </td>
+                                )
+                              })}
+                              <td style={{ padding: '0.75rem', border: '1px solid #e5e7eb', textAlign: 'right' }}>—</td>
+                            </tr>
+                          </>
+                        )}
                       </tfoot>
                     </table>
                   </div>

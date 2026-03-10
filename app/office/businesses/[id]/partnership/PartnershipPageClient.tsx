@@ -2580,20 +2580,24 @@ export default function PartnershipPageClient({ businessId, businessName, telegr
                     type="button"
                     onClick={() => {
                       const partners = periodSummaryData.counterparties.filter((c) => c.id !== '__OWN_PRICE__')
-                      const items = periodSummaryData.sections.flatMap((s) => s.items)
                       const selectedPriceByItem: Record<string, string | null> = {}
-                      let globalIdx = 0
                       periodSummaryData.sections.forEach((section, sectionIdx) => {
                         section.items.forEach((_, idx) => {
                           const key = `${sectionIdx}-${idx}`
                           const sel = periodSummarySelectedPrice[key]
-                          selectedPriceByItem[String(globalIdx)] = sel ?? null
-                          globalIdx++
+                          selectedPriceByItem[key] = sel ?? null
                         })
                       })
                       const useForRequest = Object.fromEntries(partners.map((c) => [c.id, true]))
+                      const sections = periodSummaryData.sections.map((s) => ({
+                        department: s.department,
+                        departmentLabel: s.departmentLabel,
+                        date: s.date,
+                        requestNumbers: s.requestNumbers,
+                        items: s.items.map((r) => ({ name: r.name, quantity: r.quantity, unit: r.unit, offers: r.offers, analogues: r.analogues })),
+                      }))
                       const payload = {
-                        items: items.map((r) => ({ name: r.name, quantity: r.quantity, unit: r.unit, offers: r.offers, analogues: r.analogues })),
+                        sections,
                         counterparties: periodSummaryData.counterparties,
                         selectedPriceByItem,
                         useForRequest,
