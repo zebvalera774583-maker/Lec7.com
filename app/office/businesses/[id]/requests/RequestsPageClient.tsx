@@ -279,33 +279,115 @@ export default function RequestsPageClient({ businessId, initialSection, initial
       })
     })
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', ...summaryData.counterparties.map((c) => c.legalName), 'Итоговая сумма']
-    let rowIdx = 0
-    const dataRows: (string | number)[][] = []
-    iterateItems((item, itemKey) => {
-      const rowTotalSum = rowTotals[rowIdx] ?? 0
-      rowIdx++
-      dataRows.push([
-        rowIdx,
-        item.name,
-        item.quantity || '',
-        item.unit || '',
-        ...summaryData.counterparties.map((c) => {
-          const exact = item.offers[c.id]
-          const applied = appliedAnalogue[itemKey]?.[c.id]?.price
-          const p = exact ?? applied ?? null
-          return p != null ? p : ''
-        }),
-        rowTotalSum > 0 ? rowTotalSum : '',
-      ])
-    })
-    const footerRow1 = ['Итого (по выбранным позициям)', '', '', '', ...summaryData.counterparties.map((c) => sumByCounterparty[c.id] > 0 ? sumByCounterparty[c.id] : ''), totalMinSum > 0 ? totalMinSum : '']
-    const footerRow2 = ['Сумма заказа у поставщика', '', '', '', ...summaryData.counterparties.map((c) => fullOrderBySupplier[c.id] > 0 ? fullOrderBySupplier[c.id] : ''), '']
-    const footerRow3 = ['Экономия', '', '', '', ...summaryData.counterparties.map((c) => {
-      const saving = totalMinSum - fullOrderBySupplier[c.id]
-      if (saving === 0) return 0
-      return saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`
-    }), '']
-    const aoa = [headerRow, ...dataRows, footerRow1, footerRow2, footerRow3]
+    const aoa: (string | number)[][] = [headerRow]
+
+    if (summaryData.sections) {
+      summaryData.sections.forEach((section, sectionIdx) => {
+        const keys = section.items.map((_, ii) => `${sectionIdx}-${ii}`)
+        const st = {
+          sumByCounterparty: {} as Record<string, number>,
+          rowTotals: [] as number[],
+          totalMinSum: 0,
+          fullOrderBySupplier: {} as Record<string, number>,
+        }
+        summaryData.counterparties.forEach((c) => { st.sumByCounterparty[c.id] = 0; st.fullOrderBySupplier[c.id] = 0 })
+        section.items.forEach((item, itemIdx) => {
+          const itemKey = keys[itemIdx]
+          const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+          const s = selectedPriceByItem[itemKey]
+          let rowSum = 0
+          if (s != null) {
+            const p = item.offers[s] ?? appliedAnalogue[itemKey]?.[s]?.price ?? 0
+            rowSum = p * qty
+            st.sumByCounterparty[s] += rowSum
+          } else {
+            let rowMin: number | null = null
+            partners.forEach((cc) => {
+              const p = item.offers[cc.id] ?? appliedAnalogue[itemKey]?.[cc.id]?.price ?? null
+              if (p != null && (rowMin == null || p < rowMin)) rowMin = p
+            })
+            rowSum = rowMin != null ? rowMin * qty : 0
+            partners.forEach((cc) => {
+              const p = item.offers[cc.id] ?? appliedAnalogue[itemKey]?.[cc.id]?.price ?? null
+              if (p != null && rowMin != null && Math.abs(p - rowMin) < 1e-6) st.sumByCounterparty[cc.id] += p * qty
+            })
+          }
+          if (item.offers[OWN_PRICE_ID] != null) st.sumByCounterparty[OWN_PRICE_ID] += item.offers[OWN_PRICE_ID] * qty
+          st.rowTotals.push(rowSum)
+        })
+        st.totalMinSum = st.rowTotals.reduce((a, b) => a + b, 0)
+        section.items.forEach((item, itemIdx) => {
+          const itemKey = keys[itemIdx]
+          const qty = Math.max(0, parseFloat(String(item.quantity).replace(',', '.')) || 0)
+          summaryData.counterparties.forEach((c) => {
+            let p = item.offers[c.id] ?? appliedAnalogue[itemKey]?.[c.id]?.price ?? null
+            if (p == null && c.id !== OWN_PRICE_ID) {
+              const others = partners.filter((x) => x.id !== c.id)
+              let minOther: number | null = null
+              others.forEach((o) => {
+                const op = item.offers[o.id] ?? appliedAnalogue[itemKey]?.[o.id]?.price ?? null
+                if (op != null && (minOther == null || op < minOther)) minOther = op
+              })
+              p = minOther ?? 0
+            } else if (p == null) p = 0
+            st.fullOrderBySupplier[c.id] += p * qty
+          })
+        })
+        const fmtDate = section.date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3.$2.$1')
+        const sectionLabel = section.requestNumbers.length > 1
+          ? `${section.departmentLabel} — ${fmtDate} (объединено из №${section.requestNumbers.join(', №')})`
+          : `${section.departmentLabel} — ${fmtDate}${section.requestNumbers.length ? ` (№${section.requestNumbers[0]})` : ''}`
+        aoa.push([sectionLabel, '', '', '', ...summaryData.counterparties.map(() => ''), ''])
+        section.items.forEach((item, itemIdx) => {
+          const itemKey = keys[itemIdx]
+          const rowTotalSum = st.rowTotals[itemIdx] ?? 0
+          aoa.push([
+            itemIdx + 1,
+            item.name,
+            item.quantity || '',
+            item.unit || '',
+            ...summaryData.counterparties.map((c) => {
+              const p = item.offers[c.id] ?? appliedAnalogue[itemKey]?.[c.id]?.price ?? null
+              return p != null ? p : ''
+            }),
+            rowTotalSum > 0 ? rowTotalSum : '',
+          ])
+        })
+        aoa.push(['Итого (по выбранным позициям)', '', '', '', ...summaryData.counterparties.map((c) => st.sumByCounterparty[c.id] > 0 ? st.sumByCounterparty[c.id] : ''), st.totalMinSum > 0 ? st.totalMinSum : ''])
+        aoa.push(['Сумма заказа у поставщика', '', '', '', ...summaryData.counterparties.map((c) => st.fullOrderBySupplier[c.id] > 0 ? st.fullOrderBySupplier[c.id] : ''), ''])
+        aoa.push(['Экономия', '', '', '', ...summaryData.counterparties.map((c) => {
+          const saving = st.totalMinSum - st.fullOrderBySupplier[c.id]
+          if (saving === 0) return 0
+          return saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`
+        }), ''])
+      })
+    } else {
+      let rowIdx = 0
+      iterateItems((item, itemKey) => {
+        const rowTotalSum = rowTotals[rowIdx] ?? 0
+        rowIdx++
+        aoa.push([
+          rowIdx,
+          item.name,
+          item.quantity || '',
+          item.unit || '',
+          ...summaryData.counterparties.map((c) => {
+            const exact = item.offers[c.id]
+            const applied = appliedAnalogue[itemKey]?.[c.id]?.price
+            const p = exact ?? applied ?? null
+            return p != null ? p : ''
+          }),
+          rowTotalSum > 0 ? rowTotalSum : '',
+        ])
+      })
+      aoa.push(['Итого (по выбранным позициям)', '', '', '', ...summaryData.counterparties.map((c) => sumByCounterparty[c.id] > 0 ? sumByCounterparty[c.id] : ''), totalMinSum > 0 ? totalMinSum : ''])
+      aoa.push(['Сумма заказа у поставщика', '', '', '', ...summaryData.counterparties.map((c) => fullOrderBySupplier[c.id] > 0 ? fullOrderBySupplier[c.id] : ''), ''])
+      aoa.push(['Экономия', '', '', '', ...summaryData.counterparties.map((c) => {
+        const saving = totalMinSum - fullOrderBySupplier[c.id]
+        if (saving === 0) return 0
+        return saving > 0 ? `+${formatPrice(saving)}` : `-${formatPrice(Math.abs(saving))}`
+      }), ''])
+    }
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, ...summaryData.counterparties.map(() => ({ wch: 14 })), { wch: 14 }]
     const wb = XLSX.utils.book_new()
@@ -320,12 +402,21 @@ export default function RequestsPageClient({ businessId, initialSection, initial
     setMenuOpenCardId(null)
     const c = summaryData.counterparties.find((x) => x.id === counterpartyId)
     if (!c) return
-    const rowsForCounterparty = getRowsForCounterparty(entry, counterpartyId)
-    const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
     const headerRow = ['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена', 'Сумма']
-    const dataRows = rowsForCounterparty.map((r, i) => [i + 1, r.item.name, r.item.quantity || '', r.item.unit || '', r.price, r.sum])
-    const footerRow = ['Итого', '', '', '', '', total]
-    const aoa = [headerRow, ...dataRows, footerRow]
+    const aoa: (string | number)[][] = [headerRow]
+    const sectionsByCounterparty = getRowsForCounterpartyBySection(entry, counterpartyId)
+    if (sectionsByCounterparty) {
+      sectionsByCounterparty.forEach((sec) => {
+        aoa.push([sec.sectionLabel, '', '', '', '', ''])
+        sec.rows.forEach((r, i) => aoa.push([i + 1, r.item.name, r.item.quantity || '', r.item.unit || '', r.price, r.sum]))
+        aoa.push(['Итого', '', '', '', '', sec.rows.reduce((a, r) => a + r.sum, 0)])
+      })
+    } else {
+      const rowsForCounterparty = getRowsForCounterparty(entry, counterpartyId)
+      const total = rowsForCounterparty.reduce((a, r) => a + r.sum, 0)
+      rowsForCounterparty.forEach((r, i) => aoa.push([i + 1, r.item.name, r.item.quantity || '', r.item.unit || '', r.price, r.sum]))
+      aoa.push(['Итого', '', '', '', '', rowsForCounterparty.reduce((a, r) => a + r.sum, 0)])
+    }
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 14 }]
     const wb = XLSX.utils.book_new()
