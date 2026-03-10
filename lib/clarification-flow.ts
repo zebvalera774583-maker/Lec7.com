@@ -1,6 +1,6 @@
 /**
  * Логика уточнения позиций до создания заявки (MAX бот).
- * Использует ClarificationQuestion и getItemsNeedingQuestion.
+ * Использует Master Catalog (requiresClarification) и getItemsNeedingQuestion.
  */
 
 import { buildCatalogMaps, getClarificationMap, getItemsNeedingQuestion } from '@/lib/summary-pipeline'

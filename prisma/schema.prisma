@@ -242,28 +242,21 @@ model BotChatState {
 
 // Глобальный каталог товаров для распознавания ботом (scope=GLOBAL)
 model BotCatalogItem {
-  id            String   @id @default(cuid())
-  scope         String   // GLOBAL | BUSINESS
-  canonicalName String
-  synonyms      String[] // синонимы для распознавания
-  defaultUnit   String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  scope                 String    // GLOBAL | BUSINESS
+  canonicalName         String
+  synonyms              String[]  // синонимы для распознавания
+  defaultUnit           String?
+  isActive              Boolean   @default(true)
+  requiresClarification  Boolean   @default(false) // не финальная позиция, требует выбора варианта
+  clarificationOptions  String[]  // варианты для кнопок уточнения (при requiresClarification=true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   priceListRows PriceListRow[]
 
   @@unique([scope, canonicalName])
   @@index([scope])
-}
-
-// Таблица №6: позиции, требующие уточнения. Слово → вопрос (перец → перец красный, перец желтый, перец зеленый?)
-model ClarificationQuestion {
-  id        String   @id @default(cuid())
-  word      String   @unique
-  question  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 // Сессия уточнения позиций до создания заявки (MAX бот). Одна активная на chatId.

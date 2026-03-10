@@ -8,6 +8,8 @@ interface BotCatalogItem {
   synonyms: string[]
   defaultUnit: string | null
   isActive: boolean
+  requiresClarification?: boolean
+  clarificationOptions?: string[]
 }
 
 interface ImportResult {
@@ -37,7 +39,9 @@ export default function BotToolsClient() {
     canonicalName: '',
     defaultUnit: '',
     isActive: true,
+    requiresClarification: false,
     synonyms: '',
+    clarificationOptions: '',
   })
 
   const fetchItems = useCallback(async () => {
@@ -75,7 +79,9 @@ export default function BotToolsClient() {
       canonicalName: '',
       defaultUnit: '',
       isActive: true,
+      requiresClarification: false,
       synonyms: '',
+      clarificationOptions: '',
     })
     setModalOpen(true)
   }
@@ -86,7 +92,9 @@ export default function BotToolsClient() {
       canonicalName: item.canonicalName,
       defaultUnit: item.defaultUnit || '',
       isActive: item.isActive,
+      requiresClarification: !!item.requiresClarification,
       synonyms: Array.isArray(item.synonyms) ? item.synonyms.join(', ') : '',
+      clarificationOptions: Array.isArray(item.clarificationOptions) ? item.clarificationOptions.join(', ') : '',
     })
     setModalOpen(true)
   }
@@ -102,13 +110,23 @@ export default function BotToolsClient() {
       alert('Введите каноническое название')
       return
     }
+    if (formData.requiresClarification) {
+      const opts = formData.clarificationOptions.split(/[,\n]+/).map((p) => p.trim()).filter(Boolean)
+      const unique = [...new Set(opts.map((p) => p.toLowerCase()))]
+      if (unique.length < 2) {
+        alert('При включённом «Требует уточнения» нужно минимум 2 варианта')
+        return
+      }
+    }
     setSaving(true)
     try {
       const body = {
         canonicalName,
         defaultUnit: formData.defaultUnit.trim() || null,
         isActive: formData.isActive,
+        requiresClarification: formData.requiresClarification,
         synonyms: formData.synonyms,
+        clarificationOptions: formData.requiresClarification ? formData.clarificationOptions : '',
       }
       if (editingItem) {
         const res = await fetch(`/api/admin/bot-tools/catalog/${editingItem.id}`, {
@@ -535,6 +553,15 @@ export default function BotToolsClient() {
                   }}
                 />
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="requiresClarification"
+                  checked={formData.requiresClarification}
+                  onChange={(e) => setFormData((f) => ({ ...f, requiresClarification: e.target.checked }))}
+                />
+                <label htmlFor="requiresClarification" style={{ fontSize: '0.875rem' }}>Требует уточнения</label>
+              </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }}>
                   Единица измерения
@@ -552,15 +579,6 @@ export default function BotToolsClient() {
                     boxSizing: 'border-box',
                   }}
                 />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData((f) => ({ ...f, isActive: e.target.checked }))}
-                />
-                <label htmlFor="isActive" style={{ fontSize: '0.875rem' }}>Активен</label>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }}>
@@ -581,6 +599,40 @@ export default function BotToolsClient() {
                     resize: 'vertical',
                   }}
                 />
+              </div>
+              {formData.requiresClarification && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                    Варианты (через запятую) *
+                  </label>
+                  <textarea
+                    value={formData.clarificationOptions}
+                    onChange={(e) => setFormData((f) => ({ ...f, clarificationOptions: e.target.value }))}
+                    placeholder="перец красный, перец жёлтый, перец зелёный"
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      boxSizing: 'border-box',
+                      resize: 'vertical',
+                    }}
+                  />
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                    Минимум 2 варианта. Будут показаны как кнопки выбора в боте.
+                  </p>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData((f) => ({ ...f, isActive: e.target.checked }))}
+                />
+                <label htmlFor="isActive" style={{ fontSize: '0.875rem' }}>Активен</label>
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.5rem' }}>

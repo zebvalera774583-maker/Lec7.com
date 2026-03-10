@@ -105,15 +105,24 @@ export async function buildCatalogMaps(): Promise<CatalogMaps> {
 
 export type ItemNeedingQuestion = { itemName: string; question: string }
 
-/** Загрузить справочник таблицы №6: слово → вопрос */
+/** Загрузить справочник уточнений из Master Catalog: слово → варианты (строка через запятую) */
 export async function getClarificationMap(): Promise<Map<string, string>> {
-  const rows = await prisma.clarificationQuestion.findMany({
-    select: { word: true, question: true },
+  const items = await prisma.botCatalogItem.findMany({
+    where: { scope: 'GLOBAL', isActive: true, requiresClarification: true },
+    select: { canonicalName: true, synonyms: true, clarificationOptions: true },
   })
   const map = new Map<string, string>()
-  for (const r of rows) {
-    const norm = normalizeForMatch(r.word)
-    if (norm) map.set(norm, r.question)
+  for (const item of items) {
+    const opts = item.clarificationOptions
+    if (!opts || opts.length < 2) continue
+    const question = opts.join(', ')
+    const addNorm = (norm: string) => {
+      if (norm) map.set(norm, question)
+    }
+    addNorm(normalizeForMatch(item.canonicalName))
+    for (const syn of item.synonyms) {
+      addNorm(normalizeForMatch(syn))
+    }
   }
   return map
 }

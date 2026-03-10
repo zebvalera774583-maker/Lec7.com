@@ -8,6 +8,19 @@ function parseSynonyms(val: unknown): string[] {
   return s.split(/[,\n]+/).map((p) => p.trim().toLowerCase()).filter(Boolean)
 }
 
+function parseClarificationOptions(val: unknown): string[] {
+  if (val == null || val === '') return []
+  const s = String(val)
+  const arr = s.split(/[,\n]+/).map((p) => p.trim()).filter(Boolean)
+  const seen = new Set<string>()
+  return arr.filter((p) => {
+    const key = p.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export const PATCH = requireRole(['LEC7_ADMIN'], async (req: NextRequest) => {
   try {
     const url = new URL(req.url)
@@ -23,6 +36,18 @@ export const PATCH = requireRole(['LEC7_ADMIN'], async (req: NextRequest) => {
     const defaultUnit = body.defaultUnit != null ? (String(body.defaultUnit).trim() || null) : undefined
     const isActive = body.isActive !== undefined ? !!body.isActive : undefined
     const synonyms = body.synonyms !== undefined ? parseSynonyms(body.synonyms) : undefined
+    const requiresClarification = body.requiresClarification !== undefined ? !!body.requiresClarification : undefined
+    let clarificationOptions: string[] | undefined
+    if (requiresClarification !== undefined) {
+      if (requiresClarification) {
+        clarificationOptions = parseClarificationOptions(body.clarificationOptions)
+        if (clarificationOptions.length < 2) {
+          return NextResponse.json({ error: 'При включённом «Требует уточнения» нужно минимум 2 варианта' }, { status: 400 })
+        }
+      } else {
+        clarificationOptions = []
+      }
+    }
 
     if (canonicalName !== undefined && !canonicalName) {
       return NextResponse.json({ error: 'canonicalName cannot be empty' }, { status: 400 })
@@ -33,6 +58,8 @@ export const PATCH = requireRole(['LEC7_ADMIN'], async (req: NextRequest) => {
     if (defaultUnit !== undefined) updateData.defaultUnit = defaultUnit
     if (isActive !== undefined) updateData.isActive = isActive
     if (synonyms !== undefined) updateData.synonyms = synonyms
+    if (requiresClarification !== undefined) updateData.requiresClarification = requiresClarification
+    if (clarificationOptions !== undefined) updateData.clarificationOptions = clarificationOptions
 
     const item = await prisma.botCatalogItem.update({
       where: { id },

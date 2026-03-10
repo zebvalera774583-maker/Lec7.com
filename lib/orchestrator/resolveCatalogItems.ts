@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import { matchToCatalogSyncWithNorm, normalizeForMatch } from '@/lib/catalog-match'
 import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
 import { buildTokenIndex, tokenMatchCatalog } from '@/lib/orchestrator/tokenMatchCatalog'
-import { getClarificationMap } from '@/lib/summary-pipeline'
 
 /**
  * Нормализация названия позиции перед сопоставлением с каталогом:
@@ -30,8 +29,10 @@ export interface ResolvedItem {
   matchType?: 'alias' | 'learned' | 'token' | 'none'
   /** Score совпадения (alias=1, learned=1, token=0.6..1, none=0) */
   matchScore?: number
-  /** Общее слово из ClarificationQuestion — не матчить, запустить уточнение */
+  /** Карточка Master Catalog с requiresClarification — не матчить, запустить уточнение */
   requiresClarification?: boolean
+  /** Варианты для кнопок уточнения (при requiresClarification=true) */
+  clarificationOptions?: string[]
 }
 
 /**
@@ -44,27 +45,34 @@ export async function resolveCatalogItems(
   items: { name: string; quantity: string; unit: string }[],
   businessId: string
 ): Promise<ResolvedItem[]> {
-  const [catalogItems, learnedAliases, clarificationMap] = await Promise.all([
+  const [catalogItems, learnedAliases] = await Promise.all([
     prisma.botCatalogItem.findMany({
       where: { scope: 'GLOBAL', isActive: true },
-      select: { id: true, canonicalName: true, synonyms: true },
+      select: { id: true, canonicalName: true, synonyms: true, requiresClarification: true, clarificationOptions: true },
     }),
     prisma.botLearnedAlias.findMany({
       where: { businessId },
       select: { aliasText: true, canonicalName: true },
     }),
-    getClarificationMap(),
   ])
 
   const normToId = new Map<string, string>()
   const normToCanonical = new Map<string, string>()
   const canonicalToId = new Map<string, string>()
   const ambiguous = new Set<string>()
+  const clarificationNormToOptions = new Map<string, string[]>()
 
   for (const item of catalogItems) {
     canonicalToId.set(item.canonicalName, item.id)
+    const options = item.requiresClarification && item.clarificationOptions?.length >= 2
+      ? item.clarificationOptions
+      : null
     const addMapping = (norm: string) => {
       if (!norm) return
+      if (options) {
+        clarificationNormToOptions.set(norm, options)
+        return
+      }
       if (normToId.has(norm)) {
         if (normToId.get(norm) !== item.id) ambiguous.add(norm)
       } else {
@@ -99,7 +107,9 @@ export async function resolveCatalogItems(
     const normalizedName = normalizeItemName(item.name)
     const norm = normalizeForMatch(item.name)
     const words = norm.split(/\s+/).filter(Boolean)
-    if (words.length === 1 && !normToId.has(norm) && clarificationMap.has(norm)) {
+    const firstWord = words[0] ?? ''
+    const clarificationOpts = firstWord ? clarificationNormToOptions.get(firstWord) : null
+    if (clarificationOpts && clarificationOpts.length >= 2) {
       resolved.push({
         catalogItemId: null,
         canonicalName: item.name,
@@ -111,6 +121,7 @@ export async function resolveCatalogItems(
         matchType: 'none',
         matchScore: 0,
         requiresClarification: true,
+        clarificationOptions: clarificationOpts,
       })
       continue
     }
@@ -145,6 +156,24 @@ export async function resolveCatalogItems(
           )
         }
       }
+    }
+
+    const matchedCatalogItem = catalogItemId ? catalogItems.find((c) => c.id === catalogItemId) : null
+    if (matchedCatalogItem?.requiresClarification && matchedCatalogItem.clarificationOptions?.length >= 2) {
+      resolved.push({
+        catalogItemId: null,
+        canonicalName: item.name,
+        confidence: 0,
+        needsUserChoice: true,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        matchType: 'none',
+        matchScore: 0,
+        requiresClarification: true,
+        clarificationOptions: matchedCatalogItem.clarificationOptions,
+      })
+      continue
     }
 
     const confidence =

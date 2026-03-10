@@ -40,7 +40,7 @@ export interface NormalizeResult {
   comments?: string[]
   needsUnitClarification?: number[]
   needsQtyClarification?: number[]
-  /** Индексы items, требующих уточнения (ClarificationQuestion) */
+  /** Индексы items, требующих уточнения (Master Catalog: requiresClarification) */
   needsClarification?: number[]
 }
 

@@ -840,13 +840,13 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       let questionByIndex: Map<number, string>
       if (needsClarification.length > 0) {
         clarifyIndices = needsClarification
-        const { clarificationMap } = await loadClarificationMaps()
         questionByIndex = new Map()
         for (const idx of clarifyIndices) {
-          const item = itemsForClarification[idx]
-          const norm = normalizeForMatch(item?.title || '').split(/\s+/)[0]
-          const q = norm ? clarificationMap.get(norm) : null
-          if (q) questionByIndex.set(idx, q)
+          const orchItem = orchestratorResult.items?.[idx] as { clarificationOptions?: string[] } | undefined
+          const opts = orchItem?.clarificationOptions
+          if (opts && opts.length >= 2) {
+            questionByIndex.set(idx, opts.join(', '))
+          }
         }
       } else {
         const { catalogMaps, clarificationMap } = await loadClarificationMaps()

@@ -12,6 +12,19 @@ function parseSynonyms(val: unknown): string[] {
   return s.split(/[,\n]+/).map((p) => p.trim().toLowerCase()).filter(Boolean)
 }
 
+function parseClarificationOptions(val: unknown): string[] {
+  if (val == null || val === '') return []
+  const s = String(val)
+  const arr = s.split(/[,\n]+/).map((p) => p.trim()).filter(Boolean)
+  const seen = new Set<string>()
+  return arr.filter((p) => {
+    const key = p.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export const GET = requireRole(['LEC7_ADMIN'], async (req: NextRequest) => {
   try {
     const url = new URL(req.url)
@@ -86,6 +99,14 @@ export const POST = requireRole(['LEC7_ADMIN'], async (req: NextRequest) => {
     const defaultUnit = body.defaultUnit != null ? String(body.defaultUnit).trim() || null : null
     const isActive = body.isActive !== false
     const synonyms = parseSynonyms(body.synonyms)
+    const requiresClarification = !!body.requiresClarification
+    let clarificationOptions: string[] = []
+    if (requiresClarification) {
+      clarificationOptions = parseClarificationOptions(body.clarificationOptions)
+      if (clarificationOptions.length < 2) {
+        return NextResponse.json({ error: 'При включённом «Требует уточнения» нужно минимум 2 варианта' }, { status: 400 })
+      }
+    }
 
     if (!canonicalName) {
       return NextResponse.json({ error: 'canonicalName is required' }, { status: 400 })
@@ -98,6 +119,8 @@ export const POST = requireRole(['LEC7_ADMIN'], async (req: NextRequest) => {
         defaultUnit,
         isActive,
         synonyms,
+        requiresClarification,
+        clarificationOptions,
       },
     })
 

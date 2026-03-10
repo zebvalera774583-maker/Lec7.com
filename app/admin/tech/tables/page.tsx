@@ -32,12 +32,10 @@ const TABLES_CATALOG = [
   {
     num: 6,
     name: 'Позиции, требующие уточнения',
-    location: '/admin/tech/tables',
-    path: 'Админка → Техничка → Таблицы (справочник: слово → вопрос). Отображение: Потребности → [заявка] → Просмотр.',
+    location: '/admin/bot-tools',
+    path: 'Мастер каталог: чекбокс «Требует уточнения» + поле «Варианты». Отображение: Потребности → [заявка] → Просмотр.',
   },
 ]
-
-import ClarificationTableClient from './ClarificationTableClient'
 
 const SAMPLE_SUMMARY_ROWS = [
   { name: 'Грибы шампиньоны', qty: '1', unit: 'кг', piliev: null, nep: 290, sum: 290 },
@@ -365,19 +363,16 @@ export default function TechTablesPage() {
           Таблица №6: Позиции, требующие уточнения
         </h2>
         <p style={{ margin: '0 0 1rem 0', color: '#6b7280', fontSize: '0.875rem' }}>
-          Заявка — позиция — вопрос: перец красный, перец желтый, перец зеленый?
+          Перенесено в <strong>Мастер каталог</strong>. Добавьте карточку (например, «Перец»), включите чекбокс «Требует уточнения» и укажите варианты через запятую.
         </p>
         <div style={{ marginBottom: '1rem', padding: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.875rem' }}>
           <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 600 }}>ТЗ к таблице №6</h3>
           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#475569', lineHeight: 1.6 }}>
-            <li><strong>Назначение:</strong> Позиции, по которым нужен вопрос. Справочник: столбец «слово» — столбец «вопрос». Вносите вручную: перец → перец красный, перец желтый, перец зеленый?</li>
-            <li><strong>Логика:</strong> «перец красный» — точное совпадение в каталоге → не вопрос. «перец 6 кг» — название «перец», есть в справочнике → показываем уточняющий вопрос.</li>
-            <li><strong>Расположение:</strong> Блок под таблицей позиций на странице просмотра заявки (таблица №5).</li>
-            <li><strong>Колонки:</strong> № заявки, Наименование в заявке, Вопрос.</li>
+            <li><strong>Назначение:</strong> Позиции, по которым нужен вопрос. Настраивается в Мастер каталог: чекбокс «Требует уточнения» + поле «Варианты».</li>
+            <li><strong>Логика:</strong> «перец красный» — точное совпадение в каталоге → не вопрос. «перец 6 кг» — карточка «Перец» с requiresClarification → показываем кнопки выбора.</li>
+            <li><strong>Расположение:</strong> Мастер каталог (Админка → Мастер каталог). Отображение: блок под таблицей позиций на странице просмотра заявки (таблица №5).</li>
           </ul>
         </div>
-
-        <ClarificationTableClient />
 
         <div style={{ marginTop: '1rem', fontSize: '0.8125rem', color: '#6b7280' }}>Образец отображения в заявке:</div>
         <div style={{ marginTop: '0.5rem', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', background: 'white' }}>
