@@ -188,6 +188,15 @@ function findNextIncompleteIndex(items: { quantity: string; unit: string }[]): n
   return -1
 }
 
+/** То же для ClarificationItem (qty вместо quantity) */
+function findNextIncompleteClarificationIndex(items: ClarificationItem[]): number {
+  for (let i = 0; i < items.length; i++) {
+    const p = items[i]
+    if (!(p.qty ?? '').trim() || !(p.unit ?? '').trim()) return i
+  }
+  return -1
+}
+
 export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventResult> {
   const { channel, chatId } = event
   const text = event.text.trim().toLowerCase()
@@ -332,9 +341,21 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const { indices, questionByIndex } = findIndicesNeedingClarification(updated, catalogMaps, clarificationMap)
     const nextIdx = indices.find((i) => i > idx) ?? indices[0]
     if (nextIdx == null) {
+      const qtyUnitIdx = findNextIncompleteClarificationIndex(updated)
+      if (qtyUnitIdx >= 0) {
+        const item = updated[qtyUnitIdx]
+        const displayTitle = item.title.charAt(0).toUpperCase() + item.title.slice(1).toLowerCase()
+        await prisma.clarificationSession.update({
+          where: { id: sessionId },
+          data: { itemsJson: updated, pendingItemIndex: qtyUnitIdx, needQtyUnit: true, needDepartment: false },
+        })
+        return {
+          messages: [clarificationMessage({ name: item.title, quantity: item.qty, unit: item.unit })],
+        }
+      }
       await prisma.clarificationSession.update({
         where: { id: sessionId },
-        data: { itemsJson: updated, pendingItemIndex: null, needDepartment: true },
+        data: { itemsJson: updated, pendingItemIndex: null, needQtyUnit: false, needDepartment: true },
       })
       return {
         messages: ['Выберите подразделение:'],
@@ -391,9 +412,20 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const { indices, questionByIndex } = findIndicesNeedingClarification(updated, catalogMaps, clarificationMap)
     const nextIdx = indices[0]
     if (nextIdx == null) {
+      const qtyUnitIdx = findNextIncompleteClarificationIndex(updated)
+      if (qtyUnitIdx >= 0) {
+        const item = updated[qtyUnitIdx]
+        await prisma.clarificationSession.update({
+          where: { id: sessionId },
+          data: { itemsJson: updated, pendingItemIndex: qtyUnitIdx, needQtyUnit: true, needDepartment: false },
+        })
+        return {
+          messages: [`Позиция удалена: ${deletedTitle}`, clarificationMessage({ name: item.title, quantity: item.qty, unit: item.unit })],
+        }
+      }
       await prisma.clarificationSession.update({
         where: { id: sessionId },
-        data: { itemsJson: updated, pendingItemIndex: null, needDepartment: true },
+        data: { itemsJson: updated, pendingItemIndex: null, needQtyUnit: false, needDepartment: true },
       })
       return {
         messages: [`Позиция удалена: ${deletedTitle}`, 'Выберите подразделение:'],
@@ -605,10 +637,49 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
   }
 
-  // Новое текстовое сообщение при активной ClarificationSession — отменить сессию
-  if (event.text.trim() && !choice && channel === 'max') {
+  // Текстовое сообщение при ClarificationSession.needQtyUnit — ввод количества и ед.изм.
+  if (event.text.trim() && !choice) {
     const existingSession = await prisma.clarificationSession.findUnique({ where: { chatId } })
-    if (existingSession) {
+    if (existingSession?.needQtyUnit && existingSession.pendingItemIndex != null) {
+      const items = (existingSession.itemsJson as ClarificationItem[]) || []
+      const idx = existingSession.pendingItemIndex
+      const item = items[idx]
+      if (item) {
+        const itemNeedsUnit = !!(item.qty ?? '').trim() && !(item.unit ?? '').trim()
+        let parsed = parseQtyInput(event.text, itemNeedsUnit)
+        if (!parsed && itemNeedsUnit && UNIT_ONLY_PATTERN.test(event.text.trim())) {
+          parsed = { quantity: item.qty, unit: event.text.trim().toLowerCase() }
+        }
+        if (parsed) {
+          const itemNeedsUnitFromUser = !(item.unit ?? '').trim() || !(item.qty ?? '').trim()
+          if (itemNeedsUnitFromUser && !(parsed.unit ?? '').trim()) {
+            return { messages: ['Уточните единицу (кг/шт/л/уп...)'] }
+          }
+          const updated = [...items]
+          updated[idx] = { ...item, qty: parsed.quantity, unit: (parsed.unit ?? '').trim() || (item.unit ?? '').trim() || 'шт' }
+          const nextIdx = findNextIncompleteClarificationIndex(updated)
+          if (nextIdx >= 0) {
+            const nextItem = updated[nextIdx]
+            await prisma.clarificationSession.update({
+              where: { id: existingSession.id },
+              data: { itemsJson: updated, pendingItemIndex: nextIdx },
+            })
+            return { messages: [clarificationMessage({ name: nextItem.title, quantity: nextItem.qty, unit: nextItem.unit })] }
+          }
+          await prisma.clarificationSession.update({
+            where: { id: existingSession.id },
+            data: { itemsJson: updated, pendingItemIndex: null, needQtyUnit: false, needDepartment: true },
+          })
+          return {
+            messages: ['Выберите подразделение:'],
+            replyInlineKeyboard: { rows: departmentKeyboardRows() },
+          }
+        }
+      }
+      return { messages: ['Введите количество и единицу (например: 2 кг или 5 шт)'] }
+    }
+    // Отменить сессию при новом тексте (только MAX, если не needQtyUnit)
+    if (channel === 'max' && existingSession) {
       await prisma.clarificationSession.delete({ where: { id: existingSession.id } }).catch(() => {})
       await prisma.botChatState.upsert({
         where: { channel_chatId: { channel, chatId } },
