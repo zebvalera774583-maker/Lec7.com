@@ -99,12 +99,17 @@ export default async function RequestDetailPage({ params }: PageProps) {
   const [catalogMaps, clarificationMap] = await Promise.all([buildCatalogMaps(), getClarificationMap()])
   const itemsNeedingQuestion = getItemsNeedingQuestion(requestItems, catalogMaps, clarificationMap)
 
+  const itemsWithIds = incoming?.items
+    ? incoming.items.map((it) => ({ id: it.id, title: it.name, qty: it.quantity, unit: it.unit }))
+    : itemsForQuestion.map((it: { title?: string; qty?: string; unit?: string }) => ({ title: it.title, qty: it.qty, unit: it.unit }))
+
   console.timeEnd(perfTotal)
 
   return (
     <RequestDetailClient
       businessId={params.id}
-      itemsJson={itemsJson}
+      requestId={params.requestId}
+      itemsJson={itemsWithIds}
       descriptionFallback={request.description}
       commentsText={commentsText}
       department={department}
