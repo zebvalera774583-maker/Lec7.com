@@ -244,12 +244,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           },
         })
         if (options.length > 0) {
-          rows.push(
-            options.slice(0, 4).map((opt) => ({
-              text: opt,
-              callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}`,
-            }))
-          )
+          for (const opt of options.slice(0, 4)) {
+            rows.push([{ text: opt, callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}` }])
+          }
         }
         rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
         await prisma.botChatState.update({
@@ -349,11 +346,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const options = question ? parseClarificationOptions(question) : []
     const rows: { text: string; callback_data: string }[][] = []
     if (options.length > 0) {
-      const choiceRow = options.slice(0, 4).map((opt) => ({
-        text: opt,
-        callback_data: `clarify_choice|${sessionId}|${nextIdx}|${opt}`,
-      }))
-      rows.push(choiceRow)
+      for (const opt of options.slice(0, 4)) {
+        rows.push([{ text: opt, callback_data: `clarify_choice|${sessionId}|${nextIdx}|${opt}` }])
+      }
     }
     rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${sessionId}|${nextIdx}` }])
     await prisma.clarificationSession.update({
@@ -410,12 +405,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     const options = question ? parseClarificationOptions(question) : []
     const rows: { text: string; callback_data: string }[][] = []
     if (options.length > 0) {
-      rows.push(
-        options.slice(0, 4).map((opt) => ({
-          text: opt,
-          callback_data: `clarify_choice|${sessionId}|${nextIdx}|${opt}`,
-        }))
-      )
+      for (const opt of options.slice(0, 4)) {
+        rows.push([{ text: opt, callback_data: `clarify_choice|${sessionId}|${nextIdx}|${opt}` }])
+      }
     }
     rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${sessionId}|${nextIdx}` }])
     await prisma.clarificationSession.update({
@@ -699,12 +691,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
             },
           })
           if (options.length > 0) {
-            rows.push(
-              options.slice(0, 4).map((opt) => ({
-                text: opt,
-                callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}`,
-              }))
-            )
+            for (const opt of options.slice(0, 4)) {
+              rows.push([{ text: opt, callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}` }])
+            }
           }
           rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
           await prisma.botChatState.update({
@@ -872,12 +861,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           },
         })
         if (options.length > 0) {
-          rows.push(
-            options.slice(0, 4).map((opt) => ({
-              text: opt,
-              callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}`,
-            }))
-          )
+          for (const opt of options.slice(0, 4)) {
+            rows.push([{ text: opt, callback_data: `clarify_choice|${session.id}|${firstClarifyIdx}|${opt}` }])
+          }
         }
         rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
         const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
