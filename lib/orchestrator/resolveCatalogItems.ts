@@ -61,12 +61,20 @@ export async function resolveCatalogItems(
   const canonicalToId = new Map<string, string>()
   const ambiguous = new Set<string>()
   const clarificationNormToOptions = new Map<string, string[]>()
+  /** Полное совпадение с вариантом уточнения (перец красный → Перец красный) — не спрашивать */
+  const optionNormToMatch = new Map<string, { catalogItemId: string; canonicalName: string }>()
 
   for (const item of catalogItems) {
     canonicalToId.set(item.canonicalName, item.id)
     const options = item.requiresClarification && item.clarificationOptions?.length >= 2
       ? item.clarificationOptions
       : null
+    if (options) {
+      for (const opt of options) {
+        const optNorm = normalizeForMatch(opt)
+        if (optNorm) optionNormToMatch.set(optNorm, { catalogItemId: item.id, canonicalName: opt })
+      }
+    }
     const addMapping = (norm: string) => {
       if (!norm) return
       if (options) {
@@ -106,6 +114,21 @@ export async function resolveCatalogItems(
   for (const item of items) {
     const normalizedName = normalizeItemName(item.name)
     const norm = normalizeForMatch(item.name)
+    const optionMatch = norm ? optionNormToMatch.get(norm) : null
+    if (optionMatch) {
+      resolved.push({
+        catalogItemId: optionMatch.catalogItemId,
+        canonicalName: optionMatch.canonicalName,
+        confidence: 1,
+        needsUserChoice: false,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        matchType: 'alias',
+        matchScore: 1,
+      })
+      continue
+    }
     const words = norm.split(/\s+/).filter(Boolean)
     const firstWord = words[0] ?? ''
     const clarificationOpts = firstWord ? clarificationNormToOptions.get(firstWord) : null
