@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     text?: string
     messageId?: unknown
     choice?: string
-    source?: 'ocr' | 'max_photo'
+    source?: 'ocr' | 'max_photo' | 'max_pdf'
     rawText?: string
     lines?: string[]
   }
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
   let text = typeof body?.text === 'string' ? body.text : ''
   if (body?.source === 'max_photo') {
     text = Array.isArray(body?.lines) && body.lines.length > 0 ? body.lines.join('\n') : text
+  } else if (body?.source === 'max_pdf') {
+    // text уже приходит в формате "название кол-во ед\n..."
   } else if (body?.source === 'ocr' && text) {
     const cleaned = normalizeOcrUnits(cleanOcrTable(text))
     const rows = cleaned.split(/\n/).filter(Boolean)
@@ -40,7 +42,8 @@ export async function POST(req: NextRequest) {
     text = tableItems.length > 0 ? tableItems.join('\n') : cleaned
   }
   const choice = typeof body?.choice === 'string' ? body.choice : undefined
-  const source: 'ocr' | undefined = body?.source === 'ocr' || body?.source === 'max_photo' ? 'ocr' : undefined
+  const source: 'ocr' | undefined =
+    body?.source === 'ocr' || body?.source === 'max_photo' || body?.source === 'max_pdf' ? 'ocr' : undefined
 
   if (!chatId) {
     return NextResponse.json({ replyText: 'Ошибка: chatId отсутствует' })

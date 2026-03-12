@@ -252,7 +252,7 @@ async function forwardToWebhook(
   choice?: string,
   messageId?: string,
   ts?: string,
-  source?: 'ocr' | 'max_photo',
+  source?: 'ocr' | 'max_photo' | 'max_pdf',
   rawText?: string,
   lines?: string[]
 ) {
@@ -260,7 +260,7 @@ async function forwardToWebhook(
   if (source) payload.source = source
   if (rawText != null) payload.rawText = rawText
   if (lines != null) payload.lines = lines
-  const timeoutMs = source === 'ocr' || source === 'max_photo' ? 60000 : 15000
+  const timeoutMs = source === 'ocr' || source === 'max_photo' || source === 'max_pdf' ? 60000 : 15000
   const { data } = await axios.post<WebhookResponse>(
     `${LEC7_BASE_URL}/api/integrations/max/webhook`,
     payload,
@@ -338,9 +338,15 @@ bot.on('message_created', async (ctx: any) => {
 
   const body = ctx.message?.body
   const text = body?.text
-  const bodyAttachments = body?.attachments as { type?: string; payload?: { url?: string; link?: string } }[] | undefined
+  const bodyAttachments = body?.attachments as {
+    type?: string
+    payload?: { url?: string; link?: string; mimeType?: string; fileName?: string; name?: string; filename?: string }
+  }[] | undefined
   const linkMsgAttachments = ctx.message?.link?.message?.attachments as
-    | { type?: string; payload?: { url?: string; link?: string } }[]
+    | {
+        type?: string
+        payload?: { url?: string; link?: string; mimeType?: string; fileName?: string; name?: string; filename?: string }
+      }[]
     | undefined
 
   const chatId = ctx.chatId ?? ctx.chat?.chat_id ?? ctx.message?.recipient?.chat_id
@@ -351,6 +357,96 @@ bot.on('message_created', async (ctx: any) => {
   let messageText = typeof text === 'string' ? text : ''
   let useOcrSource = false
   let attachmentSource: 'body.attachments' | 'link.message.attachments' | undefined
+
+  // [MAX attachment] логирование
+  const allAttachments = [...(bodyAttachments ?? []), ...(linkMsgAttachments ?? [])]
+  if (allAttachments.length > 0) {
+    console.log('[MAX attachment]', {
+      count: allAttachments.length,
+      types: allAttachments.map((a) => a?.type),
+      payloads: allAttachments.map((a) => ({
+        keys: a?.payload ? Object.keys(a.payload) : [],
+        mimeType: (a?.payload as any)?.mimeType,
+        fileName: (a?.payload as any)?.fileName ?? (a?.payload as any)?.name ?? (a?.payload as any)?.filename,
+      })),
+    })
+  }
+
+  // Детект PDF: type=file/document и (mimeType=application/pdf или имя заканчивается на .pdf)
+  function isPdfAttachment(a: { type?: string; payload?: { mimeType?: string; fileName?: string; name?: string; filename?: string } }): boolean {
+    if (!a?.payload) return false
+    const t = (a.type || '').toLowerCase()
+    if (t !== 'file' && t !== 'document') return false
+    const p = a.payload as any
+    const mime = (p?.mimeType || '').toLowerCase()
+    if (mime.includes('pdf')) return true
+    const name = (p?.fileName ?? p?.name ?? p?.filename ?? '').toLowerCase()
+    if (name.endsWith('.pdf')) return true
+    return false
+  }
+
+  let pdfAtt: { type?: string; payload?: { url?: string; link?: string } } | undefined
+  if (Array.isArray(bodyAttachments) && bodyAttachments.length > 0) {
+    pdfAtt = bodyAttachments.find(isPdfAttachment)
+    if (pdfAtt) attachmentSource = 'body.attachments'
+  }
+  if (!pdfAtt && Array.isArray(linkMsgAttachments) && linkMsgAttachments.length > 0) {
+    pdfAtt = linkMsgAttachments.find(isPdfAttachment)
+    if (pdfAtt) attachmentSource = 'link.message.attachments'
+  }
+
+  // Обработка PDF — скачивание, парсинг через Lec7, webhook
+  if (!messageText.trim() && pdfAtt) {
+    const url = pdfAtt?.payload?.url ?? pdfAtt?.payload?.link
+    if (url) {
+      try {
+        console.log('[MAX PDF] detected')
+        console.log('[MAX PDF] download start')
+        const pdfRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 })
+        const pdfBuffer = Buffer.from(pdfRes.data)
+        console.log('[MAX PDF] download success bytes=', pdfBuffer.length)
+
+        const pdfBase64 = pdfBuffer.toString('base64')
+        const parseRes = await axios.post<{ text?: string; itemsCount?: number; error?: string }>(
+          `${LEC7_BASE_URL}/api/integrations/max/parse-pdf`,
+          { pdfBase64 },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-LEC7-MAX-SECRET': LEC7_MAX_SECRET,
+            },
+            timeout: 60000,
+          }
+        )
+        const orderText = parseRes.data?.text ?? ''
+        const itemsCount = parseRes.data?.itemsCount ?? 0
+        console.log('[MAX PDF] parsed items count=', itemsCount)
+
+        if (!orderText.trim()) {
+          await sendReply(ctx, 'Не удалось извлечь текст заявки из PDF. Попробуйте отправить фото или текстом.')
+          return
+        }
+
+        const data = await forwardToWebhook(
+          chatId,
+          userId,
+          orderText,
+          undefined,
+          messageId,
+          ts,
+          'max_pdf'
+        )
+        const replyText = data?.replyText ?? 'Спасибо, заявка принята'
+        await sendReply(ctx, replyText, data?.replyInlineKeyboard)
+        console.log('[MAX PDF] done', { replyText: replyText.slice(0, 50) })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.log('[MAX PDF] download fail:', msg)
+        await sendReply(ctx, 'Не удалось обработать PDF. Попробуйте отправить фото или текстом.')
+      }
+      return
+    }
+  }
 
   // Поиск image: primary = body.attachments, fallback = link.message.attachments
   let imageAtt: { type?: string; payload?: { url?: string; link?: string } } | undefined
