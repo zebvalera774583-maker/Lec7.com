@@ -357,6 +357,154 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   }
 }
 
+const MAX_PDF_PAGES_FOR_VISION = 10
+const PDF_SCREENSHOT_WIDTH = 1200
+
+/**
+ * Извлечь прайс из PDF: сначала vision, при ошибке — fallback на текст + AI.
+ */
+export async function parsePricelistFromPdfWithAIVisionOrFallback(buffer: Buffer): Promise<ImportItem[]> {
+  console.log('[price-import] pdf vision start')
+  try {
+    const items = await parsePricelistFromPdfWithAIVision(buffer)
+    if (items.length > 0) {
+      console.log('[price-import] pdf vision success')
+      return items
+    }
+  } catch (e) {
+    console.log('[price-import] pdf vision fallback to text:', e instanceof Error ? e.message : String(e))
+  }
+
+  console.log('[price-import] pdf vision fallback to text')
+  try {
+    const text = await extractTextFromPdf(buffer)
+    if (!text || !text.trim()) {
+      console.error('[price-import] pdf vision failed')
+      throw new Error('Не удалось извлечь текст из PDF')
+    }
+    const items = await parsePricelistWithAI(text)
+    console.log('[price-import] pdf text fallback success')
+    return items
+  } catch (e) {
+    console.error('[price-import] pdf vision failed')
+    throw e
+  }
+}
+
+/**
+ * Вариант 4: PDF → рендер страниц в изображения → AI vision извлекает прайс.
+ * Работает для сканов и сложной вёрстки, где pdf-parse даёт пустой/плохой текст.
+ */
+export async function parsePricelistFromPdfWithAIVision(buffer: Buffer): Promise<ImportItem[]> {
+  const gatewayUrl = process.env.LEC7_AI_GATEWAY_URL
+  const gatewaySecret = process.env.LEC7_GATEWAY_SECRET
+
+  if (!gatewayUrl || !gatewaySecret) {
+    throw new Error('AI gateway configuration is missing')
+  }
+
+  const parser = new PDFParse({ data: new Uint8Array(buffer) })
+  let screenshots: { dataUrl: string }[] = []
+
+  try {
+    const info = await parser.getInfo()
+    const totalPages = info?.total ?? 1
+    const pagesToRender = Math.min(totalPages, MAX_PDF_PAGES_FOR_VISION)
+    const partial = Array.from({ length: pagesToRender }, (_, i) => i + 1)
+
+    const shotResult = await parser.getScreenshot({
+      partial,
+      desiredWidth: PDF_SCREENSHOT_WIDTH,
+      imageDataUrl: true,
+      imageBuffer: false,
+    })
+
+    screenshots = (shotResult?.pages || []).map((p) => ({ dataUrl: p.dataUrl })).filter((p) => p.dataUrl)
+  } finally {
+    await parser.destroy()
+  }
+
+  if (screenshots.length === 0) {
+    throw new Error('Не удалось отрендерить страницы PDF')
+  }
+
+  const visionPrompt = `Извлеки прайс-лист из изображений страниц PDF. Верни JSON массив объектов:
+{ "title": string, "price": number, "unit": string, "category": string }
+
+Только валидный JSON массив, без markdown и пояснений.`
+
+  const content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+    { type: 'text', text: visionPrompt },
+  ]
+  for (const s of screenshots) {
+    if (s.dataUrl) content.push({ type: 'image_url', image_url: { url: s.dataUrl } })
+  }
+
+  const response = await fetch(`${gatewayUrl}/v1/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-LEC7-GATEWAY-SECRET': gatewaySecret,
+    },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content }],
+    }),
+  })
+
+  if (!response.ok) {
+    const bodyText = await response.text()
+    try {
+      const errBody = JSON.parse(bodyText) as { error?: string; message?: string }
+      const detail = errBody.error || errBody.message || bodyText.slice(0, 500)
+      console.error('[parsePricelistFromPdfWithAIVision] Gateway error:', response.status, detail)
+      throw new Error(`AI gateway error: ${response.status} — ${detail}`)
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('AI gateway error:')) throw e
+      throw new Error(`AI gateway error: ${response.status} — ${bodyText.slice(0, 200)}`)
+    }
+  }
+
+  const data = (await response.json()) as { reply?: string }
+  const reply = (data.reply || '').trim()
+  if (!reply) {
+    throw new Error('Empty AI reply')
+  }
+
+  let jsonStr = reply
+  const codeMatch = reply.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (codeMatch) {
+    jsonStr = codeMatch[1].trim()
+  }
+  const start = jsonStr.indexOf('[')
+  const end = jsonStr.lastIndexOf(']')
+  if (start !== -1 && end !== -1 && end >= start) {
+    jsonStr = jsonStr.slice(start, end + 1)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(jsonStr)
+  } catch {
+    throw new Error('Не удалось распознать прайс. Файл не имеет табличной структуры.')
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('Не удалось распознать прайс. Файл не имеет табличной структуры.')
+  }
+
+  return parsed.map((it: unknown) => {
+    const o = it as Record<string, unknown>
+    return {
+      title: String(o?.title ?? ''),
+      price: typeof o?.price === 'number' ? o.price : null,
+      priceWithVat: null,
+      priceWithoutVat: null,
+      unit: typeof o?.unit === 'string' ? o.unit : null,
+      sku: null,
+    }
+  })
+}
+
 /**
  * Извлечь текст из DOCX
  */

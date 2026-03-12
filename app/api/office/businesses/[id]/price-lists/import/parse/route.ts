@@ -5,9 +5,9 @@ import {
   getBusinessIdFromPath,
   assertFileSize,
   parseFileToItems,
-  extractTextFromPdf,
   extractTextFromDocx,
   parsePricelistWithAI,
+  parsePricelistFromPdfWithAIVisionOrFallback,
 } from '@/lib/price-import'
 
 const ALLOWED_EXT = ['.xlsx', '.xls', '.csv', '.pdf', '.docx']
@@ -54,14 +54,7 @@ export const POST = withBusinessAccess(async (req, user) => {
     let warnings: string[] = []
 
     if (ext === '.pdf' || mimetype === 'application/pdf') {
-      const text = await extractTextFromPdf(buffer)
-      if (!text) {
-        return NextResponse.json(
-          { error: 'Не удалось извлечь текст из PDF' },
-          { status: 400 }
-        )
-      }
-      items = await parsePricelistWithAI(text)
+      items = await parsePricelistFromPdfWithAIVisionOrFallback(buffer)
       warnings = []
     } else if (ext === '.docx' || mimetype.includes('wordprocessingml') || mimetype.includes('docx')) {
       const text = await extractTextFromDocx(buffer)

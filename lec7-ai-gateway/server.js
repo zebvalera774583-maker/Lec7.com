@@ -2,7 +2,8 @@ import express from "express";
 import OpenAI from "openai";
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+// 15MB для vision-запросов (PDF страницы как base64)
+app.use(express.json({ limit: "15mb" }));
 
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.LEC7_GATEWAY_SECRET || "";
@@ -13,6 +14,10 @@ const YANDEX_FOLDER_ID = process.env.YANDEX_FOLDER_ID || "";
 const YANDEX_MODEL =
   process.env.YANDEX_MODEL ||
   (YANDEX_FOLDER_ID ? `gpt://${YANDEX_FOLDER_ID}/yandexgpt-lite/latest` : "");
+// Vision (PDF): явная модель. OpenAI: gpt-4o-mini или gpt-4o. Yandex может не поддерживать.
+const VISION_MODEL =
+  process.env.LEC7_VISION_MODEL ||
+  (LLM_PROVIDER === "yandex" ? YANDEX_MODEL : "gpt-4o-mini");
 
 const openai =
   LLM_PROVIDER === "yandex"
@@ -108,8 +113,20 @@ app.post("/v1/chat", async (req, res) => {
       return res.status(400).json({ error: "messages array is required" });
     }
 
+    const hasVisionContent = messages.some((m) => {
+      const c = m?.content;
+      if (Array.isArray(c)) {
+        return c.some((p) => p?.type === "image_url" && p?.image_url?.url);
+      }
+      return false;
+    });
+    const model = hasVisionContent ? VISION_MODEL : (LLM_PROVIDER === "yandex" ? YANDEX_MODEL : "gpt-4o-mini");
+    if (hasVisionContent) {
+      console.log("[v1/chat] vision request, model=", model);
+    }
+
     const completion = await openai.chat.completions.create({
-      model: LLM_PROVIDER === "yandex" ? YANDEX_MODEL : "gpt-4o-mini",
+      model,
       messages,
       temperature: 0,
     });
