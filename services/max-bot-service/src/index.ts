@@ -368,6 +368,7 @@ bot.on('message_created', async (ctx: any) => {
         keys: a?.payload ? Object.keys(a.payload) : [],
         mimeType: (a?.payload as any)?.mimeType,
         fileName: (a?.payload as any)?.fileName ?? (a?.payload as any)?.name ?? (a?.payload as any)?.filename,
+        hasUrl: !!(a?.payload?.url ?? (a?.payload as any)?.link),
       })),
     })
   }
@@ -459,7 +460,8 @@ bot.on('message_created', async (ctx: any) => {
     if (imageAtt) attachmentSource = 'link.message.attachments'
   }
 
-  // Обработка изображений (attachments) — OCR (локально в max-bot, без Lec7 API)
+  // Обработка изображений (attachments) — OCR. MAX может присылать PDF как type=image (превью).
+  // Проверяем Content-Type: если application/pdf — идём в PDF-ветку, не OCR.
   if (!messageText.trim() && imageAtt) {
     const url = imageAtt?.payload?.url ?? imageAtt?.payload?.link
     if (url) {
@@ -472,6 +474,33 @@ bot.on('message_created', async (ctx: any) => {
         let buffer = Buffer.from(imgRes.data)
         let mimeType = parseMimeFromContentType(imgRes.headers['content-type'])
         console.log('[MAX PHOTO] downloaded bytes=', buffer.length, 'mime=', mimeType)
+
+        // MAX иногда присылает PDF как image — по факту это PDF
+        if (mimeType === 'application/pdf') {
+          console.log('[MAX PDF] detected (Content-Type from image attachment)')
+          try {
+            const pdfBase64 = buffer.toString('base64')
+            const parseRes = await axios.post<{ text?: string; itemsCount?: number }>(
+              `${LEC7_BASE_URL}/api/integrations/max/parse-pdf`,
+              { pdfBase64 },
+              {
+                headers: { 'Content-Type': 'application/json', 'X-LEC7-MAX-SECRET': LEC7_MAX_SECRET },
+                timeout: 60000,
+              }
+            )
+            const orderText = parseRes.data?.text ?? ''
+            console.log('[MAX PDF] parsed items count=', parseRes.data?.itemsCount ?? 0)
+            if (orderText.trim()) {
+              const data = await forwardToWebhook(chatId, userId, orderText, undefined, messageId, ts, 'max_pdf')
+              await sendReply(ctx, data?.replyText ?? 'Спасибо, заявка принята', data?.replyInlineKeyboard)
+              return
+            }
+          } catch (e) {
+            console.log('[MAX PDF] parse fail:', e instanceof Error ? e.message : String(e))
+          }
+          await sendReply(ctx, 'Не удалось извлечь текст заявки из PDF. Попробуйте отправить фото или текстом.')
+          return
+        }
 
         if (mimeType === 'image/webp') {
           buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer()
