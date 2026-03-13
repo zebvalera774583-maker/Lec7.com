@@ -115,6 +115,56 @@ function logRawUpdate(ctx: any, eventType: string) {
 
 const YANDEX_OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
 
+/** Заголовки и категории заявки — пропускаем при сборке строк из таблицы */
+const SERVICE_ROW_PATTERNS = [
+  /^кухня$/i,
+  /^подразделение$/i,
+  /^дата\s*заявки$/i,
+  /^фамилия\s*заказчика/i,
+  /^номенклатура$/i,
+  /^количество$/i,
+  /^ед\.?\s*изм\.?$/i,
+  /^наименование$/i,
+  /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\s*[\/\\|]\s*.*)?$/i,
+]
+
+/** Извлечь строки из tables[].cells[] (model=table). Сохраняет row/column структуру. */
+function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  const result = obj.result as Record<string, unknown> | undefined
+  const textAnnotation = (result?.textAnnotation ?? result) as Record<string, unknown> | undefined
+  const tables = textAnnotation?.tables as Array<Record<string, unknown>> | undefined
+  if (!Array.isArray(tables) || tables.length === 0) return null
+
+  const allRows: string[] = []
+  for (const table of tables) {
+    const cells = table.cells as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(cells) || cells.length === 0) continue
+
+    const byRow = new Map<number, Array<{ col: number; text: string }>>()
+    for (const cell of cells) {
+      const text = typeof cell.text === 'string' ? cell.text.trim() : ''
+      if (!text) continue
+      const rowIdx = parseInt(String(cell.rowIndex ?? cell.row_index ?? 0), 10)
+      const colIdx = parseInt(String(cell.columnIndex ?? cell.column_index ?? 0), 10)
+      if (!byRow.has(rowIdx)) byRow.set(rowIdx, [])
+      byRow.get(rowIdx)!.push({ col: colIdx, text })
+    }
+
+    const rowIndices = Array.from(byRow.keys()).sort((a, b) => a - b)
+    for (const rowIdx of rowIndices) {
+      const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
+      const rowText = cellsInRow.map((c) => c.text).join(' ').trim()
+      if (!rowText) continue
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowText))) continue
+      if (/^\d+$/.test(rowText)) continue
+      allRows.push(rowText)
+    }
+  }
+  return allRows.length > 0 ? allRows : null
+}
+
 function extractLinesFromYandexResponse(data: unknown): string[] {
   if (!data || typeof data !== 'object') return []
   const obj = data as Record<string, unknown>
@@ -229,7 +279,15 @@ async function recognizeImageWithYandex(
       timeout: 30000,
     }
   )
-  const lines = extractLinesFromYandexResponse(res.data)
+  const tableRows = extractTableRowsFromYandexResponse(res.data)
+  let lines: string[]
+  if (tableRows && tableRows.length > 0) {
+    lines = tableRows
+    console.log('[MAX OCR] table rows=', tableRows.length)
+  } else {
+    const blockLines = extractLinesFromYandexResponse(res.data)
+    lines = reconstructOcrLines(blockLines)
+  }
   const text = lines.join('\n')
   if (!text) {
     console.log('[MAX OCR RAW]', JSON.stringify(res.data).slice(0, 4000))

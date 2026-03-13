@@ -3,10 +3,63 @@
  * POST https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText
  *
  * Env: YANDEX_API_KEY, YANDEX_FOLDER_ID
+ *
+ * Модель table возвращает tables[].cells[] с rowIndex/columnIndex — используем для сохранения структуры.
  */
 
 const OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
 const LOG_MAX = 200
+
+/** Заголовки и категории заявки — пропускаем при сборке строк */
+const SERVICE_ROW_PATTERNS = [
+  /^кухня$/i,
+  /^подразделение$/i,
+  /^дата\s*заявки$/i,
+  /^фамилия\s*заказчика/i,
+  /^номенклатура$/i,
+  /^количество$/i,
+  /^ед\.?\s*изм\.?$/i,
+  /^наименование$/i,
+  /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\\s*[\/\\|]\s*.*)?$/i,
+]
+
+/** Извлечь строки из tables[].cells[] (model=table). Сохраняет row/column структуру. */
+export function extractTableRowsFromResponse(data: unknown): string[] | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+
+  const result = obj.result as Record<string, unknown> | undefined
+  const textAnnotation = (result?.textAnnotation ?? result?.text_annotation ?? result) as Record<string, unknown> | undefined
+  const tables = (textAnnotation?.tables ?? (textAnnotation as Record<string, unknown>)?.tables) as Array<Record<string, unknown>> | undefined
+  if (!Array.isArray(tables) || tables.length === 0) return null
+
+  const allRows: string[] = []
+  for (const table of tables) {
+    const cells = table.cells as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(cells) || cells.length === 0) continue
+
+    const byRow = new Map<number, Array<{ col: number; text: string }>>()
+    for (const cell of cells) {
+      const text = typeof cell.text === 'string' ? cell.text.trim() : ''
+      if (!text) continue
+      const rowIdx = parseInt(String(cell.rowIndex ?? cell.row_index ?? 0), 10)
+      const colIdx = parseInt(String(cell.columnIndex ?? cell.column_index ?? 0), 10)
+      if (!byRow.has(rowIdx)) byRow.set(rowIdx, [])
+      byRow.get(rowIdx)!.push({ col: colIdx, text })
+    }
+
+    const rowIndices = Array.from(byRow.keys()).sort((a, b) => a - b)
+    for (const rowIdx of rowIndices) {
+      const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
+      const rowText = cellsInRow.map((c) => c.text).join(' ').trim()
+      if (!rowText) continue
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowText))) continue
+      if (/^\d+$/.test(rowText)) continue
+      allRows.push(rowText)
+    }
+  }
+  return allRows.length > 0 ? allRows : null
+}
 
 /** Извлечь текст из ответа Yandex Vision OCR (blocks -> lines -> text) */
 function extractTextFromResponse(data: unknown): string {
@@ -73,10 +126,13 @@ export async function recognizeImage(buffer: Buffer): Promise<string> {
   }
 
   const data = (await res.json()) as unknown
-  const text = extractTextFromResponse(data)
+  const tableRows = extractTableRowsFromResponse(data)
+  const text = tableRows
+    ? tableRows.join('\n')
+    : extractTextFromResponse(data)
 
   const logPreview = text.slice(0, LOG_MAX) + (text.length > LOG_MAX ? '...' : '')
-  console.log('[Yandex Vision OCR] result length:', text.length, 'preview:', logPreview)
+  console.log('[Yandex Vision OCR]', tableRows ? `table rows=${tableRows.length}` : 'blocks', 'preview:', logPreview)
 
   return text
 }
