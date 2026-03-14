@@ -42,7 +42,7 @@ export interface RecognizeResult {
 export async function recognizeNeedsForChat(
   chatId: string,
   message: string,
-  source: 'max_text' | 'max_photo' = 'max_text'
+  source: 'max_text' | 'max_photo' | 'telegram_photo' = 'max_text'
 ): Promise<RecognizeResult> {
   const businessId = await getBusinessIdByChatId(chatId)
   if (!businessId) return { intent: 'unknown' }

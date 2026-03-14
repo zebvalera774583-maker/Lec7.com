@@ -236,8 +236,12 @@ function extractTextFromYandexResponse(data: unknown): string {
   return lines.join('\n')
 }
 
-/** Мусорные строки: номера строк, одиночные символы, разделители */
-const GARBAGE_LINE = /^\d+$|^[|:()]$|^.$/
+/** Мусорные строки: номера строк (12., 57..., 67...), разделители */
+const GARBAGE_LINE = /^\d+$|^\d+\.?\.\.?$|^[|:()]$|^\.+$|^.$/
+/** Служебные и категории — пропускаем */
+const SERVICE_LINE =
+  /^(подразделение|дата\s*заявки|мк2\s*кухня|кухня|наименование|номенклатура|количество|ед\.?\s*изм\.?)$/i
+const CATEGORY_LINE = /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\s*[\/\\|]\s*.*)?$/i
 
 /** Строка содержит только единицу измерения */
 const UNIT_ONLY = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i
@@ -261,6 +265,9 @@ function reconstructOcrLines(lines: string[]): string[] {
     const t = line.trim()
     if (!t) continue
     if (GARBAGE_LINE.test(t)) continue
+    if (SERVICE_LINE.test(t)) continue
+    if (CATEGORY_LINE.test(t)) continue
+    if (/^подразделение\s|^дата\s*заявки\s|мк2\s*кухня/i.test(t) && t.length < 50) continue
     filtered.push(t)
   }
 
@@ -326,6 +333,13 @@ async function recognizeImageWithYandex(
   } else {
     const blockLines = extractLinesFromYandexResponse(res.data)
     lines = reconstructOcrLines(blockLines)
+    lines = postProcessTableRows(lines)
+    lines = lines.filter(
+      (l) =>
+        !SERVICE_ROW_PATTERNS.some((p) => p.test(l)) &&
+        !CATEGORY_LINE.test(l) &&
+        !/подразделение.*дата\s*заявки|дата\s*заявки.*подразделение/i.test(l)
+    )
   }
   const text = lines.join('\n')
   if (!text) {

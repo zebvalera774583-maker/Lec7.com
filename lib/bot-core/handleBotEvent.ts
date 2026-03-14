@@ -845,7 +845,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     // Orchestrator: read-only распознавание (единственный источник items)
-    const orchestratorSource = event.source === 'ocr' && event.channel === 'max' ? 'max_photo' : 'max_text'
+    const orchestratorSource =
+      event.source === 'ocr' && event.channel === 'max'
+        ? 'max_photo'
+        : event.source === 'ocr' && event.channel === 'telegram'
+          ? 'telegram_photo'
+          : 'max_text'
     let orchestratorResult: Awaited<ReturnType<typeof recognizeNeedsForChat>> | null = null
     try {
       orchestratorResult = await recognizeNeedsForChat(chatId, needText, orchestratorSource)
@@ -977,13 +982,9 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
-    if (orchestratorResult?.intent === 'unknown') {
-      return {
-        messages: ['Напишите потребность в формате, например: яблоки 10 кг'],
-      }
-    }
+    // При intent unknown — пробуем fallback-парсер (splitIntoItems), не возвращаем сразу
 
-    // Fallback: старый парсер (при сбое Orchestrator)
+    // Fallback: старый парсер (при сбое Orchestrator или intent unknown)
     const rawItems = splitIntoItems(needText)
     let normToId: Map<string, string>
     try {
@@ -1046,6 +1047,12 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         messages: [
           `${missingStr}Формат: наименование количество ед.изм. Например: яблоки 10 кг`,
         ],
+      }
+    }
+
+    if (mappedItems.length === 0) {
+      return {
+        messages: ['Напишите потребность в формате, например: яблоки 10 кг'],
       }
     }
 

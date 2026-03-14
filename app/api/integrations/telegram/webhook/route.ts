@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
 import { recognizeImage } from '@/lib/ai/yandexVisionOCR'
 import { normalizeOrderText } from '@/lib/ai/yandexNormalizeOrder'
+import { postProcessTableRows } from '@/lib/ocr/orderImage'
 
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token'
 const TELEGRAM_API = 'https://api.telegram.org'
@@ -159,8 +160,11 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        const normalizedText = await normalizeOrderText(ocrText)
-        const textForBot = normalizedText.trim() || ocrText
+        const lines = ocrText.split(/\n/).map((l) => l.trim()).filter(Boolean)
+        const processedLines = lines.length > 1 ? postProcessTableRows(lines) : lines
+        const textForNormalize = processedLines.join('\n')
+        const normalizedText = await normalizeOrderText(textForNormalize)
+        const textForBot = normalizedText.trim() || textForNormalize
         console.log('[NORMALIZED ORDER TEXT]', textForBot)
 
         const event = {
