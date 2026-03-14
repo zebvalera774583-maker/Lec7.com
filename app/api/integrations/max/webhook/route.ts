@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
-import { cleanOcrTable, normalizeOcrUnits, extractTableItems } from '@/lib/ocr/orderImage'
+import { cleanOcrTable, normalizeOcrUnits, extractTableItems, postProcessTableRows } from '@/lib/ocr/orderImage'
 
 const SECRET_HEADER = 'x-lec7-max-secret'
 
@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
   const chatId = body?.chatId != null ? String(body.chatId) : null
   let text = typeof body?.text === 'string' ? body.text : ''
   if (body?.source === 'max_photo') {
-    text = Array.isArray(body?.lines) && body.lines.length > 0 ? body.lines.join('\n') : text
+    const rawLines = Array.isArray(body?.lines) && body.lines.length > 0 ? body.lines : (text ? text.split(/\n/) : [])
+    const processed = rawLines.length > 0 ? postProcessTableRows(rawLines) : []
+    text = processed.length > 0 ? processed.join('\n') : text
   } else if (body?.source === 'max_pdf') {
     // text уже приходит в формате "название кол-во ед\n..."
   } else if (body?.source === 'ocr' && text) {

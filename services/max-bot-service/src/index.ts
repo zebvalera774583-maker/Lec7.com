@@ -126,7 +126,43 @@ const SERVICE_ROW_PATTERNS = [
   /^ед\.?\s*изм\.?$/i,
   /^наименование$/i,
   /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\s*[\/\\|]\s*.*)?$/i,
+  /^овощи\s+очищенные$/i,
+  /^сухофрукты\/\s*орехи$/i,
 ]
+
+/** Нормализация строк таблицы */
+function normalizeTableRowText(row: string): string {
+  return row
+    .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
+    .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
+    .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
+    .replace(/\bЗ\s*(\d)/g, '3 $1')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+const HAS_QTY_UNIT_ROW = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i
+
+function isNameOnly(s: string): boolean {
+  const t = s.trim()
+  return t.length >= 2 && /[\p{L}]/u.test(t) && !/\d/.test(t)
+}
+
+function postProcessTableRows(rows: string[]): string[] {
+  const normalized = rows.map(normalizeTableRowText).filter(Boolean)
+  const result: string[] = []
+  for (let i = 0; i < normalized.length; i++) {
+    const row = normalized[i]
+    const next = normalized[i + 1]
+    if (isNameOnly(row) && next && HAS_QTY_UNIT_ROW.test(next)) {
+      result.push(`${row} ${next}`.trim())
+      i++
+      continue
+    }
+    result.push(row)
+  }
+  return result
+}
 
 /** Извлечь строки из tables[].cells[] (model=table). Сохраняет row/column структуру. */
 function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
@@ -155,14 +191,16 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
     const rowIndices = Array.from(byRow.keys()).sort((a, b) => a - b)
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
-      const rowText = cellsInRow.map((c) => c.text).join(' ').trim()
+      const texts = cellsInRow.map((c) => c.text)
+      const filtered = texts.filter((t, i) => !(i === 0 && /^\d+$/.test(t)))
+      const rowText = filtered.join(' ').trim()
       if (!rowText) continue
       if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowText))) continue
       if (/^\d+$/.test(rowText)) continue
       allRows.push(rowText)
     }
   }
-  return allRows.length > 0 ? allRows : null
+  return allRows.length > 0 ? postProcessTableRows(allRows) : null
 }
 
 function extractLinesFromYandexResponse(data: unknown): string[] {

@@ -7,6 +7,8 @@
  * Модель table возвращает tables[].cells[] с rowIndex/columnIndex — используем для сохранения структуры.
  */
 
+import { postProcessTableRows } from '@/lib/ocr/orderImage'
+
 const OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
 const LOG_MAX = 200
 
@@ -20,7 +22,9 @@ const SERVICE_ROW_PATTERNS = [
   /^количество$/i,
   /^ед\.?\s*изм\.?$/i,
   /^наименование$/i,
-  /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\\s*[\/\\|]\s*.*)?$/i,
+  /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\s*[\/\\|]\s*.*)?$/i,
+  /^овощи\s+очищенные$/i,
+  /^сухофрукты\/\s*орехи$/i,
 ]
 
 /** Извлечь строки из tables[].cells[] (model=table). Сохраняет row/column структуру. */
@@ -51,14 +55,17 @@ export function extractTableRowsFromResponse(data: unknown): string[] | null {
     const rowIndices = Array.from(byRow.keys()).sort((a, b) => a - b)
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
-      const rowText = cellsInRow.map((c) => c.text).join(' ').trim()
+      const texts = cellsInRow.map((c) => c.text)
+      const filtered = texts.filter((t, i) => !(i === 0 && /^\d+$/.test(t)))
+      const rowText = filtered.join(' ').trim()
       if (!rowText) continue
       if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowText))) continue
       if (/^\d+$/.test(rowText)) continue
       allRows.push(rowText)
     }
   }
-  return allRows.length > 0 ? allRows : null
+  if (allRows.length === 0) return null
+  return postProcessTableRows(allRows)
 }
 
 /** Извлечь текст из ответа Yandex Vision OCR (blocks -> lines -> text) */

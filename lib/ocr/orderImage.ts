@@ -258,6 +258,46 @@ export function normalizeOcrUnits(text: string): string {
     .replace(/\bЗ\s*(\d)/g, '3 $1')
 }
 
+/** Расширенная нормализация для строк таблицы заявки */
+function normalizeTableRowText(row: string): string {
+  return (
+    row
+      .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
+      .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
+      .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
+      .replace(/\bЗ\s*(\d)/g, '3 $1')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  )
+}
+
+/** Строка содержит только qty+unit (число + опционально ед.) */
+const HAS_QTY_UNIT = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i
+
+/** Строка — только название (буквы, без числа) */
+function isNameOnly(s: string): boolean {
+  const t = s.trim()
+  if (!t || t.length < 2) return false
+  return /[\p{L}]/u.test(t) && !/\d/.test(t)
+}
+
+/** Постобработка строк таблицы: нормализация + склейка разорванных (название + qty+unit) */
+export function postProcessTableRows(rows: string[]): string[] {
+  const normalized = rows.map(normalizeTableRowText).filter(Boolean)
+  const result: string[] = []
+  for (let i = 0; i < normalized.length; i++) {
+    const row = normalized[i]
+    const next = normalized[i + 1]
+    if (isNameOnly(row) && next && HAS_QTY_UNIT.test(next)) {
+      result.push(`${row} ${next}`.trim())
+      i++
+      continue
+    }
+    result.push(row)
+  }
+  return result
+}
+
 type Bbox = { x0: number; y0: number; x1: number; y1: number }
 type WordWithBbox = { text: string; bbox: Bbox }
 
