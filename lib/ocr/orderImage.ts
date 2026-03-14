@@ -271,8 +271,8 @@ function normalizeTableRowText(row: string): string {
   )
 }
 
-/** Строка содержит только qty+unit (число + опционально ед.) */
-const HAS_QTY_UNIT = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i
+/** Строка целиком — только qty+unit (1 кг, 0.5 кг, 2 шт). НЕ "Перец 1 кг". */
+const QTY_UNIT_ONLY = /^\s*(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?\s*$/i
 
 /** Строка — только название (буквы, без числа) */
 function isNameOnly(s: string): boolean {
@@ -281,14 +281,17 @@ function isNameOnly(s: string): boolean {
   return /[\p{L}]/u.test(t) && !/\d/.test(t)
 }
 
-/** Постобработка строк таблицы: нормализация + склейка разорванных (название + qty+unit) */
+/** Постобработка строк таблицы: нормализация + склейка разорванных (название + qty+unit).
+ * Склеиваем ТОЛЬКО когда следующая строка — чисто qty+unit (1 кг, 0.5 кг).
+ * Иначе "Вешенки" + "Перец болгарский 1 кг" даст ошибку (пустая ячейка у Вешенки).
+ */
 export function postProcessTableRows(rows: string[]): string[] {
   const normalized = rows.map(normalizeTableRowText).filter(Boolean)
   const result: string[] = []
   for (let i = 0; i < normalized.length; i++) {
     const row = normalized[i]
     const next = normalized[i + 1]
-    if (isNameOnly(row) && next && HAS_QTY_UNIT.test(next)) {
+    if (isNameOnly(row) && next && QTY_UNIT_ONLY.test(next.trim())) {
       result.push(`${row} ${next}`.trim())
       i++
       continue

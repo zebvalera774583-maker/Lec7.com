@@ -141,7 +141,8 @@ function normalizeTableRowText(row: string): string {
     .trim()
 }
 
-const HAS_QTY_UNIT_ROW = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i
+/** Только qty+unit (1 кг, 0.5 кг). НЕ "Перец 1 кг" — иначе "Вешенки" склеится с "Перец 1 кг" при пустой ячейке. */
+const QTY_UNIT_ONLY = /^\s*(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?\s*$/i
 
 function isNameOnly(s: string): boolean {
   const t = s.trim()
@@ -154,7 +155,7 @@ function postProcessTableRows(rows: string[]): string[] {
   for (let i = 0; i < normalized.length; i++) {
     const row = normalized[i]
     const next = normalized[i + 1]
-    if (isNameOnly(row) && next && HAS_QTY_UNIT_ROW.test(next)) {
+    if (isNameOnly(row) && next && QTY_UNIT_ONLY.test(next.trim())) {
       result.push(`${row} ${next}`.trim())
       i++
       continue
