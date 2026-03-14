@@ -52,7 +52,7 @@ function isUnitCell(cell: string): boolean {
 }
 
 /** Ячейка содержит количество + опционально единицу (10кг, 2 кг, 0.200) */
-function parseQtyUnitCell(cell: string): { qty: string; unit: string } | null {
+export function parseQtyUnitCell(cell: string): { qty: string; unit: string } | null {
   const normalized = cell.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
   const m = normalized.match(/^(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i)
   if (!m) return null
@@ -74,6 +74,51 @@ function isProductNameCell(cell: string): boolean {
   if (isUnitCell(cell)) return false
   if (SERVICE_PATTERNS.some((p) => p.test(cell))) return false
   return /[\p{L}]/u.test(cell)
+}
+
+/** Служебные строки — пропускаем */
+const COLUMN_SERVICE_PATTERNS = [
+  /^кухня$/i,
+  /^подразделение$/i,
+  /^дата\s*заявки$/i,
+  /^номенклатура$/i,
+  /^количество$/i,
+  /^ед\.?\s*изм\.?$/i,
+  /^наименование$/i,
+  /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\s*[\/\\|]\s*.*)?$/i,
+]
+
+/**
+ * Парсинг таблицы по колонкам: col0=номенклатура, col1=игнор, col2=qty+ед.изм.
+ * Начинаем с колонки 3 (qty+unit), находим валидное — берём col0 как название.
+ * Поддержка левой и правой частей: при 6+ колонках — левая (0-2), правая (3-5).
+ */
+export function parseTableRowsByColumnStructure(
+  rows: string[][]
+): string[] {
+  const items: string[] = []
+  const processSection = (cells: string[]) => {
+    if (cells.length < 3) return
+    const col0 = cells[0].trim()
+    const col2 = cells[2].trim()
+    if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(col0))) return
+    const parsed = parseQtyUnitCell(col2)
+    if (!parsed) return
+    const name = col0
+    if (!name || /^\d+$/.test(name)) return
+    if (!isProductNameCell(name)) return
+    items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
+  }
+  for (const row of rows) {
+    if (row.length < 3) continue
+    const skipFirst = row.length >= 4 && /^\d+$/.test(row[0].trim())
+    const cells = skipFirst ? row.slice(1) : row
+    processSection(cells)
+    if (cells.length >= 6) {
+      processSection(cells.slice(3, 6))
+    }
+  }
+  return items
 }
 
 /**

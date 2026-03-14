@@ -7,7 +7,7 @@
  * Модель table возвращает tables[].cells[] с rowIndex/columnIndex — используем для сохранения структуры.
  */
 
-import { postProcessTableRows } from '@/lib/ocr/orderImage'
+import { parseTableRowsByColumnStructure } from '@/lib/ocr/orderImage'
 
 const OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
 const LOG_MAX = 200
@@ -27,7 +27,9 @@ const SERVICE_ROW_PATTERNS = [
   /^сухофрукты\/\s*орехи$/i,
 ]
 
-/** Извлечь строки из tables[].cells[] (model=table). Сохраняет row/column структуру. */
+/** Извлечь строки из tables[].cells[] (model=table).
+ * Колонки: 1=номенклатура, 2=игнор, 3=qty+ед.изм. Парсим с колонки 3, затем берём колонку 1.
+ * Левая часть таблицы, затем правая (при 6+ колонках). */
 export function extractTableRowsFromResponse(data: unknown): string[] | null {
   if (!data || typeof data !== 'object') return null
   const obj = data as Record<string, unknown>
@@ -37,7 +39,7 @@ export function extractTableRowsFromResponse(data: unknown): string[] | null {
   const tables = (textAnnotation?.tables ?? (textAnnotation as Record<string, unknown>)?.tables) as Array<Record<string, unknown>> | undefined
   if (!Array.isArray(tables) || tables.length === 0) return null
 
-  const allRows: string[] = []
+  const allRowsAsCells: string[][] = []
   for (const table of tables) {
     const cells = table.cells as Array<Record<string, unknown>> | undefined
     if (!Array.isArray(cells) || cells.length === 0) continue
@@ -56,16 +58,14 @@ export function extractTableRowsFromResponse(data: unknown): string[] | null {
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
       const texts = cellsInRow.map((c) => c.text)
-      const filtered = texts.filter((t, i) => !(i === 0 && /^\d+$/.test(t)))
-      const rowText = filtered.join(' ').trim()
-      if (!rowText) continue
-      if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowText))) continue
-      if (/^\d+$/.test(rowText)) continue
-      allRows.push(rowText)
+      if (texts.length < 3) continue
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(texts.join(' ')))) continue
+      allRowsAsCells.push(texts)
     }
   }
-  if (allRows.length === 0) return null
-  return postProcessTableRows(allRows)
+  if (allRowsAsCells.length === 0) return null
+  const items = parseTableRowsByColumnStructure(allRowsAsCells)
+  return items.length > 0 ? items : null
 }
 
 /** Извлечь текст из ответа Yandex Vision OCR (blocks -> lines -> text) */

@@ -177,7 +177,40 @@ function postProcessTableRows(rows: string[]): string[] {
   return result
 }
 
-/** Извлечь строки из tables[].cells[] (model=table). Сохраняет row/column структуру. */
+/** Парсинг qty+unit из ячейки (10кг, 2 кг, 0.200) */
+function parseQtyUnitCell(cell: string): { qty: string; unit: string } | null {
+  const normalized = cell.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
+  const m = normalized.match(/^(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i)
+  if (!m) return null
+  return { qty: m[1].replace(',', '.'), unit: (m[2] || 'шт').toLowerCase() }
+}
+
+/** Парсинг по колонкам: col0=номенклатура, col1=игнор, col2=qty+ед. Сначала col2, потом col0. Левая часть, затем правая (6+ колонок). */
+function parseTableRowsByColumnStructure(rows: string[][]): string[] {
+  const items: string[] = []
+  const processSection = (cells: string[]) => {
+    if (cells.length < 3) return
+    const col0 = cells[0].trim()
+    const col2 = cells[2].trim()
+    if (SERVICE_ROW_PATTERNS.some((p) => p.test(col0))) return
+    const parsed = parseQtyUnitCell(col2)
+    if (!parsed) return
+    const name = col0
+    if (!name || /^\d+$/.test(name)) return
+    if (!looksLikeProductName(name)) return
+    items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
+  }
+  for (const row of rows) {
+    if (row.length < 3) continue
+    const skipFirst = row.length >= 4 && /^\d+$/.test(row[0].trim())
+    const cells = skipFirst ? row.slice(1) : row
+    processSection(cells)
+    if (cells.length >= 6) processSection(cells.slice(3, 6))
+  }
+  return items
+}
+
+/** Извлечь строки из tables[].cells[]. Колонки: 1=номенклатура, 2=игнор, 3=qty+ед. Сначала col3, потом col1. Левая часть, затем правая. */
 function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
   if (!data || typeof data !== 'object') return null
   const obj = data as Record<string, unknown>
@@ -186,7 +219,7 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
   const tables = textAnnotation?.tables as Array<Record<string, unknown>> | undefined
   if (!Array.isArray(tables) || tables.length === 0) return null
 
-  const allRows: string[] = []
+  const allRowsAsCells: string[][] = []
   for (const table of tables) {
     const cells = table.cells as Array<Record<string, unknown>> | undefined
     if (!Array.isArray(cells) || cells.length === 0) continue
@@ -205,15 +238,14 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
       const texts = cellsInRow.map((c) => c.text)
-      const filtered = texts.filter((t, i) => !(i === 0 && /^\d+$/.test(t)))
-      const rowText = filtered.join(' ').trim()
-      if (!rowText) continue
-      if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowText))) continue
-      if (/^\d+$/.test(rowText)) continue
-      allRows.push(rowText)
+      if (texts.length < 3) continue
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(texts.join(' ')))) continue
+      allRowsAsCells.push(texts)
     }
   }
-  return allRows.length > 0 ? postProcessTableRows(allRows) : null
+  if (allRowsAsCells.length === 0) return null
+  const items = parseTableRowsByColumnStructure(allRowsAsCells)
+  return items.length > 0 ? items : null
 }
 
 function extractLinesFromYandexResponse(data: unknown): string[] {
