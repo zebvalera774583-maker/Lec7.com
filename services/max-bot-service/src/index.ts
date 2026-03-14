@@ -350,7 +350,7 @@ function parseMimeFromContentType(contentType: string | undefined): string {
 async function recognizeImageWithYandex(
   buffer: Buffer,
   mimeType: string = 'image/jpeg'
-): Promise<{ text: string; lines: string[] }> {
+): Promise<{ text: string; lines: string[]; fromTable?: boolean }> {
   const apiKey = process.env.YANDEX_API_KEY?.trim()
   const folderId = process.env.YANDEX_FOLDER_ID?.trim()
   if (!apiKey || !folderId) {
@@ -371,8 +371,10 @@ async function recognizeImageWithYandex(
   )
   const tableRows = extractTableRowsFromYandexResponse(res.data)
   let lines: string[]
+  let fromTable = false
   if (tableRows && tableRows.length > 0) {
     lines = tableRows
+    fromTable = true
     console.log('[MAX OCR] table rows=', tableRows.length)
   } else {
     const blockLines = extractLinesFromYandexResponse(res.data)
@@ -389,7 +391,7 @@ async function recognizeImageWithYandex(
   if (!text) {
     console.log('[MAX OCR RAW]', JSON.stringify(res.data).slice(0, 4000))
   }
-  return { text, lines }
+  return { text, lines, fromTable }
 }
 
 type WebhookResponse = {
@@ -663,7 +665,7 @@ bot.on('message_created', async (ctx: any) => {
           console.log('[MAX PHOTO] converted webp -> jpeg bytes=', buffer.length)
         }
 
-        const { text: ocrText, lines: ocrLines } = await recognizeImageWithYandex(buffer, mimeType)
+        const { text: ocrText, lines: ocrLines, fromTable } = await recognizeImageWithYandex(buffer, mimeType)
         console.log('[MAX OCR TEXT]\n', ocrText)
 
         if (!ocrText.trim()) {
@@ -671,7 +673,7 @@ bot.on('message_created', async (ctx: any) => {
           return
         }
 
-        reconstructedLines = reconstructOcrLines(ocrLines)
+        reconstructedLines = fromTable ? ocrLines : reconstructOcrLines(ocrLines)
         rawText = ocrText
         textForBot = reconstructedLines.join('\n')
         messageText = textForBot
