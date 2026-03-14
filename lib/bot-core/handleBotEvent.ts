@@ -67,46 +67,6 @@ function isItemComplete(item: { hasUnit: boolean }): boolean {
   return item.hasUnit
 }
 
-/** Позиции с недостающими полями: onlyUnit = true если есть вес, но нет ед.изм. */
-function getIncompleteItems(text: string): { displayName: string; onlyUnitMissing: boolean }[] {
-  const items = splitIntoItems(text)
-  const result: { displayName: string; onlyUnitMissing: boolean }[] = []
-  for (const raw of items) {
-    const parsed = parseOneItem(raw)
-    if (!parsed.name || isItemComplete(parsed)) continue
-    const displayName = parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1).toLowerCase()
-    const hasWeight = /\d/.test(raw)
-    result.push({ displayName, onlyUnitMissing: hasWeight })
-  }
-  return result
-}
-
-/** Проверка: все ли позиции имеют вес и ед. изм. */
-function areAllItemsValid(text: string): boolean {
-  const items = splitIntoItems(text)
-  if (items.length === 0) return false
-  for (const raw of items) {
-    const parsed = parseOneItem(raw)
-    if (!parsed.name || !isItemComplete(parsed)) return false
-  }
-  return true
-}
-
-/** Возвращает список недостающих полей для одной позиции (если одна) */
-function getMissingNeedFields(text: string): string[] {
-  const t = text.trim()
-  if (!t) return ['наименование', 'количество', 'единица измерения'];
-  if (NEED_FORMAT_REGEX.test(t)) return [];
-  const hasNumber = /\d/.test(t);
-  const hasUnit = UNIT_PATTERN.test(t);
-  const hasName = !/^\d/.test(t) && /[\p{L}]/u.test(t);
-  const missing: string[] = [];
-  if (!hasName) missing.push('наименование');
-  if (!hasNumber) missing.push('количество');
-  if (!hasUnit) missing.push('единица измерения');
-  return missing;
-}
-
 export interface BotEvent {
   channel: 'telegram' | 'max'
   chatId: string
@@ -949,30 +909,23 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         }
       }
 
-      const firstIdx = findNextIncompleteIndex(parsedItems)
-      if (firstIdx >= 0) {
-        const firstItem = parsedItems[firstIdx]
-        await prisma.botChatState.update({
-          where: { channel_chatId: { channel, chatId } },
-          data: {
-            stateJson: {
-              type: 'awaiting_item_clarification',
-              pendingItems: { needText, parsedItems, commentsText },
-              pendingIndex: firstIdx,
-            },
-          },
-        })
+      // Не спрашивать вес — показывать только позиции с весом. Фильтруем неполные.
+      const completeParsed = parsedItems.filter(
+        (p) => (p.quantity ?? '').trim() && (p.unit ?? '').trim()
+      )
+      if (completeParsed.length === 0) {
         return {
-          messages: [clarificationMessage(firstItem)],
+          messages: ['Не удалось распознать позиции с весом. Напишите заявку в формате: наименование количество ед.изм. (например: яблоки 10 кг)'],
         }
       }
+      const completeNeedText = completeParsed.map((p) => `${p.name} ${p.quantity} ${p.unit}`.trim()).join(', ')
 
       await prisma.botChatState.update({
         where: { channel_chatId: { channel, chatId } },
         data: {
           stateJson: {
             type: 'awaiting_department',
-            pendingItems: { needText, parsedItems, commentsText },
+            pendingItems: { needText: completeNeedText, parsedItems: completeParsed, commentsText },
           },
         },
       })
@@ -1008,45 +961,16 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
     }
 
     const mappedNeedText = mappedItems.map((m) => m.raw).join(', ')
-    const incomplete = mappedItems.length > 0 ? getIncompleteItems(mappedNeedText) : []
+    // Не спрашивать вес — показывать только позиции с весом. Фильтруем неполные.
+    const completeMapped = mappedItems.filter((m) => {
+      const p = parseOneItem(m.raw)
+      return p.name && isItemComplete(p)
+    })
+    const completeNeedText = completeMapped.map((m) => m.raw).join(', ')
 
-    if (incomplete.length > 0) {
-      const onlyUnit = incomplete.filter((i) => i.onlyUnitMissing).map((i) => i.displayName)
-      const needBoth = incomplete.filter((i) => !i.onlyUnitMissing).map((i) => i.displayName)
-      const parts: string[] = []
-      if (onlyUnit.length > 0) parts.push(`Укажите ед. изм. для: ${onlyUnit.join(', ')}`)
-      if (needBoth.length > 0) parts.push(`Укажите вес и ед. изм. для: ${needBoth.join(', ')}`)
-
-      const incompleteRaw = onlyUnit.length > 0
-        ? mappedItems
-            .filter((m) => {
-              const p = parseOneItem(m.raw)
-              return p.name && !isItemComplete(p) && /\d/.test(m.raw)
-            })
-            .map((m) => m.raw)
-        : []
-      await prisma.botChatState.update({
-        where: { channel_chatId: { channel, chatId } },
-        data: {
-          stateJson:
-            incompleteRaw.length > 0
-              ? { type: 'confirmed', pendingUnit: { needText, incompleteRaw } }
-              : { type: 'confirmed' },
-        },
-      })
-
+    if (mappedItems.length > 0 && completeMapped.length === 0) {
       return {
-        messages: [parts.join('. ')],
-      }
-    }
-
-    if (mappedItems.length > 0 && !areAllItemsValid(mappedNeedText)) {
-      const missing = getMissingNeedFields(mappedNeedText)
-      const missingStr = missing.length > 0 ? `Не указано: ${missing.join(', ')}. ` : ''
-      return {
-        messages: [
-          `${missingStr}Формат: наименование количество ед.изм. Например: яблоки 10 кг`,
-        ],
+        messages: ['Не удалось распознать позиции с весом. Напишите заявку в формате: наименование количество ед.изм. (например: яблоки 10 кг)'],
       }
     }
 
@@ -1056,8 +980,8 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       }
     }
 
-    if (businessId && needText) {
-      const parsedItems = mappedItems.map(({ raw, canonical }) => {
+    if (businessId && completeMapped.length > 0) {
+      const parsedItems = completeMapped.map(({ raw, canonical }) => {
         const p = parseOneItem(raw)
         return { ...p, name: canonical }
       })
@@ -1069,7 +993,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         data: {
           stateJson: {
             type: 'awaiting_department',
-            pendingItems: { needText, parsedItems, commentsText },
+            pendingItems: { needText: completeNeedText, parsedItems, commentsText },
           },
         },
       })

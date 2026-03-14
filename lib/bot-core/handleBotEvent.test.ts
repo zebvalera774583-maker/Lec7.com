@@ -309,38 +309,24 @@ describe('handleBotEvent', () => {
     process.env.BOT_BUSINESS_ID = origEnv
   })
 
-  it('clarification: "Айсберг салат 3 шт, груши 5" asks for unit, then "кг" yields full list', async () => {
-    delete process.env.BOT_BUSINESS_ID
+  it('"Айсберг салат 3 шт, груши 5" — показывает только позиции с весом, не спрашивает вес', async () => {
+    const origEnv = process.env.BOT_BUSINESS_ID
+    process.env.BOT_BUSINESS_ID = 'biz1'
     mockGetCatalogNormMap.mockResolvedValue(
       new Map([
         ['айсберг', 'id1'],
         ['груши', 'id2'],
       ])
     )
+    mockFindUnique.mockResolvedValue({ stateJson: { type: 'confirmed' } })
 
-    mockFindUnique
-      .mockResolvedValueOnce({ stateJson: { type: 'confirmed' } })
-      .mockResolvedValueOnce({
-        stateJson: {
-          type: 'confirmed',
-          pendingUnit: {
-            needText: 'Айсберг салат 3 шт, груши 5',
-            incompleteRaw: ['груши 5'],
-          },
-        },
-      })
-
-    const askResult = await handleBotEvent({
+    const result = await handleBotEvent({
       ...baseEvent,
       text: 'Айсберг салат 3 шт, груши 5',
     })
-    expect(askResult.messages.some((m) => m.includes('Укажите'))).toBe(true)
-
-    const replyResult = await handleBotEvent({
-      ...baseEvent,
-      text: 'кг',
-    })
-    expect(replyResult.messages.some((m) => m.includes('Укажите'))).toBe(false)
-    expect(replyResult.messages[0]).toContain('Принял')
+    // Не спрашивает вес — сразу показывает подразделения (только полная позиция "Айсберг салат 3 шт")
+    expect(result.messages.some((m) => m.includes('Укажите'))).toBe(false)
+    expect(result.messages[0]).toContain('Выберите подразделение')
+    process.env.BOT_BUSINESS_ID = origEnv
   })
 })
