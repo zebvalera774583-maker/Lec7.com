@@ -282,8 +282,8 @@ function isNameOnly(s: string): boolean {
 }
 
 /** Постобработка строк таблицы: нормализация + склейка разорванных (название + qty+unit).
- * Склеиваем ТОЛЬКО когда следующая строка — чисто qty+unit (1 кг, 0.5 кг).
- * Иначе "Вешенки" + "Перец болгарский 1 кг" даст ошибку (пустая ячейка у Вешенки).
+ * 1) name_only + qty_only — склеиваем, НО только если после qty НЕТ названия (иначе qty от того товара).
+ * 2) qty_only + name_only — склеиваем (blocks: "1 кг" перед "Перец болгарский").
  */
 export function postProcessTableRows(rows: string[]): string[] {
   const normalized = rows.map(normalizeTableRowText).filter(Boolean)
@@ -291,8 +291,19 @@ export function postProcessTableRows(rows: string[]): string[] {
   for (let i = 0; i < normalized.length; i++) {
     const row = normalized[i]
     const next = normalized[i + 1]
-    if (isNameOnly(row) && next && QTY_UNIT_ONLY.test(next.trim())) {
+    const nextNext = normalized[i + 2]
+    const rowIsNameOnly = isNameOnly(row)
+    const rowIsQtyOnly = row && QTY_UNIT_ONLY.test(row.trim())
+    const nextIsQtyOnly = next && QTY_UNIT_ONLY.test(next.trim())
+    const nextIsNameOnly = next && isNameOnly(next)
+    const nextNextIsProduct = nextNext && isNameOnly(nextNext)
+    if (rowIsNameOnly && nextIsQtyOnly && !nextNextIsProduct) {
       result.push(`${row} ${next}`.trim())
+      i++
+      continue
+    }
+    if (rowIsQtyOnly && nextIsNameOnly) {
+      result.push(`${next} ${row}`.trim())
       i++
       continue
     }

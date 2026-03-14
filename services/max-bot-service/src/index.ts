@@ -141,7 +141,7 @@ function normalizeTableRowText(row: string): string {
     .trim()
 }
 
-/** Только qty+unit (1 кг, 0.5 кг). НЕ "Перец 1 кг" — иначе "Вешенки" склеится с "Перец 1 кг" при пустой ячейке. */
+/** Только qty+unit (1 кг, 0.5 кг). НЕ "Перец 1 кг". */
 const QTY_UNIT_ONLY = /^\s*(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?\s*$/i
 
 function isNameOnly(s: string): boolean {
@@ -149,14 +149,26 @@ function isNameOnly(s: string): boolean {
   return t.length >= 2 && /[\p{L}]/u.test(t) && !/\d/.test(t)
 }
 
+/** Не склеивать "Вешенки" + "1 кг" когда после "1 кг" идёт "Перец болгарский". Зато "1 кг" + "Перец" → "Перец 1 кг". */
 function postProcessTableRows(rows: string[]): string[] {
   const normalized = rows.map(normalizeTableRowText).filter(Boolean)
   const result: string[] = []
   for (let i = 0; i < normalized.length; i++) {
     const row = normalized[i]
     const next = normalized[i + 1]
-    if (isNameOnly(row) && next && QTY_UNIT_ONLY.test(next.trim())) {
+    const nextNext = normalized[i + 2]
+    const rowIsNameOnly = isNameOnly(row)
+    const rowIsQtyOnly = row && QTY_UNIT_ONLY.test(row.trim())
+    const nextIsQtyOnly = next && QTY_UNIT_ONLY.test(next.trim())
+    const nextIsNameOnly = next && isNameOnly(next)
+    const nextNextIsProduct = nextNext && isNameOnly(nextNext)
+    if (rowIsNameOnly && nextIsQtyOnly && !nextNextIsProduct) {
       result.push(`${row} ${next}`.trim())
+      i++
+      continue
+    }
+    if (rowIsQtyOnly && nextIsNameOnly) {
+      result.push(`${next} ${row}`.trim())
       i++
       continue
     }
