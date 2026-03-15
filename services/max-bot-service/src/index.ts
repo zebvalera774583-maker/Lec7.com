@@ -188,16 +188,33 @@ function parseQtyUnitCell(cell: string): { qty: string; unit: string } | null {
 /** Парсинг по колонкам: col0=номенклатура, col1=игнор, col2=qty+ед. Сначала col2, потом col0. Левая часть, затем правая (6+ колонок). */
 function parseTableRowsByColumnStructure(rows: string[][]): string[] {
   const items: string[] = []
+  const skipped: { row: string; reason: string }[] = []
   const processSection = (cells: string[]) => {
-    if (cells.length < 3) return
+    if (cells.length < 3) {
+      skipped.push({ row: cells.join(' | '), reason: 'cells<3' })
+      return
+    }
     const col0 = cells[0].trim()
     const col2 = cells[2].trim()
-    if (SERVICE_ROW_PATTERNS.some((p) => p.test(col0))) return
+    const rowStr = `${col0} | ${col2}`
+    if (SERVICE_ROW_PATTERNS.some((p) => p.test(col0))) {
+      skipped.push({ row: rowStr, reason: 'service_pattern' })
+      return
+    }
     const parsed = parseQtyUnitCell(col2)
-    if (!parsed) return
+    if (!parsed) {
+      skipped.push({ row: rowStr, reason: 'qty_unit_parse_fail' })
+      return
+    }
     const name = col0
-    if (!name || /^\d+$/.test(name)) return
-    if (!looksLikeProductName(name)) return
+    if (!name || /^\d+$/.test(name)) {
+      skipped.push({ row: rowStr, reason: 'name_empty_or_digits' })
+      return
+    }
+    if (!looksLikeProductName(name)) {
+      skipped.push({ row: rowStr, reason: 'not_product_name' })
+      return
+    }
     items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
   }
   for (const row of rows) {
@@ -206,6 +223,9 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     const cells = skipFirst ? row.slice(1) : row
     processSection(cells)
     if (cells.length >= 6) processSection(cells.slice(3, 6))
+  }
+  if (skipped.length > 0) {
+    console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
   }
   return items
 }

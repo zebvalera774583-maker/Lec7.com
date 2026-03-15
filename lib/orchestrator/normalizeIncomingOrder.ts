@@ -65,11 +65,15 @@ export async function normalizeIncomingOrder(
     input.lines && input.lines.length > 0 ? input.lines.join('\n') : (input.rawText || '').trim()
   if (!text) return { intent: 'unknown' }
 
+  const inputLines = (input.lines ?? text.split(/\n/).map((l) => l.trim()).filter(Boolean)) as string[]
+  console.log('[PARSE INPUT]', inputLines)
+
   let rawItems: RawItem[]
 
   try {
     console.log('[ORCH][AI] request source=', input.source, 'text=', text.slice(0, 80))
     const aiItems = await recognizeOrderWithAI(text)
+    console.log('[PARSE RESULT]', aiItems.map((a) => `${a.name} ${a.quantity} ${a.unit}`.trim()))
 
     if (aiItems.length > 0) {
       rawItems = aiItems.map((a) => {
@@ -85,7 +89,7 @@ export async function normalizeIncomingOrder(
       })
       console.log('[ORCH][AI] success items=', rawItems.length, rawItems.map((r) => r.name.slice(0, 15)))
     } else {
-      console.log('[ORCH][AI] success items=0 (empty)')
+      console.log('[PARSE SKIPPED] AI returned 0 items for input lines=', inputLines.slice(0, 5))
       return { intent: 'unknown' }
     }
   } catch (err) {
@@ -170,32 +174,26 @@ export async function normalizeIncomingOrder(
 
     if (isGarbageSegment(segment, raw)) {
       comments.push(segment)
-      console.log(`[ORCH] safeguard garbage segment="${segment.slice(0, 30)}" → comment`)
+      console.log(`[PARSE SKIPPED] reason=garbage segment="${segment.slice(0, 50)}"`)
       continue
     }
 
     const nonItem = isLikelyNonItem(segment, matchScore, raw)
     if (nonItem.isNonItem) {
       comments.push(segment)
-      console.log(
-        `[ORCH] safeguard nonItem reason=${nonItem.reason} segment="${segment.slice(0, 30)}" → comment`
-      )
+      console.log(`[PARSE SKIPPED] reason=nonItem (${nonItem.reason}) segment="${segment.slice(0, 50)}"`)
       continue
     }
 
     if (r.matchType === 'token' && matchScore < HIGH) {
       comments.push(segment)
-      console.log(
-        `[ORCH] safeguard weak token match score=${matchScore.toFixed(2)} < ${HIGH} → comment`
-      )
+      console.log(`[PARSE SKIPPED] reason=weak_token score=${matchScore.toFixed(2)} segment="${segment.slice(0, 50)}"`)
       continue
     }
 
     if (isDoubtfulSegment(segment, raw, r, { hasDashTerminated: raw.hasDashTerminated })) {
       comments.push(segment)
-      console.log(
-        `[ORCH] safeguard doubtful segment="${segment.slice(0, 30)}" canonical="${r.canonicalName.slice(0, 20)}" → comment`
-      )
+      console.log(`[PARSE SKIPPED] reason=doubtful segment="${segment.slice(0, 50)}" canonical="${r.canonicalName.slice(0, 20)}"`)
       continue
     }
 
@@ -209,6 +207,7 @@ export async function normalizeIncomingOrder(
 
     if (verdict === 'COMMENT') {
       comments.push(segment)
+      console.log(`[PARSE SKIPPED] reason=verdict_COMMENT segment="${segment.slice(0, 50)}"`)
     } else {
       r.canonicalName = sanitizeTitle(r.canonicalName)
       r.name = sanitizeTitle(r.name)
