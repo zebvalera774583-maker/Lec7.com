@@ -469,6 +469,44 @@ async function recognizeImageWithYandex(
   return { text, lines, fromTable }
 }
 
+/** Левая колонка таблицы (~40% ширины) — отдельный OCR для проверки гипотезы потери названий */
+const LEFT_COLUMN_WIDTH_RATIO = 0.4
+
+async function recognizeLeftColumnWithYandex(
+  buffer: Buffer,
+  mimeType: string = 'image/jpeg'
+): Promise<string> {
+  const apiKey = process.env.YANDEX_API_KEY?.trim()
+  const folderId = process.env.YANDEX_FOLDER_ID?.trim()
+  if (!apiKey || !folderId) return ''
+
+  const meta = await sharp(buffer).metadata()
+  const w = meta.width ?? 0
+  const h = meta.height ?? 0
+  if (w < 50 || h < 50) return ''
+
+  const leftW = Math.max(50, Math.floor(w * LEFT_COLUMN_WIDTH_RATIO))
+  const leftBuffer = await sharp(buffer)
+    .extract({ left: 0, top: 0, width: leftW, height: h })
+    .jpeg({ quality: 90 })
+    .toBuffer()
+
+  const content = leftBuffer.toString('base64')
+  const res = await axios.post(
+    YANDEX_OCR_URL,
+    { mimeType: 'image/jpeg', languageCodes: ['ru'], model: 'page', content },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Api-Key ${apiKey}`,
+        'x-folder-id': folderId,
+      },
+      timeout: 30000,
+    }
+  )
+  return extractTextFromYandexResponse(res.data)
+}
+
 type WebhookResponse = {
   replyText?: string
   replyInlineKeyboard?: {
@@ -742,6 +780,13 @@ bot.on('message_created', async (ctx: any) => {
 
         const { text: ocrText, lines: ocrLines, fromTable } = await recognizeImageWithYandex(buffer, mimeType)
         console.log('[MAX OCR TEXT]\n', ocrText)
+
+        try {
+          const leftColumnText = await recognizeLeftColumnWithYandex(buffer, mimeType)
+          console.log('[OCR LEFT COLUMN]', leftColumnText || '(empty)')
+        } catch (e) {
+          console.log('[OCR LEFT COLUMN] error:', e instanceof Error ? e.message : String(e))
+        }
 
         if (!ocrText.trim()) {
           await sendReply(ctx, 'Не удалось распознать заявку, попробуйте отправить фото лучше или текстом.')
