@@ -217,13 +217,35 @@ export function parseTableRowsByColumnStructure(
       return
     }
     const col3 = cells[3]?.trim() ?? ''
-    let parsed = parseQtyUnitCell(col2) ?? parseQtyUnitCell(col1) ?? (col3 ? parseQtyUnitCell(col3) : null)
-    let name = col0
-    if (col1 && /^\([\p{L}\s\-]+\)$|^[\p{L}\s\-]+$/u.test(col1) && !parseQtyUnitCell(col1) && !/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(col1) && col1.length < 40) {
-      name = `${col0} ${col1}`.trim()
+    let qtyIdx = -1
+    let parsed: { qty: string; unit: string } | null = null
+    for (let i = 0; i < cells.length; i++) {
+      parsed = parseQtyUnitCell(cells[i].trim())
+      if (parsed) {
+        qtyIdx = i
+        break
+      }
     }
-    if (parsed && /^\d+(?:[.,]\d+)?\s*$/.test(col2) && col1 && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(col1)) {
-      parsed = { ...parsed, unit: col1.toLowerCase().replace(/\.$/, '') }
+    const nameParts: string[] = []
+    for (let i = 0; i < (qtyIdx >= 0 ? qtyIdx : cells.length); i++) {
+      const c = cells[i].trim()
+      if (!c) continue
+      if (parseQtyUnitCell(c)) break
+      if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(c.replace(/\.$/, ''))) break
+      if (/^\d+(?:[.,]\d+)?\s*$/.test(c)) break
+      if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(c))) break
+      if (/^[\p{L}\s\-()]+$/u.test(c) && c.length < 50 && !/^\d+$/.test(c)) {
+        nameParts.push(c)
+      } else {
+        break
+      }
+    }
+    let name = nameParts.join(' ').trim()
+    if (qtyIdx > 0 && parsed && /^\d+(?:[.,]\d+)?\s*$/.test(cells[qtyIdx].trim())) {
+      const prevCell = cells[qtyIdx - 1]?.trim().replace(/\.$/, '')
+      if (prevCell && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(prevCell)) {
+        parsed = { ...parsed, unit: prevCell.toLowerCase() }
+      }
     }
 
     const tryRepairFromFragments = (): boolean => {
