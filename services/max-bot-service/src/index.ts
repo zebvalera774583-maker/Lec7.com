@@ -283,7 +283,7 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     }
     let parsed = parseQtyUnitCell(col2) ?? parseQtyUnitCell(col1)
     let name = col0
-    if (col1 && /^\([\p{L}\s\-]+\)$|^[\p{L}\s\-]+$/.test(col1) && !parseQtyUnitCell(col1) && col1.length < 40) {
+    if (col1 && /^\([\p{L}\s\-]+\)$|^[\p{L}\s\-]+$/u.test(col1) && !parseQtyUnitCell(col1) && col1.length < 40) {
       name = `${col0} ${col1}`.trim()
     }
     if (parsed && /^\d+(?:[.,]\d+)?\s*$/.test(col2) && col1 && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(col1)) {
