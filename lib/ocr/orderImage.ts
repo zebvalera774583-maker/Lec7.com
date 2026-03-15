@@ -89,6 +89,7 @@ function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; uni
   const unit = (m[2] || 'шт').toLowerCase().replace('pcs', 'шт')
   const name = normalized.slice(0, m.index).trim()
   if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
+  if (/^[\d\s]+$/.test(name)) return null
   if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(name))) return null
   if (/\s+(г|кг|шт)\s+/.test(name)) return null
   return { name, qty, unit }
@@ -141,19 +142,37 @@ export function parseTableRowsByColumnStructure(
       skipped.push({ row: rowStr, reason: 'service_pattern' })
       return
     }
-    const parsed = parseQtyUnitCell(col2)
+    let parsed = parseQtyUnitCell(col2)
+    let name = col0
+
+    const tryRepairFromFragments = (): boolean => {
+      if (!/^\d+$/.test(col0)) return false
+      const col1 = cells[1]?.trim() ?? ''
+      if (!col1 || !/[\p{L}]/u.test(col1) || col1.length < 2) return false
+      if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(col1))) return false
+      const qtyFromCol2 = parseQtyUnitCell(col2)
+      if (!qtyFromCol2 || !qtyFromCol2.qty) return false
+      const qtyNum = parseFloat(qtyFromCol2.qty)
+      const unit = qtyFromCol2.unit || (qtyNum > 0 && qtyNum < 1 ? 'г' : 'шт')
+      items.push(`${col1} ${qtyFromCol2.qty} ${unit}`.trim())
+      console.log('[PARSE REPAIR TABLE_ROW]', `source=${rowStr}`, `repaired=${col1} ${qtyFromCol2.qty} ${unit}`)
+      return true
+    }
+
     if (!parsed) {
+      if (tryRepairFromFragments()) return
       if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'qty_unit_parse_fail' })
       return
     }
-    const name = col0
     if (!name || /^\d+$/.test(name)) {
+      if (tryRepairFromFragments()) return
       if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'name_empty_or_digits' })
       return
     }
     if (!isProductNameCell(name)) {
+      if (tryRepairFromFragments()) return
       if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'not_product_name' })
       return
