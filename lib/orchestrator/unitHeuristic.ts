@@ -60,8 +60,13 @@ export function applyUnitHeuristic(
   unit?: string
 ): UnitHeuristicResult {
   const normalizedQty = (qty || '').replace(',', '.').trim()
+  const qtyNum = parseFloat(normalizedQty)
   if (unit && unit.length > 0) {
-    return { unit: unit.toLowerCase(), confidence: 'HIGH' }
+    const u = unit.toLowerCase()
+    if (u === 'шт' && !Number.isNaN(qtyNum) && qtyNum > 0 && qtyNum < 1) {
+      return { unit: 'г', confidence: 'HIGH' }
+    }
+    return { unit: u, confidence: 'HIGH' }
   }
 
   const weightProduct = isWeightProduct(title)

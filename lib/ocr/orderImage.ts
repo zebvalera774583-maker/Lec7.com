@@ -84,11 +84,13 @@ function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; uni
   const normalized = fullRow.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
   const m = normalized.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/i)
   if (!m) return null
-  const qty = m[1].replace(',', '.')
+  const qty = m[1].replace(',', '.').trim()
+  if (!qty) return null
   const unit = (m[2] || 'шт').toLowerCase().replace('pcs', 'шт')
   const name = normalized.slice(0, m.index).trim()
   if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
   if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(name))) return null
+  if (/\s+(г|кг|шт)\s+/.test(name)) return null
   return { name, qty, unit }
 }
 
@@ -120,7 +122,7 @@ export function parseTableRowsByColumnStructure(
     const tryFallback = () => {
       if (!HAS_QTY_UNIT.test(fullRow)) return false
       const parsed = parseQtyUnitFromText(fullRow)
-      if (!parsed) return false
+      if (!parsed || !parsed.qty) return false
       items.push(`${parsed.name} ${parsed.qty} ${parsed.unit}`.trim())
       console.log('[PARSE FORCE ITEM]', fullRow)
       return true
@@ -201,8 +203,6 @@ export function extractTableItems(rows: string[]): string[] {
         unit = c === 'к' ? 'кг' : c.toLowerCase()
         if (i + 1 < cells.length && isQuantityOnly(cells[i + 1])) {
           qty = cells[i + 1].replace(',', '.')
-        } else {
-          qty = '1'
         }
         break
       }
@@ -393,7 +393,7 @@ export function postProcessTableRows(rows: string[]): string[] {
     const rowIsQtyOnly = row && QTY_UNIT_ONLY.test(row.trim())
     const nextIsQtyOnly = next && QTY_UNIT_ONLY.test(next.trim())
     const nextIsNameOnly = next && isNameOnly(next)
-    const nextNextIsProduct = nextNext && isNameOnly(nextNext)
+    const nextNextIsProduct = nextNext && (isNameOnly(nextNext) || /^[\p{L}]/u.test(nextNext.trim()))
     if (rowIsNameOnly && nextIsQtyOnly && !nextNextIsProduct) {
       result.push(`${row} ${next}`.trim())
       i++
