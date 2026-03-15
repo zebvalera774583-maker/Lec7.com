@@ -76,6 +76,22 @@ function isProductNameCell(cell: string): boolean {
   return /[\p{L}]/u.test(cell)
 }
 
+/** Строка содержит число + единицу (для fallback) */
+const HAS_QTY_UNIT = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/i
+
+/** Извлечь name, qty, unit из строки "Свекольные листья 0.200 г" */
+function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; unit: string } | null {
+  const normalized = fullRow.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
+  const m = normalized.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/i)
+  if (!m) return null
+  const qty = m[1].replace(',', '.')
+  const unit = (m[2] || 'шт').toLowerCase().replace('pcs', 'шт')
+  const name = normalized.slice(0, m.index).trim()
+  if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
+  if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(name))) return null
+  return { name, qty, unit }
+}
+
 /** Служебные строки — пропускаем */
 const COLUMN_SERVICE_PATTERNS = [
   /^кухня$/i,
@@ -99,28 +115,44 @@ export function parseTableRowsByColumnStructure(
   const items: string[] = []
   const skipped: { row: string; reason: string }[] = []
   const processSection = (cells: string[]) => {
+    const fullRow = cells.join(' ').trim()
+
+    const tryFallback = () => {
+      if (!HAS_QTY_UNIT.test(fullRow)) return false
+      const parsed = parseQtyUnitFromText(fullRow)
+      if (!parsed) return false
+      items.push(`${parsed.name} ${parsed.qty} ${parsed.unit}`.trim())
+      console.log('[PARSE FORCE ITEM]', fullRow)
+      return true
+    }
+
     if (cells.length < 3) {
-      skipped.push({ row: cells.join(' | '), reason: 'cells<3' })
+      if (tryFallback()) return
+      skipped.push({ row: fullRow, reason: 'cells<3' })
       return
     }
     const col0 = cells[0].trim()
     const col2 = cells[2].trim()
     const rowStr = `${col0} | ${col2}`
     if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(col0))) {
+      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'service_pattern' })
       return
     }
     const parsed = parseQtyUnitCell(col2)
     if (!parsed) {
+      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'qty_unit_parse_fail' })
       return
     }
     const name = col0
     if (!name || /^\d+$/.test(name)) {
+      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'name_empty_or_digits' })
       return
     }
     if (!isProductNameCell(name)) {
+      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'not_product_name' })
       return
     }
