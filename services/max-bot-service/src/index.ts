@@ -190,15 +190,23 @@ function parseQtyUnitCell(cell: string): { qty: string; unit: string } | null {
 /** Строка содержит число + единицу (для fallback) */
 const HAS_QTY_UNIT_FALLBACK = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/i
 
-/** Извлечь name, qty, unit из строки "Свекольные листья 0.200 г" */
+const QTY_UNIT_REGEX = /(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/gi
+
+/** Извлечь name, qty, unit из строки. При нескольких совпадениях предпочитаем 0.xxx г (заказ зелени) над N шт в названии. */
 function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; unit: string } | null {
   const normalized = fullRow.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
-  const m = normalized.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/i)
-  if (!m) return null
-  const qty = m[1].replace(',', '.').trim()
+  const matches = [...normalized.matchAll(QTY_UNIT_REGEX)]
+  if (matches.length === 0) return null
+  let best = matches[0]
+  if (matches.length > 1) {
+    const decimalGram = matches.find((m) => /^\d+[.,]\d+$/.test(m[1]) && /^(г|гр)$/i.test(m[2] || ''))
+    if (decimalGram) best = decimalGram
+    else best = matches[matches.length - 1]
+  }
+  const qty = best[1].replace(',', '.').trim()
   if (!qty) return null
-  const unit = (m[2] || 'шт').toLowerCase().replace('pcs', 'шт')
-  const name = normalized.slice(0, m.index).trim()
+  const unit = (best[2] || 'шт').toLowerCase().replace('pcs', 'шт')
+  const name = normalized.slice(0, best.index).trim()
   if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
   if (/^[\d\s]+$/.test(name)) return null
   if (SERVICE_ROW_PATTERNS.some((p) => p.test(name))) return null
@@ -222,8 +230,23 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
       return true
     }
 
+    const tryNameUnitFallback = (): boolean => {
+      if (cells.length !== 2) return false
+      const c0 = cells[0].trim()
+      const c1 = cells[1].trim().replace(/\.$/, '')
+      if (!c0 || !c1) return false
+      if (!looksLikeProductName(c0)) return false
+      if (!/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(c1)) return false
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(c0))) return false
+      const unit = c1.toLowerCase()
+      items.push(`${c0} 1 ${unit}`.trim())
+      console.log('[PARSE NAME+UNIT]', fullRow, '-> qty=1')
+      return true
+    }
+
     if (cells.length < 3) {
       if (tryFallback()) return
+      if (tryNameUnitFallback()) return
       skipped.push({ row: fullRow, reason: 'cells<3' })
       return
     }
@@ -277,7 +300,7 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     const skipFirst = row.length >= 4 && /^\d+$/.test(row[0].trim())
     const cells = skipFirst ? row.slice(1) : row
     processSection(cells)
-    if (cells.length >= 6) processSection(cells.slice(3, 6))
+    if (cells.length >= 4) processSection(cells.slice(3))
   }
   if (skipped.length > 0) {
     console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
