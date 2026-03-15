@@ -180,7 +180,7 @@ export function parseTableRowsByColumnStructure(
     items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
   }
   for (const row of rows) {
-    if (row.length < 3) continue
+    if (row.length < 2) continue
     const skipFirst = row.length >= 4 && /^\d+$/.test(row[0].trim())
     const cells = skipFirst ? row.slice(1) : row
     processSection(cells)

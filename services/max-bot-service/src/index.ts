@@ -273,7 +273,7 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
   }
   for (const row of rows) {
-    if (row.length < 3) continue
+    if (row.length < 2) continue
     const skipFirst = row.length >= 4 && /^\d+$/.test(row[0].trim())
     const cells = skipFirst ? row.slice(1) : row
     processSection(cells)
@@ -314,7 +314,13 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
       const texts = cellsInRow.map((c) => c.text)
-      if (texts.length < 3) continue
+      if (texts.length < 2) {
+        console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', texts.length, 'texts=', JSON.stringify(texts))
+        continue
+      }
+      if (texts.length === 2) {
+        console.log('[OCR ROW 2 cells] row=', rowIdx, 'texts=', JSON.stringify(texts))
+      }
       if (SERVICE_ROW_PATTERNS.some((p) => p.test(texts.join(' ')))) continue
       allRowsAsCells.push(texts)
     }
