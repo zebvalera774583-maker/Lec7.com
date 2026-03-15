@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import fs from 'fs'
+import path from 'path'
 import express from 'express'
 import axios from 'axios'
 import sharp from 'sharp'
@@ -490,6 +492,12 @@ async function recognizeLeftColumnWithYandex(
     .extract({ left: 0, top: 0, width: leftW, height: h })
     .jpeg({ quality: 90 })
     .toBuffer()
+
+  const outDir = path.join(process.cwd(), 'ocr-debug')
+  fs.mkdirSync(outDir, { recursive: true })
+  const outPath = path.join(outDir, `left-column-${Date.now()}.jpg`)
+  fs.writeFileSync(outPath, leftBuffer)
+  console.log('[OCR LEFT COLUMN IMAGE]', path.resolve(outPath))
 
   const content = leftBuffer.toString('base64')
   const res = await axios.post(
