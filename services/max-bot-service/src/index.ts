@@ -238,8 +238,37 @@ function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; uni
   return { name, qty, unit }
 }
 
+/** Склеить разорванные строки: ["лук"] + ["репчатый", "2кг"] или ["репчатый", "кг", "2кг"] → одна строка */
+function mergeSplitNameRows(rows: string[][]): string[][] {
+  const result: string[][] = []
+  let i = 0
+  while (i < rows.length) {
+    const curr = rows[i]
+    const next = rows[i + 1]
+    if (curr.length === 1 && next && (next.length === 2 || next.length === 3)) {
+      const c0 = curr[0].trim()
+      const n0 = next[0].trim()
+      const qtyCell = next.length === 2 ? next[1].trim() : next[2]?.trim() ?? ''
+      if (c0.length >= 2 && c0.length <= 25 && /[\p{L}]/u.test(c0) && !/^\d+$/.test(c0) &&
+          n0.length >= 2 && /[\p{L}]/u.test(n0) && !parseQtyUnitCell(n0) &&
+          parseQtyUnitCell(qtyCell)) {
+        const mergedName = c0 + ' ' + n0
+        const mergedRow = next.length === 2 ? [mergedName, qtyCell] : [mergedName, next[1].trim(), qtyCell]
+        result.push(mergedRow)
+        console.log('[PARSE MERGE ROWS]', JSON.stringify(curr), '+', JSON.stringify(next), '->', mergedRow)
+        i += 2
+        continue
+      }
+    }
+    result.push(curr)
+    i++
+  }
+  return result
+}
+
 /** Парсинг по колонкам: col0=номенклатура, col1=игнор, col2=qty+ед. Сначала col2, потом col0. Левая часть, затем правая (6+ колонок). */
 function parseTableRowsByColumnStructure(rows: string[][]): string[] {
+  rows = mergeSplitNameRows(rows)
   const items: string[] = []
   const skipped: { row: string; reason: string }[] = []
   const processSection = (cells: string[]) => {
