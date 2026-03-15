@@ -179,24 +179,46 @@ function postProcessTableRows(rows: string[]): string[] {
   return result
 }
 
-/** Парсинг qty+unit из ячейки (10кг, 2 кг, 0.200) */
+/** Парсинг qty+unit из ячейки (10кг, 2 кг, 0.200). Без единицы: 0.xxx → г, целое → шт. */
 function parseQtyUnitCell(cell: string): { qty: string; unit: string } | null {
   const normalized = cell.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
   const m = normalized.match(/^(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i)
   if (!m) return null
-  return { qty: m[1].replace(',', '.'), unit: (m[2] || 'шт').toLowerCase() }
+  const qty = m[1].replace(',', '.')
+  const n = parseFloat(qty)
+  const defaultUnit = n > 0 && n < 1 ? 'г' : 'шт'
+  return { qty, unit: (m[2] || defaultUnit).toLowerCase() }
 }
 
-/** Строка содержит число + единицу (для fallback) */
-const HAS_QTY_UNIT_FALLBACK = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/i
+/** Строка содержит число + единицу или только число в конце (0.200 без г) */
+const HAS_QTY_UNIT_FALLBACK = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)|\d+(?:[.,]\d+)?\s*$/i
 
 const QTY_UNIT_REGEX = /(\d+(?:[.,]\d+)?)\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|pcs)/gi
 
-/** Извлечь name, qty, unit из строки. При нескольких совпадениях предпочитаем 0.xxx г (заказ зелени) над N шт в названии. */
+/** Число в конце строки без единицы (Лук зелёный 0.200) */
+const QTY_ONLY_AT_END = /(\d+(?:[.,]\d+)?)\s*$/
+
+function inferUnitFromQty(qty: string): string {
+  const n = parseFloat(qty.replace(',', '.'))
+  return n > 0 && n < 1 ? 'г' : 'шт'
+}
+
+/** Извлечь name, qty, unit из строки. Поддержка числа без единицы: 0.xxx → г, целое → шт. */
 function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; unit: string } | null {
   const normalized = fullRow.replace(/(\d)\s*к\b/gi, '$1 кг').replace(/\bЗ\s*(\d)/g, '3 $1')
   const matches = [...normalized.matchAll(QTY_UNIT_REGEX)]
-  if (matches.length === 0) return null
+  if (matches.length === 0) {
+    const m = normalized.match(QTY_ONLY_AT_END)
+    if (!m) return null
+    const qty = m[1].replace(',', '.').trim()
+    const unit = inferUnitFromQty(qty)
+    const name = normalized.slice(0, m.index).trim()
+    if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
+    if (/^[\d\s]+$/.test(name)) return null
+    if (SERVICE_ROW_PATTERNS.some((p) => p.test(name))) return null
+    if (/\s+(г|кг|шт)\s+/.test(name)) return null
+    return { name, qty, unit }
+  }
   let best = matches[0]
   if (matches.length > 1) {
     const decimalGram = matches.find((m) => /^\d+[.,]\d+$/.test(m[1]) && /^(г|гр)$/i.test(m[2] || ''))
