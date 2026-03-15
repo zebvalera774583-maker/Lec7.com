@@ -98,11 +98,12 @@ function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; uni
     if (!m) return null
     const qty = m[1].replace(',', '.').trim()
     const unit = inferUnitFromQty(qty)
-    const name = normalized.slice(0, m.index).trim()
+    let name = normalized.slice(0, m.index).trim()
+    name = name.replace(/\s+(кг|г|гр|шт)\s*$/i, '').trim()
     if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
     if (/^[\d\s]+$/.test(name)) return null
     if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(name))) return null
-    if (/\s+(г|кг|шт)\s+/.test(name)) return null
+    if (/\s+(г|кг|шт)\s+\S/.test(name)) return null
     return { name, qty, unit }
   }
   let best = matches[0]
@@ -114,11 +115,12 @@ function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; uni
   const qty = best[1].replace(',', '.').trim()
   if (!qty) return null
   const unit = (best[2] || 'шт').toLowerCase().replace('pcs', 'шт')
-  const name = normalized.slice(0, best.index).trim()
+  let name = normalized.slice(0, best.index).trim()
+  name = name.replace(/\s+(кг|г|гр|шт)\s*$/i, '').trim()
   if (!name || name.length < 2 || !/[\p{L}]/u.test(name)) return null
   if (/^[\d\s]+$/.test(name)) return null
   if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(name))) return null
-  if (/\s+(г|кг|шт)\s+/.test(name)) return null
+  if (/\s+(г|кг|шт)\s+\S/.test(name)) return null
   return { name, qty, unit }
 }
 
@@ -185,9 +187,10 @@ export function parseTableRowsByColumnStructure(
       skipped.push({ row: rowStr, reason: 'service_pattern' })
       return
     }
-    let parsed = parseQtyUnitCell(col2) ?? parseQtyUnitCell(col1)
+    const col3 = cells[3]?.trim() ?? ''
+    let parsed = parseQtyUnitCell(col2) ?? parseQtyUnitCell(col1) ?? (col3 ? parseQtyUnitCell(col3) : null)
     let name = col0
-    if (col1 && /^\([\p{L}\s\-]+\)$|^[\p{L}\s\-]+$/u.test(col1) && !parseQtyUnitCell(col1) && col1.length < 40) {
+    if (col1 && /^\([\p{L}\s\-]+\)$|^[\p{L}\s\-]+$/u.test(col1) && !parseQtyUnitCell(col1) && !/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(col1) && col1.length < 40) {
       name = `${col0} ${col1}`.trim()
     }
     if (parsed && /^\d+(?:[.,]\d+)?\s*$/.test(col2) && col1 && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(col1)) {
