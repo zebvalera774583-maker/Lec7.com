@@ -177,6 +177,7 @@ export function parseTableRowsByColumnStructure(
       return
     }
     const col0 = cells[0].trim()
+    const col1 = cells[1]?.trim() ?? ''
     const col2 = cells[2].trim()
     const rowStr = `${col0} | ${col2}`
     if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(col0))) {
@@ -186,6 +187,9 @@ export function parseTableRowsByColumnStructure(
     }
     let parsed = parseQtyUnitCell(col2)
     let name = col0
+    if (col1 && /^\([\p{L}\s\-]+\)$|^[\p{L}\s\-]+$/.test(col1) && !parseQtyUnitCell(col1) && col1.length < 40) {
+      name = `${col0} ${col1}`.trim()
+    }
 
     const tryRepairFromFragments = (): boolean => {
       if (!/^\d+$/.test(col0)) return false
