@@ -303,6 +303,7 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
       if (!text) continue
       const rowIdx = parseInt(String(cell.rowIndex ?? cell.row_index ?? 0), 10)
       const colIdx = parseInt(String(cell.columnIndex ?? cell.column_index ?? 0), 10)
+      console.log(`[OCR RAW CELL] row=${rowIdx} col=${colIdx} text=${text}`)
       if (!byRow.has(rowIdx)) byRow.set(rowIdx, [])
       byRow.get(rowIdx)!.push({ col: colIdx, text })
     }
@@ -451,6 +452,7 @@ async function recognizeImageWithYandex(
     console.log('[MAX OCR] table rows=', tableRows.length)
   } else {
     const blockLines = extractLinesFromYandexResponse(res.data)
+    blockLines.forEach((line, idx) => console.log(`[OCR RAW LINE] idx=${idx} text=${line}`))
     lines = reconstructOcrLines(blockLines)
     lines = postProcessTableRows(lines)
     lines = lines.filter(

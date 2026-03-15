@@ -356,8 +356,13 @@ function extractTableItemsFromBbox(
 ): string[] {
   const rows = groupWordsByRow(words, lines)
   const items: string[] = []
-  for (const rowWords of rows) {
+  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    const rowWords = rows[rowIdx]
     const cells = splitRowIntoCellsByGap(rowWords)
+    cells.forEach((cellWords, colIdx) => {
+      const text = cellWords.join(' ').trim()
+      if (text) console.log(`[OCR RAW CELL] row=${rowIdx} col=${colIdx} text=${text}`)
+    })
     const validated = validateTableRowFromCells(cells)
     if (validated) {
       items.push(`${validated.name} ${validated.qty} ${validated.unit}`.trim())
