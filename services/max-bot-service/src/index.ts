@@ -187,6 +187,9 @@ function isNameOnly(s: string): boolean {
 
 const UNIT_ONLY_ROW = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i
 
+/** Столбец ед. изм. — только единица без числа (кг, г, шт). Игнорируем при парсинге. */
+const UNIT_COLUMN_IGNORE = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)\.?$/i
+
 /** Не склеивать "Вешенки" + "1 кг" когда после "1 кг" идёт "Перец болгарский". Зато "1 кг" + "Перец" → "Перец 1 кг". */
 function postProcessTableRows(rows: string[]): string[] {
   const normalized = rows.map(normalizeTableRowText).filter(Boolean)
@@ -471,7 +474,8 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
       const rowIndexVal = hasRowNumCol ? texts[0].trim() : null
       const cleanedTexts = hasRowNumCol ? texts.slice(1) : texts
       const normalizedTexts = cleanedTexts.map(normalizeCell).filter(Boolean)
-      const rowWithIndex = rowIndexVal ? [rowIndexVal, ...normalizedTexts] : normalizedTexts
+      let rowWithIndex = rowIndexVal ? [rowIndexVal, ...normalizedTexts] : normalizedTexts
+      rowWithIndex = rowWithIndex.filter((c) => !UNIT_COLUMN_IGNORE.test(c.trim()))
       if (rowWithIndex.length < 2) {
         console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', rowWithIndex.length, 'texts=', JSON.stringify(rowWithIndex))
         continue
