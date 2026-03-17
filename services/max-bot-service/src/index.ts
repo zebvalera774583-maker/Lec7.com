@@ -340,6 +340,12 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
 
     if (!parsed) {
       if (tryRepairFromFragments()) return
+      const qtyInName = parseQtyUnitFromText(col0)
+      if (qtyInName && !/в пачках|в упак|пачк/i.test(col0) && !col0.match(/\d+\s*(?:шт|уп|пач)\s+\d+\s*(?:г|гр)\b/i)) {
+        items.push(`${qtyInName.name} ${qtyInName.qty} ${qtyInName.unit}`.trim())
+        console.log('[PARSE OCR MERGE]', rowStr, '-> qty from name cell')
+        return
+      }
       skipped.push({ row: rowStr, reason: 'qty_column_empty' })
       return
     }
