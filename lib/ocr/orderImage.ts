@@ -184,32 +184,7 @@ export function parseTableRowsByColumnStructure(
   const processSection = (cells: string[]) => {
     const fullRow = cells.join(' ').trim()
 
-    const tryFallback = () => {
-      if (!HAS_QTY_UNIT.test(fullRow)) return false
-      const parsed = parseQtyUnitFromText(fullRow)
-      if (!parsed || !parsed.qty) return false
-      items.push(`${parsed.name} ${parsed.qty} ${parsed.unit}`.trim())
-      console.log('[PARSE FORCE ITEM]', fullRow)
-      return true
-    }
-
-    const tryNameUnitFallback = (): boolean => {
-      if (cells.length !== 2) return false
-      const c0 = cells[0].trim()
-      const c1 = cells[1].trim().replace(/\.$/, '')
-      if (!c0 || !c1) return false
-      if (!isProductNameCell(c0)) return false
-      if (!/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(c1)) return false
-      if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(c0))) return false
-      const unit = c1.toLowerCase()
-      items.push(`${c0} 1 ${unit}`.trim())
-      console.log('[PARSE NAME+UNIT]', fullRow, '-> qty=1')
-      return true
-    }
-
     if (cells.length < 3) {
-      if (tryFallback()) return
-      if (tryNameUnitFallback()) return
       skipped.push({ row: fullRow, reason: 'cells<3' })
       return
     }
@@ -218,14 +193,13 @@ export function parseTableRowsByColumnStructure(
     const col2 = cells[2].trim()
     const rowStr = `${col0} | ${col2}`
     if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(col0))) {
-      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'service_pattern' })
       return
     }
     const col3 = cells[3]?.trim() ?? ''
     let qtyIdx = -1
     let parsed: { qty: string; unit: string } | null = null
-    for (let i = 0; i < cells.length; i++) {
+    for (let i = 2; i < cells.length; i++) {
       parsed = parseQtyUnitCell(cells[i].trim())
       if (parsed) {
         qtyIdx = i
@@ -270,19 +244,16 @@ export function parseTableRowsByColumnStructure(
 
     if (!parsed) {
       if (tryRepairFromFragments()) return
-      if (tryFallback()) return
-      skipped.push({ row: rowStr, reason: 'qty_unit_parse_fail' })
+      skipped.push({ row: rowStr, reason: 'qty_column_empty' })
       return
     }
     if (!name || /^\d+$/.test(name)) {
       if (tryRepairFromFragments()) return
-      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'name_empty_or_digits' })
       return
     }
     if (!isProductNameCell(name)) {
       if (tryRepairFromFragments()) return
-      if (tryFallback()) return
       skipped.push({ row: rowStr, reason: 'not_product_name' })
       return
     }
