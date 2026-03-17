@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
   if (body?.source === 'max_photo') {
     const rawLines = Array.isArray(body?.lines) && body.lines.length > 0 ? body.lines : (text ? text.split(/\n/) : [])
     const processed = rawLines.length > 0 ? postProcessTableRows(rawLines) : []
-    text = processed.length > 0 ? processed.join('\n') : text
+    const withQty = processed.filter((line) => /\d/.test(line))
+    text = withQty.join('\n')
   } else if (body?.source === 'max_pdf') {
     // text уже приходит в формате "название кол-во ед\n..."
   } else if (body?.source === 'ocr' && text) {
