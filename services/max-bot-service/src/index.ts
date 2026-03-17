@@ -281,6 +281,18 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     const fullRow = cells.join(' ').trim()
 
     if (cells.length < 3) {
+      if (cells.length === 2) {
+        const c0 = cells[0].trim()
+        const c1 = cells[1].trim().replace(/\.$/, '')
+        if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(c1)) {
+          const qtyInName = parseQtyUnitFromText(c0)
+          if (qtyInName && !/в пачках|в упак|пачк/i.test(c0) && !c0.match(/\d+\s*(?:шт|уп|пач)\s+\d+\s*(?:г|гр)\b/i)) {
+            items.push(`${qtyInName.name} ${qtyInName.qty} ${qtyInName.unit}`.trim())
+            console.log('[PARSE 2 CELLS]', fullRow, '-> qty from name')
+            return
+          }
+        }
+      }
       skipped.push({ row: fullRow, reason: 'cells<3' })
       return
     }
@@ -295,7 +307,7 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     const col3 = cells[3]?.trim() ?? ''
     let qtyIdx = -1
     let parsed: { qty: string; unit: string } | null = null
-    for (let i = 2; i < cells.length; i++) {
+    for (let i = 1; i < cells.length; i++) {
       parsed = parseQtyUnitCell(cells[i].trim())
       if (parsed) {
         qtyIdx = i
@@ -371,6 +383,9 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
   if (skipped.length > 0) {
     console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
   }
+  if (items.length > 0) {
+    console.log('[PARSE ITEMS]', items.join(' | '))
+  }
   return items
 }
 
@@ -409,6 +424,9 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
       }
       if (texts.length === 2) {
         console.log('[OCR ROW 2 cells] row=', rowIdx, 'texts=', JSON.stringify(texts))
+      }
+      if (texts.some((t) => /шампиньон/i.test(t))) {
+        console.log('[OCR ROW Шампиньоны] row=', rowIdx, 'texts=', JSON.stringify(texts))
       }
       if (SERVICE_ROW_PATTERNS.some((p) => p.test(texts.join(' ')))) continue
       allRowsAsCells.push(texts)
