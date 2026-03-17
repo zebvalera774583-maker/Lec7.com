@@ -164,16 +164,26 @@ function stripRowNumberDuplicates(s: string): string {
   return s.replace(/\s+(\d+)\s+\1\b/g, '').replace(/\s{2,}/g, ' ').trim()
 }
 
+/** Убрать одиночные единицы (ед. изм.): "Пекинская капуста шт" → "Пекинская капуста", "Лук порей шт Лист" → "Лук порей Лист". Не трогать "1 кг". */
+function stripStandaloneUnits(s: string): string {
+  return s
+    .replace(/(?<!\d)\s+(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)\.?(?=\s|$)/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /** Нормализация строк таблицы */
 function normalizeTableRowText(row: string): string {
-  return stripRowNumberDuplicates(
-    row
-      .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
-      .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
-      .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
-      .replace(/\bЗ\s*(\d)/g, '3 $1')
-      .replace(/\s{2,}/g, ' ')
-      .trim()
+  return stripStandaloneUnits(
+    stripRowNumberDuplicates(
+      row
+        .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
+        .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
+        .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
+        .replace(/\bЗ\s*(\d)/g, '3 $1')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+    )
   )
 }
 
@@ -535,8 +545,8 @@ const SERVICE_LINE =
   /^(подразделение|дата\s*заявки|мк2\s*кухня|кухня|наименование|номенклатура|количество|ед\.?\s*изм\.?)$/i
 const CATEGORY_LINE = /^(овощи|зелень|фрукты|ягоды|сухофрукты|орехи)(\s*[\/\\|]\s*.*)?$/i
 
-/** Строка содержит только единицу измерения */
-const UNIT_ONLY = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i
+/** Строка содержит только единицу измерения (ед. изм. — игнорируем) */
+const UNIT_ONLY = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)\.?$/i
 
 /** Строка содержит qty+unit (1.5кг, 10 шт) */
 const HAS_QTY_UNIT = /\d+(?:[.,]\d+)?\s*(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед)?$/i
@@ -574,7 +584,10 @@ function reconstructOcrLines(lines: string[]): string[] {
     if (isUnitOnly && nextHasQtyUnit) {
       continue
     }
-    if (isUnitOnly || hasQtyUnit) {
+    if (isUnitOnly) {
+      continue
+    }
+    if (hasQtyUnit) {
       const prev = result[result.length - 1]
       if (prev && looksLikeProductName(prev)) {
         result[result.length - 1] = `${prev} ${line}`.trim()

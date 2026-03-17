@@ -480,16 +480,26 @@ function stripRowNumberDuplicates(s: string): string {
   return s.replace(/\s+(\d+)\s+\1\b/g, '').replace(/\s{2,}/g, ' ').trim()
 }
 
+/** Убрать одиночные единицы (ед. изм.): "Пекинская капуста шт" → "Пекинская капуста". Не трогать "1 кг". */
+function stripStandaloneUnits(s: string): string {
+  return s
+    .replace(/(?<!\d)\s+(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)\.?(?=\s|$)/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 /** Расширенная нормализация для строк таблицы заявки */
 function normalizeTableRowText(row: string): string {
-  return stripRowNumberDuplicates(
-    row
-      .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
-      .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
-      .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
-      .replace(/\bЗ\s*(\d)/g, '3 $1')
-      .replace(/\s{2,}/g, ' ')
-      .trim()
+  return stripStandaloneUnits(
+    stripRowNumberDuplicates(
+      row
+        .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
+        .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
+        .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
+        .replace(/\bЗ\s*(\d)/g, '3 $1')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+    )
   )
 }
 
