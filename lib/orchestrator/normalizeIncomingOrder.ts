@@ -68,25 +68,37 @@ export async function normalizeIncomingOrder(
   const inputLines = (input.lines ?? text.split(/\n/).map((l) => l.trim()).filter(Boolean)) as string[]
   console.log('[PARSE INPUT]', inputLines)
 
+  const textForAI =
+    input.source === 'max_photo' || input.source === 'telegram_photo'
+      ? inputLines.filter((line) => /\d/.test(line)).join('\n')
+      : text
+  if ((input.source === 'max_photo' || input.source === 'telegram_photo') && !textForAI.trim()) {
+    console.log('[PARSE SKIPPED] OCR: no lines with quantity')
+    return { intent: 'unknown' }
+  }
+
   let rawItems: RawItem[]
 
   try {
-    console.log('[ORCH][AI] request source=', input.source, 'text=', text.slice(0, 80))
-    const aiItems = await recognizeOrderWithAI(text)
+    console.log('[ORCH][AI] request source=', input.source, 'text=', (textForAI || text).slice(0, 80))
+    const aiItems = await recognizeOrderWithAI(textForAI || text)
     console.log('[PARSE RESULT]', aiItems.map((a) => `${a.name} ${a.quantity} ${a.unit}`.trim()))
 
     if (aiItems.length > 0) {
-      rawItems = aiItems.map((a) => {
-        const seg = `${a.name} ${a.quantity} ${a.unit}`.trim()
-        return {
-          rawText: seg,
-          name: a.name.trim(),
-          quantity: a.quantity || '1',
-          unit: a.unit || '',
-          hasDashTerminated: false,
-          originalSegment: seg,
-        }
-      })
+      const skipEmptyQty = input.source === 'max_photo' || input.source === 'telegram_photo'
+      rawItems = aiItems
+        .filter((a) => !skipEmptyQty || (a.quantity != null && String(a.quantity).trim() !== ''))
+        .map((a) => {
+          const seg = `${a.name} ${a.quantity} ${a.unit}`.trim()
+          return {
+            rawText: seg,
+            name: a.name.trim(),
+            quantity: a.quantity || '1',
+            unit: a.unit || '',
+            hasDashTerminated: false,
+            originalSegment: seg,
+          }
+        })
       console.log('[ORCH][AI] success items=', rawItems.length, rawItems.map((r) => r.name.slice(0, 15)))
     } else {
       console.log('[PARSE SKIPPED] AI returned 0 items for input lines=', inputLines.slice(0, 5))
