@@ -327,71 +327,41 @@ function mergeSplitNameRows(rows: string[][]): string[][] {
   return result
 }
 
-/** Логика "столбец C первый": ищем цифру в столбце количества (C), только тогда берём название из A.
- * Позиция = только когда в столбце C есть валидное количество. Без fallback из name. */
+/** Строго: количество ТОЛЬКО из колонки C (index 2). Название ТОЛЬКО из колонки A (index 0) этой же строки.
+ * Без mergeSplitNameRows — не смешиваем данные из разных строк. */
 function parseTableRowsByColumnStructure(rows: string[][]): string[] {
-  rows = mergeSplitNameRows(rows)
   const items: string[] = []
   const skipped: { row: string; reason: string }[] = []
   const processSection = (cells: string[], rowIndex: string | null) => {
-    const fullRow = cells.join(' ').trim()
+    if (cells.length < 2) return
+    const colA = cells[0].trim()
+    const colC = cells.length >= 3 ? cells[2].trim() : cells[1].trim()
+    const rowStr = `${colA} | ${colC}`
 
-    if (cells.length < 2) {
-      skipped.push({ row: fullRow, reason: 'cells<2' })
-      return
-    }
-    const col0 = cells[0].trim()
-    const rowStr = `${col0} | ${cells[2] ?? cells[1] ?? ''}`
-    if (SERVICE_ROW_PATTERNS.some((p) => p.test(col0))) {
+    if (SERVICE_ROW_PATTERNS.some((p) => p.test(colA))) {
       skipped.push({ row: rowStr, reason: 'service_pattern' })
       return
     }
 
-    const qtyColumnIndices =
-      cells.length === 2 ? [1] : cells.length === 3 ? [2] : cells.length === 6 ? [2, 5] : cells.length >= 4 ? [2, 3] : []
-    let qtyIdx = -1
-    let parsed: { qty: string; unit: string } | null = null
-    for (const i of qtyColumnIndices) {
-      if (i >= cells.length) continue
-      parsed = parseQtyUnitCell(cells[i].trim())
-      if (parsed && (!rowIndex || parsed.qty !== rowIndex)) {
-        qtyIdx = i
-        break
-      }
-      if (parsed && rowIndex && parsed.qty === rowIndex) parsed = null
-    }
-    if (qtyIdx < 0 || !parsed) {
+    const qtyIdx = cells.length >= 3 ? 2 : 1
+    const parsed = parseQtyUnitCell(colC)
+    if (!parsed || (rowIndex && parsed.qty === rowIndex)) {
       skipped.push({ row: rowStr, reason: 'no_qty_in_column_c' })
       return
     }
 
-    const nameParts: string[] = []
-    for (let i = 0; i < qtyIdx; i++) {
-      const c = cells[i].trim()
-      if (!c) continue
-      if (parseQtyUnitCell(c)) continue
-      if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(c.replace(/\.$/, ''))) continue
-      if (/^\d+$/.test(c)) continue
-      if (SERVICE_ROW_PATTERNS.some((p) => p.test(c))) break
-      if (/^[\p{L}\s\-()]+$/u.test(c) && c.length < 50) {
-        nameParts.push(c)
-      } else {
-        break
-      }
+    let name = colA
+    if (/^\d+$/.test(name)) {
+      skipped.push({ row: rowStr, reason: 'name_is_row_number' })
+      return
     }
-    let name = nameParts.join(' ').trim()
     if (qtyIdx > 0 && /^\d+(?:[.,]\d+)?\s*$/.test(cells[qtyIdx].trim())) {
       const prevCell = cells[qtyIdx - 1]?.trim().replace(/\.$/, '')
       if (prevCell && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(prevCell)) {
-        parsed = { ...parsed, unit: prevCell.toLowerCase() }
+        parsed.unit = prevCell.toLowerCase()
       }
     }
-
-    if (!name || /^\d+$/.test(name)) {
-      skipped.push({ row: rowStr, reason: 'name_empty_or_digits' })
-      return
-    }
-    if (!looksLikeProductName(name)) {
+    if (!name || !looksLikeProductName(name)) {
       skipped.push({ row: rowStr, reason: 'not_product_name' })
       return
     }
@@ -403,7 +373,7 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     const rowIndex = skipFirst ? row[0].trim() : null
     const cells = skipFirst ? row.slice(1) : row
     processSection(cells, rowIndex)
-    if (cells.length >= 4) processSection(cells.slice(3), rowIndex)
+    if (cells.length === 6) processSection(cells.slice(3), rowIndex)
   }
   if (skipped.length > 0) {
     console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
