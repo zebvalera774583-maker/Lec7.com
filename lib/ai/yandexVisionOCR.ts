@@ -7,7 +7,12 @@
  * Модель table возвращает tables[].cells[] с rowIndex/columnIndex — используем для сохранения структуры.
  */
 
-import { parseTableRowsByColumnStructure } from '@/lib/ocr/orderImage'
+import {
+  parseTableRowsByColumnStructure,
+  stripBeforeOvochiRows,
+  stripBeforeOvochiLines,
+  normalizeCell,
+} from '@/lib/ocr/orderImage'
 
 const OCR_URL = 'https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText'
 const LOG_MAX = 200
@@ -57,18 +62,31 @@ export function extractTableRowsFromResponse(data: unknown): string[] | null {
     const rowIndices = Array.from(byRow.keys()).sort((a, b) => a - b)
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
-      const texts = cellsInRow.map((c) => c.text)
-      if (texts.length < 3) continue
-      if (SERVICE_ROW_PATTERNS.some((p) => p.test(texts.join(' ')))) continue
-      allRowsAsCells.push(texts)
+      const normalized = cellsInRow.map((c) => ({ col: c.col, text: normalizeCell(c.text).trim() })).filter((c) => c.text)
+      if (normalized.length < 2) continue
+      const hasRowNumCol = normalized.length > 1 && /^\d+$/.test(normalized[0].text)
+      const rowIndexVal = hasRowNumCol ? normalized[0].text : null
+      const dataCells = hasRowNumCol ? normalized.slice(1) : normalized
+      // Сохраняем структуру: индекс массива = columnIndex. Колонка C (index 2) — количество.
+      const maxCol = Math.max(...dataCells.map((c) => c.col))
+      const row: string[] = []
+      for (let col = 0; col <= maxCol; col++) {
+        const cell = dataCells.find((c) => c.col === col)
+        row.push(cell ? cell.text : '')
+      }
+      const rowWithIndex = rowIndexVal ? [rowIndexVal, ...row] : row
+      if (rowWithIndex.filter(Boolean).length < 2) continue
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowWithIndex.join(' ')))) continue
+      allRowsAsCells.push(rowWithIndex)
     }
   }
   if (allRowsAsCells.length === 0) return null
-  const items = parseTableRowsByColumnStructure(allRowsAsCells)
+  const rowsAfterOvochi = stripBeforeOvochiRows(allRowsAsCells)
+  const items = parseTableRowsByColumnStructure(rowsAfterOvochi)
   return items.length > 0 ? items : null
 }
 
-/** Извлечь текст из ответа Yandex Vision OCR (blocks -> lines -> text) */
+/** Извлечь текст из ответа Yandex Vision OCR (blocks -> lines -> text). Старт после "ОВОЩИ". */
 function extractTextFromResponse(data: unknown): string {
   if (!data || typeof data !== 'object') return ''
   const obj = data as Record<string, unknown>
@@ -92,7 +110,8 @@ function extractTextFromResponse(data: unknown): string {
       if (typeof text === 'string' && text.trim()) lines.push(text.trim())
     }
   }
-  return lines.join('\n')
+  const linesAfterOvochi = stripBeforeOvochiLines(lines)
+  return linesAfterOvochi.join('\n')
 }
 
 /**
