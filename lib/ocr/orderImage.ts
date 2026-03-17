@@ -475,9 +475,14 @@ export function normalizeOcrUnits(text: string): string {
     .replace(/\bЗ\s*(\d)/g, '3 $1')
 }
 
+/** Убрать дубли номеров строк: "тархун 26 26" → "тархун", "Лук зеленый 34 34" → "Лук зеленый" */
+function stripRowNumberDuplicates(s: string): string {
+  return s.replace(/\s+(\d+)\s+\1\b/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
 /** Расширенная нормализация для строк таблицы заявки */
 function normalizeTableRowText(row: string): string {
-  return (
+  return stripRowNumberDuplicates(
     row
       .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
       .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')

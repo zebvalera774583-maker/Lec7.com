@@ -159,15 +159,22 @@ function stripBeforeOvochiLines(lines: string[]): string[] {
   return sliced
 }
 
+/** Убрать дубли номеров строк: "тархун 26 26" → "тархун", "Лук зеленый 34 34" → "Лук зеленый" */
+function stripRowNumberDuplicates(s: string): string {
+  return s.replace(/\s+(\d+)\s+\1\b/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
 /** Нормализация строк таблицы */
 function normalizeTableRowText(row: string): string {
-  return row
-    .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
-    .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
-    .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
-    .replace(/\bЗ\s*(\d)/g, '3 $1')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
+  return stripRowNumberDuplicates(
+    row
+      .replace(/(\d+(?:[.,]\d+)?)\s*к\b/gi, '$1 кг')
+      .replace(/(\d)(кг|г|гр|шт|л|мл|уп)\b/gi, '$1 $2')
+      .replace(/\bКГ\.?\s*(\d)/gi, '$1 кг')
+      .replace(/\bЗ\s*(\d)/g, '3 $1')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  )
 }
 
 /** Только qty+unit (1 кг, 0.5 кг). НЕ "Перец 1 кг". */
@@ -312,7 +319,7 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
   rows = mergeSplitNameRows(rows)
   const items: string[] = []
   const skipped: { row: string; reason: string }[] = []
-  const processSection = (cells: string[]) => {
+  const processSection = (cells: string[], rowIndex: string | null) => {
     const fullRow = cells.join(' ').trim()
 
     if (cells.length < 3) {
@@ -344,10 +351,11 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     let parsed: { qty: string; unit: string } | null = null
     for (let i = 1; i < cells.length; i++) {
       parsed = parseQtyUnitCell(cells[i].trim())
-      if (parsed) {
+      if (parsed && (!rowIndex || parsed.qty !== rowIndex)) {
         qtyIdx = i
         break
       }
+      if (parsed && rowIndex && parsed.qty === rowIndex) parsed = null
     }
     const nameParts: string[] = []
     for (let i = 0; i < (qtyIdx >= 0 ? qtyIdx : cells.length); i++) {
@@ -388,7 +396,12 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
     if (!parsed) {
       if (tryRepairFromFragments()) return
       const qtyInName = parseQtyUnitFromText(col0)
-      if (qtyInName && !/в пачках|в упак|пачк/i.test(col0) && !col0.match(/\d+\s*(?:шт|уп|пач)\s+\d+\s*(?:г|гр)\b/i)) {
+      if (
+        qtyInName &&
+        (!rowIndex || qtyInName.qty !== rowIndex) &&
+        !/в пачках|в упак|пачк/i.test(col0) &&
+        !col0.match(/\d+\s*(?:шт|уп|пач)\s+\d+\s*(?:г|гр)\b/i)
+      ) {
         items.push(`${qtyInName.name} ${qtyInName.qty} ${qtyInName.unit}`.trim())
         console.log('[PARSE OCR MERGE]', rowStr, '-> qty from name cell')
         return
@@ -410,10 +423,11 @@ function parseTableRowsByColumnStructure(rows: string[][]): string[] {
   }
   for (const row of rows) {
     if (row.length < 2) continue
-    const skipFirst = row.length >= 4 && /^\d+$/.test(row[0].trim())
+    const skipFirst = /^\d+$/.test(row[0].trim())
+    const rowIndex = skipFirst ? row[0].trim() : null
     const cells = skipFirst ? row.slice(1) : row
-    processSection(cells)
-    if (cells.length >= 4) processSection(cells.slice(3))
+    processSection(cells, rowIndex)
+    if (cells.length >= 4) processSection(cells.slice(3), rowIndex)
   }
   if (skipped.length > 0) {
     console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
@@ -453,23 +467,23 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
       const texts = cellsInRow.map((c) => c.text)
-      const cleanedTexts =
-        texts.length > 1 && /^\d+$/.test(texts[0].trim())
-          ? texts.slice(1)
-          : texts
+      const hasRowNumCol = texts.length > 1 && /^\d+$/.test(texts[0].trim())
+      const rowIndexVal = hasRowNumCol ? texts[0].trim() : null
+      const cleanedTexts = hasRowNumCol ? texts.slice(1) : texts
       const normalizedTexts = cleanedTexts.map(normalizeCell).filter(Boolean)
-      if (normalizedTexts.length < 2) {
-        console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', normalizedTexts.length, 'texts=', JSON.stringify(normalizedTexts))
+      const rowWithIndex = rowIndexVal ? [rowIndexVal, ...normalizedTexts] : normalizedTexts
+      if (rowWithIndex.length < 2) {
+        console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', rowWithIndex.length, 'texts=', JSON.stringify(rowWithIndex))
         continue
       }
-      if (normalizedTexts.length === 2) {
-        console.log('[OCR ROW 2 cells] row=', rowIdx, 'texts=', JSON.stringify(normalizedTexts))
+      if (rowWithIndex.length === 2) {
+        console.log('[OCR ROW 2 cells] row=', rowIdx, 'texts=', JSON.stringify(rowWithIndex))
       }
-      if (normalizedTexts.some((t) => /шампиньон/i.test(t))) {
-        console.log('[OCR ROW Шампиньоны] row=', rowIdx, 'texts=', JSON.stringify(normalizedTexts))
+      if (rowWithIndex.some((t) => /шампиньон/i.test(t))) {
+        console.log('[OCR ROW Шампиньоны] row=', rowIdx, 'texts=', JSON.stringify(rowWithIndex))
       }
-      if (SERVICE_ROW_PATTERNS.some((p) => p.test(normalizedTexts.join(' ')))) continue
-      allRowsAsCells.push(normalizedTexts)
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(rowWithIndex.join(' ')))) continue
+      allRowsAsCells.push(rowWithIndex)
     }
   }
   if (allRowsAsCells.length === 0) return null
