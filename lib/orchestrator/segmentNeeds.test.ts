@@ -65,6 +65,12 @@ describe('segmentNeeds', () => {
     expect(r[0].toLowerCase()).toMatch(/шампиньоны.*1.*кг/)
   })
 
+  it('"Руккола в пачках 1шт 125гр" → один сегмент (не два)', () => {
+    const r = segmentNeeds('Руккола в пачках 1шт 125гр')
+    expect(r).toHaveLength(1)
+    expect(r[0].toLowerCase()).toMatch(/руккола.*пачках.*1.*шт/)
+  })
+
   it('"лук 1 кг, морковь 1 кг" → два сегмента', () => {
     const r = segmentNeeds('лук 1 кг, морковь 1 кг')
     expect(r).toHaveLength(2)

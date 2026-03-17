@@ -56,6 +56,11 @@ describe('parseMaxRequestToRows', () => {
     ])
   })
 
+  it('Руккола в пачках 1шт 125гр — одна позиция (не две)', () => {
+    const result = parseMaxRequestToRows('', 'Руккола в пачках 1шт 125гр')
+    expect(result).toEqual([{ name: 'Руккола в пачках', quantity: '1', unit: 'шт' }])
+  })
+
   it('многострочная заявка: шапка + товары — парсятся только позиции', () => {
     const input = `Мк - 2; Войкова 4В, бар
 

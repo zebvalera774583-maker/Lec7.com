@@ -224,7 +224,13 @@ function parseQtyUnitFromText(fullRow: string): { name: string; qty: string; uni
   if (matches.length > 1) {
     const decimalGram = matches.find((m) => /^\d+[.,]\d+$/.test(m[1]) && /^(г|гр)$/i.test(m[2] || ''))
     if (decimalGram) best = decimalGram
-    else best = matches[matches.length - 1]
+    else if (/в пачках|в упак|пачк/i.test(normalized)) {
+      const firstSh = matches.find((m) => /^(шт|уп|упак|пач)$/i.test(m[2] || ''))
+      if (firstSh) best = firstSh
+      else best = matches[matches.length - 1]
+    } else {
+      best = matches[matches.length - 1]
+    }
   }
   const qty = best[1].replace(',', '.').trim()
   if (!qty) return null

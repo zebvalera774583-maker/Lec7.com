@@ -26,18 +26,23 @@ function isHeaderLine(line: string): boolean {
   return line.includes(';')
 }
 
+/** "в пачках 1шт 125гр" — одна позиция, не резать по второму qty */
+const PACK_WEIGHT_IN_LINE = /\d+\s*(?:шт|уп|упак|пач)\s+\d+\s*(?:г|гр)\b/i
+
 function parseLineToRows(
   line: string,
   defaultUnit: string
 ): { name: string; quantity: string; unit: string }[] {
   const rows: { name: string; quantity: string; unit: string }[] = []
-  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
+  const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|г|гр|шт|т|л|м|ед|упак|мл|уп|пач)?/gi
+  const onePackItem = PACK_WEIGHT_IN_LINE.test(line)
   let m: RegExpExecArray | null
   while ((m = re.exec(line)) !== null) {
     const name = m[1].trim()
     const quantity = m[2].replace(',', '.')
     const unit = ((m[3] || defaultUnit) as string).toLowerCase()
     if (name) rows.push({ name, quantity, unit })
+    if (onePackItem) break
   }
   return rows
 }
@@ -85,12 +90,14 @@ export function parseMaxRequestToRowsWithOptionalUnit(
   for (const line of lines) {
     if (isHeaderLine(line)) continue
     let m: RegExpExecArray | null
-    const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|шт|т|л|м|ед|упак)?/gi
+    const re = /([^\d]+?)[\s\-]+(\d+(?:[.,]\d+)?)\s*(кг|г|гр|шт|т|л|м|ед|упак|мл|уп|пач)?/gi
+    const onePackItem = PACK_WEIGHT_IN_LINE.test(line)
     while ((m = re.exec(line)) !== null) {
       const name = m[1].trim()
       const quantity = m[2].replace(',', '.')
       const unit = (m[3] ?? '').toString().toLowerCase().trim()
       if (name) rows.push({ name, quantity, unit })
+      if (onePackItem) break
     }
   }
   if (rows.length === 0) rows.push({ name: src.split('\n')[0] || src, quantity: '1', unit: '' })

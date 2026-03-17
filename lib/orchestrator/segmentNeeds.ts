@@ -44,25 +44,31 @@ function normalizeAndSplit(text: string): string[] {
     .filter(Boolean)
 }
 
-/** Конец qty+unit от позиции qty */
+/** Конец qty+unit от позиции qty. Важно: гр перед г (иначе "125гр" → "125г" + "р") */
 function getQtyUnitEnd(line: string, qtyStart: number): number {
-  const qtyM = line.slice(qtyStart).match(/^(\d+(?:[.,]\d+)?)\s*((?:кг|кг\.|kg|г|гр|г\.|мг|л|л\.|ml|мл|шт|pcs|уп|уп\.|упак|пач|пуч|кор|ящ|т))?/i)
+  const qtyM = line.slice(qtyStart).match(/^(\d+(?:[.,]\d+)?)\s*((?:кг|кг\.|kg|гр|г\.|г|мг|л|л\.|ml|мл|шт|pcs|уп|уп\.|упак|пач|пуч|кор|ящ|т))?/i)
   if (!qtyM) return qtyStart + 1
   return qtyStart + qtyM[0].length
 }
 
-/** Все qty с флагом isTypo (вторая из двух подряд — опечатка) */
+/** Паттерн: "в пачках 1шт 125гр" — второе qty (125гр) это вес пачки, не отдельная позиция */
+const PACK_WEIGHT_PATTERN = /\d+\s*(?:шт|уп|упак|пач)\s+\d+\s*(?:г|гр)\b/i
+
+/** Все qty с флагом isTypo (вторая из двух подряд — опечатка или вес пачки) */
 function findAllQty(line: string): { index: number; end: number; isTypo: boolean }[] {
   const result: { index: number; end: number; isTypo: boolean }[] = []
   let m: RegExpExecArray | null
   const re = new RegExp(QTY_PATTERN.source, 'g')
+  const hasPackWeight = PACK_WEIGHT_PATTERN.test(line)
   while ((m = re.exec(line)) !== null) {
     const idx = m.index
     const end = getQtyUnitEnd(line, idx)
     const prev = result[result.length - 1]
     const between = prev ? line.slice(prev.end, idx) : ''
     const onlySpacesAndUnit = /^[\s]*(?:кг|кг\.|kg|г|гр|л|мл|шт|уп|т)?[\s]*$/i.test(between)
-    const isTypo = !!prev && onlySpacesAndUnit && (idx - prev.end) < 12
+    const isTypo =
+      !!prev &&
+      (hasPackWeight || (onlySpacesAndUnit && (idx - prev.end) < 12))
     result.push({ index: idx, end, isTypo })
   }
   return result
@@ -160,7 +166,7 @@ function segmentLine(line: string): string[] {
 
   const lastEnd = validQty[validQty.length - 1].end
   let remainder = trimmed.slice(lastEnd).trim()
-  if (remainder && /[\p{L}]/u.test(remainder)) {
+  if (remainder && /[\p{L}]/u.test(remainder) && !PACK_WEIGHT_PATTERN.test(trimmed)) {
     const typoQty = allQty.find((q) => q.isTypo && q.index >= lastEnd)
     if (typoQty) {
       const typoInRem = trimmed.slice(typoQty.index, typoQty.end)
