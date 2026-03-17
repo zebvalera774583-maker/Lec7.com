@@ -498,9 +498,12 @@ function isNameOnly(s: string): boolean {
   return /[\p{L}]/u.test(t) && !/\d/.test(t)
 }
 
+const UNIT_ONLY_ROW = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i
+
 /** Постобработка строк таблицы: нормализация + склейка разорванных (название + qty+unit).
  * 1) name_only + qty_only — склеиваем, НО только если после qty НЕТ названия (иначе qty от того товара).
- * 2) qty_only + name_only — склеиваем (blocks: "1 кг" перед "Перец болгарский").
+ * 2) name_only + unit_only + qty_only — склеиваем (blocks: "Шампиньоны", "кг", "2кг").
+ * 3) qty_only + name_only — склеиваем (blocks: "1 кг" перед "Перец болгарский").
  */
 export function postProcessTableRows(rows: string[]): string[] {
   const normalized = rows.map(normalizeTableRowText).filter(Boolean)
@@ -512,11 +515,17 @@ export function postProcessTableRows(rows: string[]): string[] {
     const rowIsNameOnly = isNameOnly(row)
     const rowIsQtyOnly = row && QTY_UNIT_ONLY.test(row.trim())
     const nextIsQtyOnly = next && QTY_UNIT_ONLY.test(next.trim())
+    const nextIsUnitOnly = next && UNIT_ONLY_ROW.test(next.trim())
     const nextIsNameOnly = next && isNameOnly(next)
     const nextNextIsProduct = nextNext && (isNameOnly(nextNext) || /^[\p{L}]/u.test(nextNext.trim()))
     if (rowIsNameOnly && nextIsQtyOnly && !nextNextIsProduct) {
       result.push(`${row} ${next}`.trim())
       i++
+      continue
+    }
+    if (rowIsNameOnly && nextIsUnitOnly && nextNext && QTY_UNIT_ONLY.test(nextNext.trim())) {
+      result.push(`${row} ${nextNext}`.trim())
+      i += 2
       continue
     }
     if (rowIsQtyOnly && nextIsNameOnly) {

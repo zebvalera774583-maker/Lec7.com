@@ -151,6 +151,8 @@ function isNameOnly(s: string): boolean {
   return t.length >= 2 && /[\p{L}]/u.test(t) && !/\d/.test(t)
 }
 
+const UNIT_ONLY_ROW = /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i
+
 /** Не склеивать "Вешенки" + "1 кг" когда после "1 кг" идёт "Перец болгарский". Зато "1 кг" + "Перец" → "Перец 1 кг". */
 function postProcessTableRows(rows: string[]): string[] {
   const normalized = rows.map(normalizeTableRowText).filter(Boolean)
@@ -162,11 +164,17 @@ function postProcessTableRows(rows: string[]): string[] {
     const rowIsNameOnly = isNameOnly(row)
     const rowIsQtyOnly = row && QTY_UNIT_ONLY.test(row.trim())
     const nextIsQtyOnly = next && QTY_UNIT_ONLY.test(next.trim())
+    const nextIsUnitOnly = next && UNIT_ONLY_ROW.test(next.trim())
     const nextIsNameOnly = next && isNameOnly(next)
     const nextNextIsProduct = nextNext && (isNameOnly(nextNext) || /^[\p{L}]/u.test(nextNext.trim()))
     if (rowIsNameOnly && nextIsQtyOnly && !nextNextIsProduct) {
       result.push(`${row} ${next}`.trim())
       i++
+      continue
+    }
+    if (rowIsNameOnly && nextIsUnitOnly && nextNext && QTY_UNIT_ONLY.test(nextNext.trim())) {
+      result.push(`${row} ${nextNext}`.trim())
+      i += 2
       continue
     }
     if (rowIsQtyOnly && nextIsNameOnly) {
@@ -564,8 +572,9 @@ async function recognizeImageWithYandex(
   if (tableRows && tableRows.length > 0) {
     lines = tableRows
     fromTable = true
-    console.log('[MAX OCR] table rows=', tableRows.length)
+    console.log('[MAX OCR] table rows=', tableRows.length, 'items=', tableRows.join(' | '))
   } else {
+    console.log('[MAX OCR] table empty, using blocks fallback')
     const blockLines = extractLinesFromYandexResponse(res.data)
     blockLines.forEach((line, idx) => console.log(`[OCR RAW LINE] idx=${idx} text=${line}`))
     lines = reconstructOcrLines(blockLines)
