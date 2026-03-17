@@ -135,6 +135,14 @@ const SERVICE_ROW_PATTERNS = [
 /** Заголовок "ОВОЩИ" (не "Овощи очищенные"). Считывание начинается после этой строки. */
 const START_AFTER_HEADER = /^овощи\s*$/i
 
+/** Убрать прилипшие номера строк из ячейки: "8\nШампиньоны" → "Шампиньоны", "33 Лук" → "Лук" */
+function normalizeCell(s: string): string {
+  return s
+    .replace(/^\s*\d+\s*\n+\s*/u, '')
+    .replace(/^\s*\d+\s*(?:[.)…-]|\.\.\.)?\s*/u, '')
+    .trim()
+}
+
 function stripBeforeOvochiRows(rows: string[][]): string[][] {
   const idx = rows.findIndex((row) => row.some((cell) => START_AFTER_HEADER.test(cell.trim())))
   if (idx === -1) return rows
@@ -445,18 +453,23 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
     for (const rowIdx of rowIndices) {
       const cellsInRow = byRow.get(rowIdx)!.sort((a, b) => a.col - b.col)
       const texts = cellsInRow.map((c) => c.text)
-      if (texts.length < 2) {
-        console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', texts.length, 'texts=', JSON.stringify(texts))
+      const cleanedTexts =
+        texts.length > 1 && /^\d+$/.test(texts[0].trim())
+          ? texts.slice(1)
+          : texts
+      const normalizedTexts = cleanedTexts.map(normalizeCell).filter(Boolean)
+      if (normalizedTexts.length < 2) {
+        console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', normalizedTexts.length, 'texts=', JSON.stringify(normalizedTexts))
         continue
       }
-      if (texts.length === 2) {
-        console.log('[OCR ROW 2 cells] row=', rowIdx, 'texts=', JSON.stringify(texts))
+      if (normalizedTexts.length === 2) {
+        console.log('[OCR ROW 2 cells] row=', rowIdx, 'texts=', JSON.stringify(normalizedTexts))
       }
-      if (texts.some((t) => /шампиньон/i.test(t))) {
-        console.log('[OCR ROW Шампиньоны] row=', rowIdx, 'texts=', JSON.stringify(texts))
+      if (normalizedTexts.some((t) => /шампиньон/i.test(t))) {
+        console.log('[OCR ROW Шампиньоны] row=', rowIdx, 'texts=', JSON.stringify(normalizedTexts))
       }
-      if (SERVICE_ROW_PATTERNS.some((p) => p.test(texts.join(' ')))) continue
-      allRowsAsCells.push(texts)
+      if (SERVICE_ROW_PATTERNS.some((p) => p.test(normalizedTexts.join(' ')))) continue
+      allRowsAsCells.push(normalizedTexts)
     }
   }
   if (allRowsAsCells.length === 0) return null
