@@ -132,6 +132,25 @@ const SERVICE_ROW_PATTERNS = [
   /^сухофрукты\/\s*орехи$/i,
 ]
 
+/** Заголовок "ОВОЩИ" (не "Овощи очищенные"). Считывание начинается после этой строки. */
+const START_AFTER_HEADER = /^овощи\s*$/i
+
+function stripBeforeOvochiRows(rows: string[][]): string[][] {
+  const idx = rows.findIndex((row) => row.some((cell) => START_AFTER_HEADER.test(cell.trim())))
+  if (idx === -1) return rows
+  const sliced = rows.slice(idx + 1)
+  console.log('[MAX OCR] start after ОВОЩИ, dropped', idx + 1, 'rows, remaining', sliced.length)
+  return sliced
+}
+
+function stripBeforeOvochiLines(lines: string[]): string[] {
+  const idx = lines.findIndex((line) => START_AFTER_HEADER.test(line.trim()))
+  if (idx === -1) return lines
+  const sliced = lines.slice(idx + 1)
+  console.log('[MAX OCR] start after ОВОЩИ (blocks), dropped', idx + 1, 'lines, remaining', sliced.length)
+  return sliced
+}
+
 /** Нормализация строк таблицы */
 function normalizeTableRowText(row: string): string {
   return row
@@ -441,7 +460,8 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
     }
   }
   if (allRowsAsCells.length === 0) return null
-  const items = parseTableRowsByColumnStructure(allRowsAsCells)
+  const rowsAfterOvochi = stripBeforeOvochiRows(allRowsAsCells)
+  const items = parseTableRowsByColumnStructure(rowsAfterOvochi)
   return items.length > 0 ? items : null
 }
 
@@ -576,8 +596,9 @@ async function recognizeImageWithYandex(
   } else {
     console.log('[MAX OCR] table empty, using blocks fallback')
     const blockLines = extractLinesFromYandexResponse(res.data)
-    blockLines.forEach((line, idx) => console.log(`[OCR RAW LINE] idx=${idx} text=${line}`))
-    lines = reconstructOcrLines(blockLines)
+    const linesAfterOvochi = stripBeforeOvochiLines(blockLines)
+    linesAfterOvochi.forEach((line, idx) => console.log(`[OCR RAW LINE] idx=${idx} text=${line}`))
+    lines = reconstructOcrLines(linesAfterOvochi)
     lines = postProcessTableRows(lines)
     lines = lines.filter(
       (l) =>
