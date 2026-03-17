@@ -207,64 +207,71 @@ function mergeSplitNameRows(rows: string[][]): string[][] {
 }
 
 /**
- * Парсинг таблицы по колонкам: A=наименование, B=ед.изм (игнор), C=количество.
- * Строго: количество ТОЛЬКО из колонки C (index 2). Название ТОЛЬКО из колонки A (index 0) этой же строки.
- * Без mergeSplitNameRows — не смешиваем данные из разных строк.
+ * Строгая схема таблицы:
+ * Левый блок: A=позиция, B=ед.изм, C=количество
+ * Правый блок: D=позиция, F=ед.изм, G=количество
+ *
+ * Алгоритм: для каждой строки сначала читать C; если в C есть число — брать позицию из A.
+ * Затем читать G; если в G есть число — брать позицию из D.
+ * B и F — только для единицы измерения. Не брать числа из A/D, не брать номера строк.
  */
 export function parseTableRowsByColumnStructure(
   rows: string[][]
 ): string[] {
   const items: string[] = []
-  const skipped: { row: string; reason: string }[] = []
-  const processSection = (cells: string[], rowIndex: string | null = null) => {
-    if (cells.length < 2) return
-    const colA = cells[0].trim()
-    const colC = cells.length >= 3 ? cells[2].trim() : cells[1].trim()
-    const rowStr = `${colA} | ${colC}`
 
-    if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(colA))) {
-      skipped.push({ row: rowStr, reason: 'service_pattern' })
-      return
-    }
+  const processCell = (
+    name: string,
+    unitCol: string,
+    qtyCol: string,
+    rowIndex: string | null
+  ): void => {
+    if (COLUMN_SERVICE_PATTERNS.some((p) => p.test(name))) return
+    if (/^\d+$/.test(name)) return // не брать номера строк, не брать числа из A/D
+    const parsed = parseQtyUnitCell(qtyCol)
+    if (!parsed || (rowIndex && parsed.qty === rowIndex)) return
+    if (!isProductNameCell(name)) return
 
-    // Количество ТОЛЬКО из колонки C (index 2 при 3+ колонках, index 1 при 2 колонках)
-    const qtyIdx = cells.length >= 3 ? 2 : 1
-    const parsed = parseQtyUnitCell(colC)
-    if (!parsed || (rowIndex && parsed.qty === rowIndex)) {
-      skipped.push({ row: rowStr, reason: 'no_qty_in_column_c' })
-      return
-    }
-
-    // Название ТОЛЬКО из колонки A (index 0). Колонка B (ед.изм) — не используем для имени.
-    let name = colA
-    if (/^\d+$/.test(name)) {
-      skipped.push({ row: rowStr, reason: 'name_is_row_number' })
-      return
-    }
-    if (qtyIdx > 0 && /^\d+(?:[.,]\d+)?\s*$/.test(cells[qtyIdx].trim())) {
-      const prevCell = cells[qtyIdx - 1]?.trim().replace(/\.$/, '')
-      if (prevCell && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(prevCell)) {
-        parsed.unit = prevCell.toLowerCase()
+    let unit = parsed.unit
+    const unitOnly = unitCol.trim().replace(/\.$/, '')
+    if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к|kr)$/i.test(unitOnly)) {
+      unit = unitOnly.toLowerCase()
+    } else if (/^\d+(?:[.,]\d+)?\s*$/.test(qtyCol.trim())) {
+      const prev = unitCol.trim()
+      if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(prev)) {
+        unit = prev.toLowerCase()
       }
     }
-    if (!name || !isProductNameCell(name)) {
-      skipped.push({ row: rowStr, reason: 'not_product_name' })
-      return
-    }
-    items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
+    items.push(`${name} ${parsed.qty} ${unit}`.trim())
   }
 
   for (const row of rows) {
-    if (row.length < 2) continue
+    if (row.length < 3) continue
     const skipFirst = /^\d+$/.test(row[0].trim())
     const rowIndex = skipFirst ? row[0].trim() : null
     const cells = skipFirst ? row.slice(1) : row
-    processSection(cells, rowIndex)
-    // Только при 6 колонках — две секции в одной строке (левая и правая таблица)
-    if (cells.length === 6) processSection(cells.slice(3), rowIndex)
-  }
-  if (skipped.length > 0) {
-    console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
+
+    // Левый блок: A=0, B=1, C=2
+    if (cells.length >= 3) {
+      const colA = cells[0].trim()
+      const colB = cells[1]?.trim() ?? ''
+      const colC = cells[2].trim()
+      if (parseQtyUnitCell(colC)) {
+        processCell(colA, colB, colC, rowIndex)
+      }
+    }
+
+    // Правый блок: D=3, F=4, G=5 (6 колонок) или D=3, E=4, F=5, G=6 (7 колонок)
+    if (cells.length >= 6) {
+      const colD = cells[3].trim()
+      const colGIdx = cells.length >= 7 ? 6 : 5
+      const colFIdx = cells.length >= 7 ? 5 : 4
+      const colF = cells[colFIdx]?.trim() ?? ''
+      const colG = cells[colGIdx]?.trim() ?? ''
+      if (parseQtyUnitCell(colG)) {
+        processCell(colD, colF, colG, rowIndex)
+      }
+    }
   }
   return items
 }

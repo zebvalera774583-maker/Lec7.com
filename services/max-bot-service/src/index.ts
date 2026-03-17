@@ -327,60 +327,48 @@ function mergeSplitNameRows(rows: string[][]): string[][] {
   return result
 }
 
-/** Строго: количество ТОЛЬКО из колонки C (index 2). Название ТОЛЬКО из колонки A (index 0) этой же строки.
- * Без mergeSplitNameRows — не смешиваем данные из разных строк. */
+/** Строгая схема: левый A,B,C / правый D,F,G. C и G — количество. B и F — ед.изм. */
 function parseTableRowsByColumnStructure(rows: string[][]): string[] {
   const items: string[] = []
-  const skipped: { row: string; reason: string }[] = []
-  const processSection = (cells: string[], rowIndex: string | null) => {
-    if (cells.length < 2) return
-    const colA = cells[0].trim()
-    const colC = cells.length >= 3 ? cells[2].trim() : cells[1].trim()
-    const rowStr = `${colA} | ${colC}`
-
-    if (SERVICE_ROW_PATTERNS.some((p) => p.test(colA))) {
-      skipped.push({ row: rowStr, reason: 'service_pattern' })
-      return
-    }
-
-    const qtyIdx = cells.length >= 3 ? 2 : 1
-    const parsed = parseQtyUnitCell(colC)
-    if (!parsed || (rowIndex && parsed.qty === rowIndex)) {
-      skipped.push({ row: rowStr, reason: 'no_qty_in_column_c' })
-      return
-    }
-
-    let name = colA
-    if (/^\d+$/.test(name)) {
-      skipped.push({ row: rowStr, reason: 'name_is_row_number' })
-      return
-    }
-    if (qtyIdx > 0 && /^\d+(?:[.,]\d+)?\s*$/.test(cells[qtyIdx].trim())) {
-      const prevCell = cells[qtyIdx - 1]?.trim().replace(/\.$/, '')
-      if (prevCell && /^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(prevCell)) {
-        parsed.unit = prevCell.toLowerCase()
+  const processCell = (name: string, unitCol: string, qtyCol: string, rowIndex: string | null) => {
+    if (SERVICE_ROW_PATTERNS.some((p) => p.test(name))) return
+    if (/^\d+$/.test(name)) return
+    const parsed = parseQtyUnitCell(qtyCol)
+    if (!parsed || (rowIndex && parsed.qty === rowIndex)) return
+    if (!looksLikeProductName(name)) return
+    let unit = parsed.unit
+    const unitOnly = unitCol.trim().replace(/\.$/, '')
+    if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к|kr)$/i.test(unitOnly)) {
+      unit = unitOnly.toLowerCase()
+    } else if (/^\d+(?:[.,]\d+)?\s*$/.test(qtyCol.trim())) {
+      const prev = unitCol.trim()
+      if (/^(кг|г|гр|л|мл|шт|уп|упак|пач|пуч|кор|ящ|т|м|ед|к)$/i.test(prev)) {
+        unit = prev.toLowerCase()
       }
     }
-    if (!name || !looksLikeProductName(name)) {
-      skipped.push({ row: rowStr, reason: 'not_product_name' })
-      return
-    }
-    items.push(`${name} ${parsed.qty} ${parsed.unit}`.trim())
+    items.push(`${name} ${parsed.qty} ${unit}`.trim())
   }
   for (const row of rows) {
-    if (row.length < 2) continue
+    if (row.length < 3) continue
     const skipFirst = /^\d+$/.test(row[0].trim())
     const rowIndex = skipFirst ? row[0].trim() : null
     const cells = skipFirst ? row.slice(1) : row
-    processSection(cells, rowIndex)
-    if (cells.length === 6) processSection(cells.slice(3), rowIndex)
+    if (cells.length >= 3) {
+      const colA = cells[0].trim()
+      const colB = cells[1]?.trim() ?? ''
+      const colC = cells[2].trim()
+      if (parseQtyUnitCell(colC)) processCell(colA, colB, colC, rowIndex)
+    }
+    if (cells.length >= 6) {
+      const colD = cells[3].trim()
+      const colGIdx = cells.length >= 7 ? 6 : 5
+      const colFIdx = cells.length >= 7 ? 5 : 4
+      const colF = cells[colFIdx]?.trim() ?? ''
+      const colG = cells[colGIdx]?.trim() ?? ''
+      if (parseQtyUnitCell(colG)) processCell(colD, colF, colG, rowIndex)
+    }
   }
-  if (skipped.length > 0) {
-    console.log('[PARSE SKIPPED] table_cols', skipped.map((s) => `${s.reason}: ${s.row.slice(0, 50)}`))
-  }
-  if (items.length > 0) {
-    console.log('[PARSE ITEMS]', items.join(' | '))
-  }
+  if (items.length > 0) console.log('[PARSE ITEMS]', items.join(' | '))
   return items
 }
 
@@ -418,7 +406,6 @@ function extractTableRowsFromYandexResponse(data: unknown): string[] | null {
       const cleanedTexts = hasRowNumCol ? texts.slice(1) : texts
       const normalizedTexts = cleanedTexts.map(normalizeCell).filter(Boolean)
       let rowWithIndex = rowIndexVal ? [rowIndexVal, ...normalizedTexts] : normalizedTexts
-      rowWithIndex = rowWithIndex.filter((c) => !UNIT_COLUMN_IGNORE.test(c.trim()))
       if (rowWithIndex.length < 2) {
         console.log('[OCR ROW SKIPPED cells<2] row=', rowIdx, 'cells=', rowWithIndex.length, 'texts=', JSON.stringify(rowWithIndex))
         continue
