@@ -446,41 +446,68 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
 
                 // Обложка: coverUrl если есть, иначе первое фото
                 const coverUrl = item.coverUrl || sortedPhotos[0]?.url
+                const caption = item.comment?.trim() || null
 
                 return (
                   <div
                     key={item.id}
-                    onClick={() => setSelectedCaseIndex(index)}
                     style={{
-                      width: '100%',
-                      paddingTop: '100%',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      background: '#e5e7eb',
-                      borderRadius: 0,
-                      cursor: 'pointer',
-                      transition: 'opacity 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '0.9'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1'
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: isMobile ? '0.25rem' : '0.4rem',
                     }}
                   >
-                    {coverUrl && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={coverUrl}
-                        alt="Кейс"
+                    <div
+                      onClick={() => setSelectedCaseIndex(index)}
+                      style={{
+                        width: '100%',
+                        paddingTop: '100%',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        background: '#e5e7eb',
+                        borderRadius: 0,
+                        cursor: 'pointer',
+                        transition: 'opacity 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '0.9'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '1'
+                      }}
+                    >
+                      {coverUrl && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={coverUrl}
+                          alt="Кейс"
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      )}
+                    </div>
+                    {caption && (
+                      <div
                         style={{
-                          position: 'absolute',
-                          inset: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
+                          padding: isMobile ? '0.25rem 0.2rem' : '0.4rem 0.3rem',
+                          background: 'rgba(255,255,255,0.95)',
+                          fontSize: isMobile ? '0.7rem' : '0.8rem',
+                          color: '#374151',
+                          lineHeight: 1.3,
+                          textAlign: 'center',
+                          minHeight: isMobile ? '2rem' : '2.5rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
-                      />
+                      >
+                        {caption}
+                      </div>
                     )}
                   </div>
                 )
