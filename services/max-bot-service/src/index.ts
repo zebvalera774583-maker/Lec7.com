@@ -112,6 +112,8 @@ function logRawUpdate(ctx: any, eventType: string) {
       out.linkMessageAttachmentPayloads = linkMsgAttPayloads
     }
   }
+  const ts = u?.message?.timestamp ?? msg?.timestamp
+  console.log('[TIME]', ts, ts != null ? new Date(ts).toISOString() : '(no timestamp)')
   console.log('[MAX raw update]', out)
 }
 
@@ -916,6 +918,8 @@ bot.on('message_created', async (ctx: any) => {
 
         console.log('[MAX PHOTO] reconstructed lines=', reconstructedLines)
         console.log('[MAX PHOTO] textForBot=\n', textForBot)
+        const tsPhoto = ctx?.update?.message?.timestamp ?? ctx?.message?.timestamp
+        console.log('[TIME]', tsPhoto, tsPhoto != null ? new Date(tsPhoto).toISOString() : '(no timestamp)')
         console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', textForBot, 'source=max_photo')
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
@@ -957,6 +961,8 @@ bot.on('message_created', async (ctx: any) => {
 
   if (!messageText.trim()) return
 
+  const tsMsg = ctx?.update?.message?.timestamp ?? ctx?.message?.timestamp
+  console.log('[TIME]', tsMsg, tsMsg != null ? new Date(tsMsg).toISOString() : '(no timestamp)')
   console.log('[MAX -> handleBotEvent] chatId=', chatId, 'userId=', userId, 'text=', messageText, 'ocr=', useOcrSource)
 
   try {
