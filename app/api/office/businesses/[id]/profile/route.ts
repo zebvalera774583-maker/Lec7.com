@@ -148,6 +148,14 @@ export const PUT = withBusinessAccess(async (req, user) => {
       })
     }
 
+    // Обновляем отображаемое имя в Business.name — layout и sidebar читают его оттуда
+    if (displayName !== undefined && displayName !== null && String(displayName).trim() !== '') {
+      await prisma.business.update({
+        where: { id: businessId },
+        data: { name: String(displayName).trim() },
+      })
+    }
+
     // Обновляем или создаём профиль (upsert)
     let profile = await prisma.businessProfile.upsert({
       where: { businessId },
