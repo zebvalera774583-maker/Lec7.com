@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
+import { mirrorRawIncomingOrderToAdmin } from '@/lib/notify-admin'
 import { recognizeImage } from '@/lib/ai/yandexVisionOCR'
 import { normalizeOrderText } from '@/lib/ai/yandexNormalizeOrder'
 import { postProcessTableRows } from '@/lib/ocr/orderImage'
@@ -255,6 +256,22 @@ export async function POST(req: NextRequest) {
 
   // 2c) Остальные сообщения — handleBotEvent (потребности, кнопки)
   try {
+    const rawIncoming = body?.message?.text ?? ''
+    if (rawIncoming.trim() && !/^\/start\b/i.test(rawIncoming.trim())) {
+      void (async () => {
+        try {
+          await mirrorRawIncomingOrderToAdmin({
+            channel: 'telegram',
+            chatId: String(chatId),
+            userId: body?.message?.from?.id != null ? String(body.message.from.id) : undefined,
+            username: body?.message?.from?.username,
+            rawText: rawIncoming,
+          })
+        } catch (e) {
+          console.error('[RAW MIRROR ERROR]', e)
+        }
+      })()
+    }
     const event = {
       channel: 'telegram' as const,
       chatId: String(chatId),

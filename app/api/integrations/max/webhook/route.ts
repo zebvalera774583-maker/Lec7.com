@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
+import { mirrorRawIncomingOrderToAdmin } from '@/lib/notify-admin'
 import { cleanOcrTable, normalizeOcrUnits, extractTableItems, postProcessTableRows } from '@/lib/ocr/orderImage'
 
 const SECRET_HEADER = 'x-lec7-max-secret'
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
   let body: {
     chatId?: unknown
     userId?: unknown
+    username?: string
     text?: string
     messageId?: unknown
     choice?: string
@@ -30,6 +32,28 @@ export async function POST(req: NextRequest) {
   }
 
   const chatId = body?.chatId != null ? String(body.chatId) : null
+  const rawMirrorText = typeof body?.text === 'string' ? body.text : ''
+  if (
+    chatId &&
+    rawMirrorText.trim() &&
+    !body?.source &&
+    body?.choice == null
+  ) {
+    void (async () => {
+      try {
+        await mirrorRawIncomingOrderToAdmin({
+          channel: 'max',
+          chatId,
+          userId: body?.userId != null ? String(body.userId) : undefined,
+          username: body?.username?.trim() || undefined,
+          rawText: rawMirrorText,
+        })
+      } catch (e) {
+        console.error('[RAW MIRROR ERROR]', e)
+      }
+    })()
+  }
+
   let text = typeof body?.text === 'string' ? body.text : ''
   if (body?.source === 'max_photo') {
     const rawLines = Array.isArray(body?.lines) && body.lines.length > 0 ? body.lines : (text ? text.split(/\n/) : [])

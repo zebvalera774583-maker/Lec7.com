@@ -9,6 +9,50 @@ import { sendTelegramMessage } from '@/lib/telegram'
 const ADMIN_MAX_CHAT_ID = '208922838'
 const ADMIN_TELEGRAM_CHAT_ID = '5848277'
 
+const TELEGRAM_MESSAGE_MAX = 4096
+const RAW_MIRROR_SAFE_LEN = 3500
+
+function truncateTelegramText(s: string): string {
+  if (s.length <= TELEGRAM_MESSAGE_MAX) return s
+  return `${s.slice(0, RAW_MIRROR_SAFE_LEN)}\n\n… (обрезано)`
+}
+
+/**
+ * Копия сырого текстового входа заявки в личный чат администратора (Telegram).
+ * Только для диагностики; не блокирует обработку. Пустой rawText — не отправлять.
+ */
+export async function mirrorRawIncomingOrderToAdmin(params: {
+  channel: 'telegram' | 'max'
+  chatId: string
+  userId?: string
+  username?: string
+  rawText: string
+}): Promise<void> {
+  const raw = params.rawText
+  if (raw == null || String(raw).trim() === '') return
+
+  const userLabel =
+    params.username != null && String(params.username).trim() !== '' ? String(params.username).trim() : '—'
+  const headerLines = [
+    'RAW ЗАЯВКА',
+    `Канал: ${params.channel}`,
+    `Chat ID: ${params.chatId}`,
+    `User ID: ${params.userId ?? '—'}`,
+    `Username: ${userLabel}`,
+    'Текст:',
+  ].join('\n')
+
+  const full = `${headerLines}\n${raw}`
+  const text = truncateTelegramText(full)
+  const targetChat =
+    process.env.ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID?.trim() || ADMIN_TELEGRAM_CHAT_ID
+
+  const ok = await sendTelegramMessage(targetChat, text)
+  if (!ok) {
+    throw new Error('mirrorRawIncomingOrderToAdmin: sendTelegramMessage returned false')
+  }
+}
+
 export async function notifyAdminAboutRequest(
   channel: 'telegram' | 'max',
   department: string,
