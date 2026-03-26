@@ -18,7 +18,8 @@ function truncateTelegramText(s: string): string {
 }
 
 /**
- * Копия сырого текстового входа заявки в личный чат администратора (Telegram).
+ * Копия сырого текстового входа заявки в личный чат администратора.
+ * Telegram → Telegram; MAX → MAX (тот же чат, что в notifyAdminAboutRequest).
  * Только для диагностики; не блокирует обработку. Пустой rawText — не отправлять.
  */
 export async function mirrorRawIncomingOrderToAdmin(params: {
@@ -44,6 +45,15 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
 
   const full = `${headerLines}\n${raw}`
   const text = truncateTelegramText(full)
+
+  if (params.channel === 'max') {
+    const res = await sendMaxMessage(ADMIN_MAX_CHAT_ID, text, undefined, 'chat_id')
+    if (!res.ok) {
+      throw new Error(`mirrorRawIncomingOrderToAdmin: sendMaxMessage failed: ${res.error ?? 'unknown'}`)
+    }
+    return
+  }
+
   const targetChat =
     process.env.ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID?.trim() || ADMIN_TELEGRAM_CHAT_ID
 
