@@ -256,6 +256,12 @@ export async function POST(req: NextRequest) {
 
   // 2c) Остальные сообщения — handleBotEvent (потребности, кнопки)
   try {
+    console.log('[TG ADMIN DEBUG]', {
+      chatId,
+      userId: body?.message?.from?.id != null ? String(body.message.from.id) : undefined,
+      username: body?.message?.from?.username,
+      text,
+    })
     const rawIncoming = body?.message?.text ?? ''
     if (rawIncoming.trim() && !/^\/start\b/i.test(rawIncoming.trim())) {
       void (async () => {
