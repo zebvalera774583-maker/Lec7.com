@@ -7,7 +7,7 @@ import { sendMessage as sendMaxMessage } from '@/lib/max/client'
 import { sendTelegramMessage } from '@/lib/telegram'
 
 const ADMIN_MAX_CHAT_ID = '208922838'
-const ADMIN_TELEGRAM_CHAT_ID = '5848277'
+const ADMIN_TELEGRAM_CHAT_ID = process.env.ADMIN_TG_CHAT_ID?.trim() || ''
 
 const TELEGRAM_MESSAGE_MAX = 4096
 const RAW_MIRROR_SAFE_LEN = 3500
@@ -57,6 +57,13 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
   const targetChat =
     process.env.ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID?.trim() || ADMIN_TELEGRAM_CHAT_ID
 
+  if (!targetChat.trim()) {
+    console.warn(
+      '[mirrorRawIncomingOrderToAdmin] Telegram admin chat id is missing (set ADMIN_TG_CHAT_ID or ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID)'
+    )
+    return
+  }
+
   const ok = await sendTelegramMessage(targetChat, text)
   if (!ok) {
     throw new Error('mirrorRawIncomingOrderToAdmin: sendTelegramMessage returned false')
@@ -86,7 +93,11 @@ export async function notifyAdminAboutRequest(
         console.warn('[notifyAdmin] MAX send failed:', res.error)
       }
     } else {
-      await sendTelegramMessage(ADMIN_TELEGRAM_CHAT_ID, text)
+      if (!ADMIN_TELEGRAM_CHAT_ID) {
+        console.warn('[notifyAdmin] ADMIN_TG_CHAT_ID is missing')
+      } else {
+        await sendTelegramMessage(ADMIN_TELEGRAM_CHAT_ID, text)
+      }
     }
   } catch (e) {
     console.warn('[notifyAdmin] send error:', e)
