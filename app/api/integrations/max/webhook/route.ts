@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleBotEvent } from '@/lib/bot-core/handleBotEvent'
-import { mirrorRawIncomingOrderToAdmin } from '@/lib/notify-admin'
+import { mirrorRawIncomingOrderToAdmin, type MaxIncomingAttachmentMeta } from '@/lib/notify-admin'
 import { cleanOcrTable, normalizeOcrUnits, extractTableItems, postProcessTableRows } from '@/lib/ocr/orderImage'
 
 const SECRET_HEADER = 'x-lec7-max-secret'
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     source?: 'ocr' | 'max_photo' | 'max_pdf'
     rawText?: string
     lines?: string[]
+    maxAttachment?: MaxIncomingAttachmentMeta
   }
   try {
     body = await req.json()
@@ -33,12 +34,19 @@ export async function POST(req: NextRequest) {
 
   const chatId = body?.chatId != null ? String(body.chatId) : null
   const rawMirrorText = typeof body?.text === 'string' ? body.text : ''
-  if (
-    chatId &&
-    rawMirrorText.trim() &&
-    !body?.source &&
-    body?.choice == null
-  ) {
+  const rawPhotoOcr = typeof body?.rawText === 'string' ? body.rawText.trim() : ''
+
+  const mirrorRawText =
+    body?.source === 'max_photo' && rawPhotoOcr
+      ? rawPhotoOcr
+      : rawMirrorText.trim()
+
+  const mirrorMaxPhoto =
+    body?.source === 'max_photo' && body?.choice == null && Boolean(mirrorRawText)
+  const mirrorPlainMax =
+    !body?.source && body?.choice == null && Boolean(rawMirrorText.trim())
+
+  if (chatId && (mirrorPlainMax || mirrorMaxPhoto)) {
     void (async () => {
       try {
         await mirrorRawIncomingOrderToAdmin({
@@ -46,7 +54,8 @@ export async function POST(req: NextRequest) {
           chatId,
           userId: body?.userId != null ? String(body.userId) : undefined,
           username: body?.username?.trim() || undefined,
-          rawText: rawMirrorText,
+          rawText: mirrorRawText,
+          maxAttachment: body?.maxAttachment,
         })
       } catch (e) {
         console.error('[RAW MIRROR ERROR]', e)

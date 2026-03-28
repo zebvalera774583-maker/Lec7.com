@@ -12,6 +12,25 @@ const ADMIN_TELEGRAM_CHAT_ID = process.env.ADMIN_TG_CHAT_ID?.trim() || ''
 const TELEGRAM_MESSAGE_MAX = 4096
 const RAW_MIRROR_SAFE_LEN = 3500
 
+/** Метаданные вложения MAX (photo/file), приходят из `services/max-bot-service` → webhook JSON. */
+export type MaxIncomingAttachmentMeta = {
+  type?: string
+  mimeType?: string
+  fileName?: string
+  attachmentSource?: string
+  url?: string
+}
+
+function maxAttachmentLines(meta: MaxIncomingAttachmentMeta): string[] {
+  const lines: string[] = ['Вложение MAX:']
+  if (meta.type) lines.push(`  type: ${meta.type}`)
+  if (meta.mimeType) lines.push(`  mimeType: ${meta.mimeType}`)
+  if (meta.fileName) lines.push(`  fileName: ${meta.fileName}`)
+  if (meta.attachmentSource) lines.push(`  attachmentSource: ${meta.attachmentSource}`)
+  if (meta.url) lines.push(`  url: ${meta.url}`)
+  return lines.length > 1 ? lines : []
+}
+
 function truncateTelegramText(s: string): string {
   if (s.length <= TELEGRAM_MESSAGE_MAX) return s
   return `${s.slice(0, RAW_MIRROR_SAFE_LEN)}\n\n… (обрезано)`
@@ -28,18 +47,25 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
   userId?: string
   username?: string
   rawText: string
+  /** Только для MAX: что известно о вложении (фото и т.д.) из payload webhook. */
+  maxAttachment?: MaxIncomingAttachmentMeta
 }): Promise<void> {
   const raw = params.rawText
   if (raw == null || String(raw).trim() === '') return
 
   const userLabel =
     params.username != null && String(params.username).trim() !== '' ? String(params.username).trim() : '—'
+  const attBlock =
+    params.channel === 'max' && params.maxAttachment
+      ? maxAttachmentLines(params.maxAttachment).join('\n')
+      : ''
   const headerLines = [
     'RAW ЗАЯВКА',
     `Канал: ${params.channel}`,
     `Chat ID: ${params.chatId}`,
     `User ID: ${params.userId ?? '—'}`,
     `Username: ${userLabel}`,
+    ...(attBlock ? [attBlock, ''] : []),
     'Текст:',
   ].join('\n')
 

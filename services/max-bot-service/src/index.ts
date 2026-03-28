@@ -632,6 +632,15 @@ type WebhookResponse = {
   }
 }
 
+/** Срез полей вложения MAX (image и т.д.) — уходит в Next `max/webhook` для admin mirror. */
+type MaxWebhookAttachmentPayload = {
+  type?: string
+  mimeType?: string
+  fileName?: string
+  attachmentSource?: string
+  url?: string
+}
+
 async function forwardToWebhook(
   chatId: string | number,
   userId: string | number | undefined,
@@ -641,12 +650,14 @@ async function forwardToWebhook(
   ts?: string,
   source?: 'ocr' | 'max_photo' | 'max_pdf',
   rawText?: string,
-  lines?: string[]
+  lines?: string[],
+  maxAttachment?: MaxWebhookAttachmentPayload
 ) {
   const payload: Record<string, unknown> = { chatId, userId, text, messageId, ts, choice }
   if (source) payload.source = source
   if (rawText != null) payload.rawText = rawText
   if (lines != null) payload.lines = lines
+  if (maxAttachment != null && Object.keys(maxAttachment).length > 0) payload.maxAttachment = maxAttachment
   const timeoutMs = source === 'ocr' || source === 'max_photo' || source === 'max_pdf' ? 60000 : 15000
   const { data } = await axios.post<WebhookResponse>(
     `${LEC7_BASE_URL}/api/integrations/max/webhook`,
@@ -855,11 +866,13 @@ bot.on('message_created', async (ctx: any) => {
       let textForBot: string
       let rawText = ''
       let reconstructedLines: string[] = []
+      let mimeTypeForWebhook: string | undefined
       try {
         console.log('[MAX PHOTO] received')
         const imgRes = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
         let buffer = Buffer.from(imgRes.data)
         let mimeType = parseMimeFromContentType(imgRes.headers['content-type'])
+        mimeTypeForWebhook = mimeType
         console.log('[MAX PHOTO] downloaded bytes=', buffer.length, 'mime=', mimeType)
 
         // MAX иногда присылает PDF как image — по факту это PDF
@@ -892,6 +905,7 @@ bot.on('message_created', async (ctx: any) => {
         if (mimeType === 'image/webp') {
           buffer = await sharp(buffer).jpeg({ quality: 90 }).toBuffer()
           mimeType = 'image/jpeg'
+          mimeTypeForWebhook = 'image/jpeg'
           console.log('[MAX PHOTO] converted webp -> jpeg bytes=', buffer.length)
         }
 
@@ -929,6 +943,16 @@ bot.on('message_created', async (ctx: any) => {
       }
 
       try {
+        const imgPayload = imageAtt?.payload as
+          | { fileName?: string; name?: string; filename?: string }
+          | undefined
+        const maxAttachment: MaxWebhookAttachmentPayload = {
+          type: imageAtt?.type ?? 'image',
+          mimeType: mimeTypeForWebhook,
+          fileName: imgPayload?.fileName ?? imgPayload?.name ?? imgPayload?.filename,
+          attachmentSource,
+          url,
+        }
         const data = await forwardToWebhook(
           chatId,
           userId,
@@ -938,7 +962,8 @@ bot.on('message_created', async (ctx: any) => {
           ts,
           'max_photo',
           rawText,
-          reconstructedLines
+          reconstructedLines,
+          maxAttachment
         )
 
         console.log('[handleBotEvent -> MAX]', JSON.stringify(data))
