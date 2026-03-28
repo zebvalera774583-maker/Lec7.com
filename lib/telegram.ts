@@ -26,6 +26,42 @@ export async function sendTelegramMessage(chatId: string, text: string): Promise
   }
 }
 
+const TELEGRAM_CAPTION_MAX = 1024
+
+/**
+ * Send a photo to a Telegram chat via Bot API (sendPhoto). `photo` may be an HTTPS URL.
+ */
+export async function sendTelegramPhoto(chatId: string, photoUrl: string, caption?: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim()
+  if (!token) {
+    console.warn('TELEGRAM_BOT_TOKEN not set, skip sending photo')
+    return false
+  }
+  try {
+    let cap = caption
+    if (cap != null && cap.length > TELEGRAM_CAPTION_MAX) {
+      cap = `${cap.slice(0, TELEGRAM_CAPTION_MAX - 1)}…`
+    }
+    const body: Record<string, unknown> = { chat_id: chatId, photo: photoUrl }
+    if (cap) body.caption = cap
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const err = await res.text()
+      console.warn('Telegram sendPhoto failed:', res.status, err)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('Telegram sendPhoto error:', e)
+    return false
+  }
+}
+
 /**
  * Send a document to a Telegram chat via Bot API (sendDocument).
  * Requires TELEGRAM_BOT_TOKEN in env.

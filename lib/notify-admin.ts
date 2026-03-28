@@ -4,7 +4,7 @@
  */
 
 import { sendMessage as sendMaxMessage } from '@/lib/max/client'
-import { sendTelegramMessage } from '@/lib/telegram'
+import { sendTelegramMessage, sendTelegramPhoto } from '@/lib/telegram'
 
 const ADMIN_MAX_CHAT_ID = '208922838'
 const ADMIN_TELEGRAM_CHAT_ID = process.env.ADMIN_TG_CHAT_ID?.trim() || ''
@@ -72,7 +72,26 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
   const full = `${headerLines}\n${raw}`
   const text = truncateTelegramText(full)
 
+  const mirrorTelegramImageUrl =
+    params.maxAttachment?.type === 'image' && params.maxAttachment.url?.trim()
+      ? params.maxAttachment.url.trim()
+      : null
+
   if (params.channel === 'max') {
+    if (mirrorTelegramImageUrl) {
+      const targetChat =
+        process.env.ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID?.trim() || ADMIN_TELEGRAM_CHAT_ID
+      if (targetChat.trim()) {
+        const okPhoto = await sendTelegramPhoto(targetChat, mirrorTelegramImageUrl, text)
+        if (!okPhoto) {
+          throw new Error('mirrorRawIncomingOrderToAdmin: sendTelegramPhoto returned false')
+        }
+      } else {
+        console.warn(
+          '[mirrorRawIncomingOrderToAdmin] Telegram admin chat id is missing (set ADMIN_TG_CHAT_ID or ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID) — photo mirror skipped'
+        )
+      }
+    }
     const res = await sendMaxMessage(ADMIN_MAX_CHAT_ID, text, undefined, 'chat_id')
     if (!res.ok) {
       throw new Error(`mirrorRawIncomingOrderToAdmin: sendMaxMessage failed: ${res.error ?? 'unknown'}`)
@@ -87,6 +106,14 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
     console.warn(
       '[mirrorRawIncomingOrderToAdmin] Telegram admin chat id is missing (set ADMIN_TG_CHAT_ID or ADMIN_TELEGRAM_RAW_MIRROR_CHAT_ID)'
     )
+    return
+  }
+
+  if (mirrorTelegramImageUrl) {
+    const ok = await sendTelegramPhoto(targetChat, mirrorTelegramImageUrl, text)
+    if (!ok) {
+      throw new Error('mirrorRawIncomingOrderToAdmin: sendTelegramPhoto returned false')
+    }
     return
   }
 
