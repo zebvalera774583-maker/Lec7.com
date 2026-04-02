@@ -3,7 +3,7 @@
  * Канал (MAX/Telegram) определяет, куда отправить.
  */
 
-import { sendMessage as sendMaxMessage } from '@/lib/max/client'
+import { sendMessage as sendMaxMessage, sendMessageWithImageFromUrl } from '@/lib/max/client'
 import { sendTelegramMessage, sendTelegramPhoto } from '@/lib/telegram'
 
 const ADMIN_MAX_CHAT_ID = '208922838'
@@ -21,13 +21,13 @@ export type MaxIncomingAttachmentMeta = {
   url?: string
 }
 
-function maxAttachmentLines(meta: MaxIncomingAttachmentMeta): string[] {
+function maxAttachmentLines(meta: MaxIncomingAttachmentMeta, options?: { omitUrl?: boolean }): string[] {
   const lines: string[] = ['Вложение MAX:']
   if (meta.type) lines.push(`  type: ${meta.type}`)
   if (meta.mimeType) lines.push(`  mimeType: ${meta.mimeType}`)
   if (meta.fileName) lines.push(`  fileName: ${meta.fileName}`)
   if (meta.attachmentSource) lines.push(`  attachmentSource: ${meta.attachmentSource}`)
-  if (meta.url) lines.push(`  url: ${meta.url}`)
+  if (meta.url && !options?.omitUrl) lines.push(`  url: ${meta.url}`)
   return lines.length > 1 ? lines : []
 }
 
@@ -55,9 +55,13 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
 
   const userLabel =
     params.username != null && String(params.username).trim() !== '' ? String(params.username).trim() : '—'
+  const omitUrlInMirrorText =
+    params.channel === 'max' &&
+    params.maxAttachment?.type === 'image' &&
+    Boolean(params.maxAttachment.url?.trim())
   const attBlock =
     params.channel === 'max' && params.maxAttachment
-      ? maxAttachmentLines(params.maxAttachment).join('\n')
+      ? maxAttachmentLines(params.maxAttachment, { omitUrl: omitUrlInMirrorText }).join('\n')
       : ''
   const headerLines = [
     'RAW ЗАЯВКА',
@@ -92,9 +96,16 @@ export async function mirrorRawIncomingOrderToAdmin(params: {
         )
       }
     }
-    const res = await sendMaxMessage(ADMIN_MAX_CHAT_ID, text, undefined, 'chat_id')
+    const res = mirrorTelegramImageUrl
+      ? await sendMessageWithImageFromUrl(ADMIN_MAX_CHAT_ID, text, mirrorTelegramImageUrl, 'chat_id', {
+          fileName: params.maxAttachment?.fileName,
+          mimeType: params.maxAttachment?.mimeType,
+        })
+      : await sendMaxMessage(ADMIN_MAX_CHAT_ID, text, undefined, 'chat_id')
     if (!res.ok) {
-      throw new Error(`mirrorRawIncomingOrderToAdmin: sendMaxMessage failed: ${res.error ?? 'unknown'}`)
+      throw new Error(
+        `mirrorRawIncomingOrderToAdmin: ${mirrorTelegramImageUrl ? 'sendMessageWithImageFromUrl' : 'sendMaxMessage'} failed: ${res.error ?? 'unknown'}`
+      )
     }
     return
   }
