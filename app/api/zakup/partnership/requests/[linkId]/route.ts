@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { activatePriceAssignmentExclusive } from '@/lib/priceAssignmentExclusive'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production'
@@ -61,16 +62,18 @@ export async function POST(
       return NextResponse.json({ error: 'Request is not pending' }, { status: 409 })
     }
 
-    const newStatus = action === 'accept' ? 'ACTIVE' : 'DECLINED'
-    await prisma.priceAssignment.update({
-      where: { id: linkId },
-      data: {
-        status: newStatus,
-        respondedAt: new Date(),
-      },
-    })
-
-    if (action === 'accept') {
+    if (action === 'decline') {
+      await prisma.priceAssignment.update({
+        where: { id: linkId },
+        data: {
+          status: 'DECLINED',
+          respondedAt: new Date(),
+        },
+      })
+    } else {
+      await prisma.$transaction(async (tx) => {
+        await activatePriceAssignmentExclusive(tx, linkId)
+      })
       const { ensureActiveCounterparty } = await import('@/lib/activeCounterparty')
       await ensureActiveCounterparty(assignment.priceList.businessId, assignment.counterpartyBusinessId)
     }

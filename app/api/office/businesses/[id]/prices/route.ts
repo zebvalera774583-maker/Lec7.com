@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 import { parsePriceValue } from '@/lib/parsePrice'
 import { ensureActiveCounterparty } from '@/lib/activeCounterparty'
+import { activatePriceAssignmentExclusive } from '@/lib/priceAssignmentExclusive'
 import { buildCatalogNormMap, normalizeForMatch } from '@/lib/catalog-match'
 
 export const GET = withBusinessAccess(async (req, user) => {
@@ -117,6 +118,18 @@ export const POST = withBusinessAccess(async (req, user) => {
           skipDuplicates: true,
         })
         for (const a of existingAssignments) {
+          const row = await tx.priceAssignment.findUnique({
+            where: {
+              priceListId_counterpartyBusinessId: {
+                priceListId: priceList.id,
+                counterpartyBusinessId: a.counterpartyBusinessId,
+              },
+            },
+            select: { id: true },
+          })
+          if (row) {
+            await activatePriceAssignmentExclusive(tx, row.id)
+          }
           await ensureActiveCounterparty(businessId, a.counterpartyBusinessId)
         }
       }

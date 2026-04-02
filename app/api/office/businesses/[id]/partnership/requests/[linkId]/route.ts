@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 import { ensureActiveCounterparty } from '@/lib/activeCounterparty'
+import { activatePriceAssignmentExclusive } from '@/lib/priceAssignmentExclusive'
 
 export const POST = withBusinessAccess(async (req, user) => {
   try {
@@ -56,17 +57,18 @@ export const POST = withBusinessAccess(async (req, user) => {
       return NextResponse.json({ error: 'Request is not pending' }, { status: 409 })
     }
 
-    // Обновляем статус
-    const newStatus = action === 'accept' ? 'ACTIVE' : 'DECLINED'
-    await prisma.priceAssignment.update({
-      where: { id: linkId },
-      data: {
-        status: newStatus,
-        respondedAt: new Date(),
-      },
-    })
-
-    if (action === 'accept') {
+    if (action === 'decline') {
+      await prisma.priceAssignment.update({
+        where: { id: linkId },
+        data: {
+          status: 'DECLINED',
+          respondedAt: new Date(),
+        },
+      })
+    } else {
+      await prisma.$transaction(async (tx) => {
+        await activatePriceAssignmentExclusive(tx, linkId)
+      })
       await ensureActiveCounterparty(assignment.priceList.businessId, assignment.counterpartyBusinessId)
     }
 
