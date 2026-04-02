@@ -3,12 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withBusinessAccess } from '@/lib/access'
 
 const ROWS_SQL = `
-WITH active_counterparties AS (
-  SELECT ac."businessId" AS "supplierBusinessId"
-  FROM "ActiveCounterparty" ac
-  WHERE ac."counterpartyBusinessId" = $1
-),
-norm_to_master AS (
+WITH norm_to_master AS (
   SELECT norm, max(id) AS id
   FROM (
     SELECT lower(trim(regexp_replace(regexp_replace(b."canonicalName", '[\\.,;:()\\[\\]{}"''\`]', '', 'g'), '\\s+', ' ', 'g'))) AS norm, b.id
@@ -39,10 +34,12 @@ accepted_prices AS (
     pl."businessId" AS "supplierBusinessId",
     COALESCE(NULLIF(s."legalName", ''), s.name) AS "supplierLegalName",
     pl."updatedAt" AS "priceListUpdatedAt"
-  FROM "PriceList" pl
+  FROM "PriceAssignment" pa
+  JOIN "PriceList" pl ON pl.id = pa."priceListId"
   JOIN "Business" s ON s.id = pl."businessId"
-  JOIN active_counterparties ac ON ac."supplierBusinessId" = pl."businessId"
-  WHERE (pl.category = $2 OR pl.category IS NULL)
+  WHERE pa."counterpartyBusinessId" = $1
+    AND pa.status = 'ACTIVE'::"PartnerLinkStatus"
+    AND (pl.category = $2 OR pl.category IS NULL)
 ),
 items AS (
   SELECT
@@ -141,20 +138,7 @@ export const GET = withBusinessAccess(async (req, user) => {
 
     const categoryFilter = { OR: [{ category: categoryParam }, { category: null }] }
 
-    const activeCounterparties = await prisma.activeCounterparty.findMany({
-      where: {
-        OR: [
-          { counterpartyBusinessId: businessId },
-          { businessId },
-        ],
-      },
-      select: { businessId: true, counterpartyBusinessId: true },
-    })
-    const activeSupplierIds = [...new Set(
-      activeCounterparties.map((a) => (a.counterpartyBusinessId === businessId ? a.businessId : a.counterpartyBusinessId))
-    )]
-
-    const [ownPriceLists, counterpartyPriceLists] = await Promise.all([
+    const [ownPriceLists, activeAssignments] = await Promise.all([
       prisma.priceList.findMany({
         where: { businessId, ...categoryFilter },
         select: {
@@ -163,17 +147,22 @@ export const GET = withBusinessAccess(async (req, user) => {
           business: { select: { id: true, name: true, legalName: true } },
         },
       }),
-      activeSupplierIds.length > 0
-        ? prisma.priceList.findMany({
-            where: { businessId: { in: activeSupplierIds }, ...categoryFilter },
+      prisma.priceAssignment.findMany({
+        where: {
+          counterpartyBusinessId: businessId,
+          status: 'ACTIVE',
+          priceList: categoryFilter,
+        },
+        select: {
+          priceList: {
             select: {
               id: true,
               updatedAt: true,
               business: { select: { id: true, name: true, legalName: true } },
             },
-            orderBy: { updatedAt: 'desc' },
-          })
-        : Promise.resolve([]),
+          },
+        },
+      }),
     ])
 
     const supplierMap = new Map<string, { supplierBusinessId: string; supplierLegalName: string; priceListId: string; priceListUpdatedAt: Date }>()
@@ -188,7 +177,8 @@ export const GET = withBusinessAccess(async (req, user) => {
         priceListUpdatedAt: pl.updatedAt,
       })
     }
-    for (const pl of counterpartyPriceLists) {
+    for (const a of activeAssignments) {
+      const pl = a.priceList
       const bid = pl.business.id
       if (supplierMap.has(bid)) continue
       const legalName = (pl.business.legalName || '').trim() || pl.business.name
