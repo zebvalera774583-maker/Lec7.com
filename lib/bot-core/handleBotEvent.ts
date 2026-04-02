@@ -124,6 +124,20 @@ function parseQtyInput(
   return { quantity, unit }
 }
 
+/** Подпись позиции в каталожном уточнении: исходная формулировка из парсера/orchestrator, иначе каноническое имя. */
+function clarificationTitleFromParsed(p: { name: string; userTitle?: string | null }): string {
+  const raw = (p.userTitle ?? '').trim()
+  if (raw) return raw
+  return (p.name ?? '').trim()
+}
+
+/** Первая буква предложения для «… — какой именно?»; внутренний регистр строки не меняем. */
+function clarifyQuestionLead(title: string): string {
+  const t = (title || '').trim()
+  if (!t) return t
+  return t.charAt(0).toLocaleUpperCase('ru-RU') + t.slice(1)
+}
+
 /** Сообщение для уточнения item: что не хватает (qty, unit или оба) */
 function clarificationMessage(
   item: { name: string; quantity: string; unit: string }
@@ -169,7 +183,11 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
   let stateData = state?.stateJson as {
     type?: string
     pendingUnit?: { needText: string; incompleteRaw: string[] }
-    pendingItems?: { needText: string; parsedItems: { name: string; quantity: string; unit: string }[]; commentsText: string | null }
+    pendingItems?: {
+      needText: string
+      parsedItems: { name: string; quantity: string; unit: string; userTitle?: string }[]
+      commentsText: string | null
+    }
     pendingIndex?: number
   } | null
 
@@ -177,7 +195,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
   if (choice === 'YES' && stateData?.type === 'awaiting_ocr_confirm' && stateData?.pendingItems) {
     const { needText, parsedItems, commentsText } = stateData.pendingItems
     const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
-      title: p.name,
+      title: clarificationTitleFromParsed(p),
       qty: p.quantity,
       unit: p.unit,
     }))
@@ -222,7 +240,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           where: { channel_chatId: { channel, chatId } },
           data: { stateJson: { type: 'confirmed' } },
         })
-        const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
+        const displayTitle = clarifyQuestionLead(firstClarifyItem.title)
         return {
           messages: [`${displayTitle} — какой именно?`],
           replyInlineKeyboard: { rows },
@@ -304,7 +322,6 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       const qtyUnitIdx = findNextIncompleteClarificationIndex(updated)
       if (qtyUnitIdx >= 0) {
         const item = updated[qtyUnitIdx]
-        const displayTitle = item.title.charAt(0).toUpperCase() + item.title.slice(1).toLowerCase()
         await prisma.clarificationSession.update({
           where: { id: sessionId },
           data: { itemsJson: updated, pendingItemIndex: qtyUnitIdx, needQtyUnit: true, needDepartment: false },
@@ -336,7 +353,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       where: { id: sessionId },
       data: { itemsJson: updated, pendingItemIndex: nextIdx },
     })
-    const displayTitle = nextItem.title.charAt(0).toUpperCase() + nextItem.title.slice(1).toLowerCase()
+    const displayTitle = clarifyQuestionLead(nextItem.title)
     return {
       messages: [`${displayTitle} — какой именно?`],
       replyInlineKeyboard: { rows },
@@ -406,7 +423,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       where: { id: sessionId },
       data: { itemsJson: updated, pendingItemIndex: nextIdx },
     })
-    const displayTitle = nextItem.title.charAt(0).toUpperCase() + nextItem.title.slice(1).toLowerCase()
+    const displayTitle = clarifyQuestionLead(nextItem.title)
     return {
       messages: [`Позиция удалена: ${deletedTitle}`, `${displayTitle} — какой именно?`],
       replyInlineKeyboard: { rows },
@@ -566,7 +583,11 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
   // Миграция: awaiting_qty / awaiting_qty_other / awaiting_unit → awaiting_item_clarification
   const oldState = stateData as {
     type?: string
-    pendingItems?: { needText: string; parsedItems: { name: string; quantity: string; unit: string }[]; commentsText: string | null }
+    pendingItems?: {
+      needText: string
+      parsedItems: { name: string; quantity: string; unit: string; userTitle?: string }[]
+      commentsText: string | null
+    }
     pendingIndex?: number
     pendingClarificationIndex?: number
     indicesNeedingQty?: number[]
@@ -694,7 +715,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
       const nextIdx = findNextIncompleteIndex(parsedItems)
       if (nextIdx < 0) {
         const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
-          title: p.name,
+          title: clarificationTitleFromParsed(p),
           qty: p.quantity,
           unit: p.unit,
         }))
@@ -731,7 +752,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
             where: { channel_chatId: { channel, chatId } },
             data: { stateJson: { type: 'confirmed' } },
           })
-          const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
+          const displayTitle = clarifyQuestionLead(firstClarifyItem.title)
           return {
             messages: [`${displayTitle} — какой именно?`],
             replyInlineKeyboard: { rows },
@@ -827,7 +848,8 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
         let unit = r.unit || ''
         if (userTypedNoDigit || needsQty.has(i)) qty = ''
         if (userTypedNoDigit || needsUnit.has(i)) unit = ''
-        return { name: r.canonicalName, quantity: qty, unit }
+        const userTitle = (r.name ?? '').trim() || (r.canonicalName ?? '').trim()
+        return { name: r.canonicalName, quantity: qty, unit, userTitle }
       })
       const commentsText = orchestratorResult.comments?.join('\n') ?? null
 
@@ -857,7 +879,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
 
       const needsClarification = orchestratorResult.needsClarification ?? []
       const itemsForClarification: ClarificationItem[] = parsedItems.map((p) => ({
-        title: p.name,
+        title: clarificationTitleFromParsed(p),
         qty: p.quantity,
         unit: p.unit,
       }))
@@ -902,7 +924,7 @@ export async function handleBotEvent(event: BotEvent): Promise<HandleBotEventRes
           }
         }
         rows.push([{ text: 'Удалить позицию', callback_data: `clarify_delete|${session.id}|${firstClarifyIdx}` }])
-        const displayTitle = firstClarifyItem.title.charAt(0).toUpperCase() + firstClarifyItem.title.slice(1).toLowerCase()
+        const displayTitle = clarifyQuestionLead(firstClarifyItem.title)
         return {
           messages: [`${displayTitle} — какой именно?`],
           replyInlineKeyboard: { rows },

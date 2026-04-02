@@ -176,7 +176,7 @@ export async function normalizeIncomingOrder(
 
     if (r.requiresClarification) {
       r.canonicalName = sanitizeTitle(r.canonicalName)
-      r.name = sanitizeTitle(r.name)
+      // r.name — исходная формулировка из парсера; не заменять на сокращённый канон для текста уточнения
       r.unit = itemsWithUnit[i].unit
       items.push(r)
       needsClarificationFiltered.push(itemIndex)

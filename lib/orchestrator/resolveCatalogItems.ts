@@ -14,6 +14,22 @@ export function normalizeItemName(name: string): string {
   return s.replace(/\s+/g, ' ').trim()
 }
 
+/** Полное нормализованное совпадение фразы пользователя с одним из вариантов уточнения (как в optionNormToMatch). */
+function pickUniqueClarificationOption(
+  userNorm: string,
+  options: string[],
+  optionNormToMatch: Map<string, { catalogItemId: string; canonicalName: string }>
+): { catalogItemId: string; canonicalName: string } | null {
+  if (!userNorm || options.length < 2) return null
+  for (const opt of options) {
+    const on = normalizeForMatch(opt)
+    if (on && userNorm === on) {
+      return optionNormToMatch.get(on) ?? null
+    }
+  }
+  return null
+}
+
 export interface ResolvedItem {
   catalogItemId: string | null
   canonicalName: string
@@ -129,25 +145,6 @@ export async function resolveCatalogItems(
       })
       continue
     }
-    const words = norm.split(/\s+/).filter(Boolean)
-    const firstWord = words[0] ?? ''
-    const clarificationOpts = firstWord ? clarificationNormToOptions.get(firstWord) : null
-    if (clarificationOpts && clarificationOpts.length >= 2) {
-      resolved.push({
-        catalogItemId: null,
-        canonicalName: item.name,
-        confidence: 0,
-        needsUserChoice: true,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        matchType: 'none',
-        matchScore: 0,
-        requiresClarification: true,
-        clarificationOptions: clarificationOpts,
-      })
-      continue
-    }
 
     let catalogItemId: string | null = null
     let canonicalName = item.name
@@ -183,6 +180,37 @@ export async function resolveCatalogItems(
 
     const matchedCatalogItem = catalogItemId ? catalogItems.find((c) => c.id === catalogItemId) : null
     if (matchedCatalogItem?.requiresClarification && matchedCatalogItem.clarificationOptions?.length >= 2) {
+      const opts = matchedCatalogItem.clarificationOptions
+      const picked = pickUniqueClarificationOption(norm, opts, optionNormToMatch)
+      if (picked) {
+        resolved.push({
+          catalogItemId: picked.catalogItemId,
+          canonicalName: picked.canonicalName,
+          confidence: 1,
+          needsUserChoice: false,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          matchType: 'alias',
+          matchScore: 1,
+        })
+        continue
+      }
+      const wordCount = norm.split(/\s+/).filter(Boolean).length
+      if (matchScore >= ORCHESTRATOR_CONFIG.highConfidenceThreshold && wordCount >= 3) {
+        resolved.push({
+          catalogItemId,
+          canonicalName,
+          confidence: matchScore,
+          needsUserChoice: false,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          matchType,
+          matchScore,
+        })
+        continue
+      }
       resolved.push({
         catalogItemId: null,
         canonicalName: item.name,
@@ -194,7 +222,31 @@ export async function resolveCatalogItems(
         matchType: 'none',
         matchScore: 0,
         requiresClarification: true,
-        clarificationOptions: matchedCatalogItem.clarificationOptions,
+        clarificationOptions: opts,
+      })
+      continue
+    }
+
+    const words = norm.split(/\s+/).filter(Boolean)
+    const firstWord = words[0] ?? ''
+    const clarificationOptsFallback = firstWord ? clarificationNormToOptions.get(firstWord) : null
+    if (
+      !catalogItemId &&
+      clarificationOptsFallback &&
+      clarificationOptsFallback.length >= 2
+    ) {
+      resolved.push({
+        catalogItemId: null,
+        canonicalName: item.name,
+        confidence: 0,
+        needsUserChoice: true,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        matchType: 'none',
+        matchScore: 0,
+        requiresClarification: true,
+        clarificationOptions: clarificationOptsFallback,
       })
       continue
     }
