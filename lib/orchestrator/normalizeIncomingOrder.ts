@@ -18,6 +18,37 @@ import { sanitizeTitle } from '@/lib/orchestrator/sanitizeTitle'
 import { ORCHESTRATOR_CONFIG } from '@/lib/orchestrator/config'
 import { isDoubtfulSegment, isGarbageSegment, isLikelyNonItem } from '@/lib/orchestrator/nonItemFilter'
 import { recognizeOrderWithAI } from '@/lib/ai/recognizeOrderWithAI'
+import { correctProductNamesForCatalog } from '@/lib/ai/correctProductNamesForCatalog'
+
+const NAME_CORRECTION_SCORE_DELTA = 0.15
+
+/**
+ * Принять исправление имени только при явном выигрыше матча каталога и достаточной уверенности AI.
+ * Без новых env: пороги из ORCHESTRATOR_CONFIG.
+ */
+function shouldApplyNameCorrection(
+  resolvedRaw: ResolvedItem,
+  resolvedCorr: ResolvedItem,
+  aiItem: { corrected_name: string; ai_confidence: number; unchanged: boolean },
+  originalName: string
+): boolean {
+  if (aiItem.unchanged) return false
+  const rawName = (originalName ?? '').trim()
+  const corrName = (aiItem.corrected_name ?? '').trim()
+  if (!corrName || rawName === corrName) return false
+
+  const MED = ORCHESTRATOR_CONFIG.mediumConfidenceThreshold
+  if (aiItem.ai_confidence < MED) return false
+
+  const sr = resolvedRaw.matchScore ?? 0
+  const sc = resolvedCorr.matchScore ?? 0
+  if (sc <= sr) return false
+
+  const HIGH = ORCHESTRATOR_CONFIG.highConfidenceThreshold
+  const improvementObvious =
+    sc - sr >= NAME_CORRECTION_SCORE_DELTA || (sr < HIGH && sc >= HIGH)
+  return improvementObvious
+}
 
 export type NormalizeInputSource =
   | 'max_text'
@@ -151,9 +182,43 @@ export async function normalizeIncomingOrder(
     }
   }
 
+  const nameCorrection = await correctProductNamesForCatalog(itemsWithUnit.map((it) => it.name))
+  const itemsCorrectedForCompare = itemsWithUnit.map((it, i) => ({
+    ...it,
+    name: nameCorrection.items[i]?.corrected_name ?? it.name,
+  }))
+
+  let resolvedRaw: ResolvedItem[]
+  let resolvedCorr: ResolvedItem[]
+  try {
+    resolvedRaw = await resolveCatalogItems(itemsWithUnit, businessId)
+    resolvedCorr = await resolveCatalogItems(itemsCorrectedForCompare, businessId)
+  } catch (err) {
+    console.error('[ORCH] resolveCatalogItems (raw/corr compare) error', err)
+    return { intent: 'unknown' }
+  }
+
+  const itemsForCatalog = itemsWithUnit.map((it, i) => {
+    const aiIt = nameCorrection.items[i]
+    const rawR = resolvedRaw[i]
+    const corrR = resolvedCorr[i]
+    if (
+      aiIt &&
+      rawR &&
+      corrR &&
+      shouldApplyNameCorrection(rawR, corrR, aiIt, it.name)
+    ) {
+      console.log(
+        `[ORCH] name_correction applied idx=${i} rawScore=${(rawR.matchScore ?? 0).toFixed(2)} corrScore=${(corrR.matchScore ?? 0).toFixed(2)} aiConf=${aiIt.ai_confidence.toFixed(2)}`
+      )
+      return { ...it, name: aiIt.corrected_name }
+    }
+    return it
+  })
+
   let resolved: ResolvedItem[]
   try {
-    resolved = await resolveCatalogItems(itemsWithUnit, businessId)
+    resolved = await resolveCatalogItems(itemsForCatalog, businessId)
   } catch (err) {
     console.error('[ORCH] resolveCatalogItems error', err)
     return { intent: 'unknown' }
