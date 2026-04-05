@@ -3,6 +3,9 @@
 # app:3000 — сервис app из docker-compose (Caddy и app в одной сети)
 
 lek7.com {
+    handle_path /tech* {
+        reverse_proxy lead-hunter-service:3847
+    }
     reverse_proxy app:3000
 }
 
