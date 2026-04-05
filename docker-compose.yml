@@ -112,6 +112,24 @@ services:
         max-size: "10m"
         max-file: "5"
 
+  lead-hunter-service:
+    build: ./services/lead-hunter-service
+    ports:
+      - "127.0.0.1:3847:3847"
+    environment:
+      PORT: 3847
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3847/health | grep -q ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
   caddy:
     image: caddy:latest
     container_name: lec7-caddy
