@@ -6,6 +6,7 @@ lek7.com {
     handle_path /tech* {
         reverse_proxy lead-hunter-service:3847
     }
+
     reverse_proxy app:3000
 }
 
