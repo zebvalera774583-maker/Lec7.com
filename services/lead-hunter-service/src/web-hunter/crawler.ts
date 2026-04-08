@@ -6,8 +6,6 @@ export const CRAWL_INTERVAL_MS = 30_000
 
 const URLS = [
   'https://pikabu.ru/search.php?q=доставка%20еды',
-  'https://otzovik.com/?search_text=доставка+еды',
-  'https://irecommend.ru/search/content/доставка',
   'https://www.avito.ru/rossiya?q=доставка+еды',
 ]
 
@@ -23,8 +21,8 @@ async function fetchPublicPage(url: string): Promise<string | null> {
       },
       redirect: 'follow',
     })
-    if (!res.ok) {
-      console.warn(`[web-hunter] HTTP ${res.status} for ${url.slice(0, 80)}`)
+    if (res.status !== 200) {
+      console.warn(`[web-hunter] HTTP ${res.status} ${url}`)
       return null
     }
     const ct = res.headers.get('content-type') ?? ''
@@ -41,10 +39,10 @@ async function fetchPublicPage(url: string): Promise<string | null> {
 
 async function crawlOnce(): Promise<void> {
   for (const url of URLS) {
+    console.log(`[web-hunter] fetch ${url}`)
     const html = await fetchPublicPage(url)
-    if (!html) continue
 
-    const found = extractSignals(html)
+    const found = html ? extractSignals(html) : []
     for (const item of found) {
       const signal: TestSignal = {
         receivedAt: new Date().toISOString(),
@@ -57,9 +55,7 @@ async function crawlOnce(): Promise<void> {
       }
       appendTestSignal(signal)
     }
-    if (found.length > 0) {
-      console.log(`[web-hunter] ${found.length} signal(s) from ${url.slice(0, 60)}…`)
-    }
+    console.log(`[web-hunter] signals: ${found.length} for ${url}`)
   }
 }
 
