@@ -1,18 +1,10 @@
 import http from 'node:http'
+import { appendTestSignal, getTestSignals, type TestSignal } from './testSignalsStore.js'
+import { startCrawler } from './web-hunter/crawler.js'
 
-export interface TestSignal {
-  receivedAt: string
-  source: string
-  chatId: string
-  chatTitle: string
-  username: string
-  text: string
-  messageLink: string
-}
+export type { TestSignal }
 
 const PORT = Number(process.env.PORT) || 3847
-
-const testSignals: TestSignal[] = []
 
 function escapeHtml(s: string | null | undefined): string {
   if (s == null) return ''
@@ -33,6 +25,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 }
 
 function renderIndexHtml(): string {
+  const testSignals = getTestSignals()
   const serverTime = new Date().toISOString()
   const count = testSignals.length
   const last20 = testSignals.slice(-20).reverse()
@@ -130,9 +123,9 @@ const server = http.createServer(async (req, res) => {
         text: String(body.text ?? ''),
         messageLink: String(body.messageLink ?? ''),
       }
-      testSignals.push(signal)
+      appendTestSignal(signal)
       res.writeHead(202, { 'Content-Type': 'application/json; charset=utf-8' })
-      res.end(JSON.stringify({ accepted: true, total: testSignals.length }))
+      res.end(JSON.stringify({ accepted: true, total: getTestSignals().length }))
       return
     }
 
@@ -146,4 +139,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`lead-hunter-service listening on http://localhost:${PORT}/`)
+  startCrawler()
 })
