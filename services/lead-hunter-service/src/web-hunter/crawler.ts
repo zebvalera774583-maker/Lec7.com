@@ -6,7 +6,13 @@ export const CRAWL_INTERVAL_MS = 30_000
 
 const URLS = [
   'https://pikabu.ru/search.php?q=доставка%20еды',
+  'https://pikabu.ru/tag/%D0%94%D0%BE%D1%81%D1%82%D0%B0%D0%B2%D0%BA%D0%B0/hot',
   'https://www.avito.ru/rossiya?q=доставка+еды',
+  'https://habr.com/ru/search/?q=доставка+еды&target_type=posts',
+  'https://4pda.to/forum/index.php?act=search&source=all&query=доставка+еды',
+  'https://old.reddit.com/r/russia/search?q=доставка+еды&restrict_sr=1',
+  'https://ru.wikipedia.org/wiki/%D0%AF%D0%BD%D0%B4%D0%B5%D0%BA%D1%81.%D0%95%D0%B4%D0%B0',
+  'https://vc.ru/search?query=доставка%20еды',
 ]
 
 const DEFAULT_UA =
