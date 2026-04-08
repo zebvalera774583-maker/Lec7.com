@@ -4,11 +4,11 @@ import { appendTestSignal, type TestSignal } from '../testSignalsStore.js'
 /** Не чаще одного полного цикла раз в 30 с (см. setInterval). */
 export const CRAWL_INTERVAL_MS = 30_000
 
-/** Временно: публичные страницы поисковых выдач по ключевым темам. */
-const SEED_URLS: string[] = [
-  'https://www.google.com/search?q=%D0%B3%D0%B4%D0%B5+%D0%B7%D0%B0%D0%BA%D0%B0%D0%B7%D0%B0%D1%82%D1%8C+%D0%B5%D0%B4%D1%83',
-  'https://www.bing.com/search?q=%D0%B4%D0%BE%D1%81%D1%82%D0%B0%D0%B2%D0%BA%D0%B0+%D0%BF%D0%B8%D1%86%D1%86%D1%8B',
-  'https://yandex.ru/search/?text=%D0%B3%D0%B4%D0%B5+%D0%B7%D0%B0%D0%BA%D0%B0%D0%B7%D0%B0%D1%82%D1%8C+%D0%B5%D0%B4%D1%83',
+const URLS = [
+  'https://pikabu.ru/search.php?q=доставка%20еды',
+  'https://otzovik.com/?search_text=доставка+еды',
+  'https://irecommend.ru/search/content/доставка',
+  'https://www.avito.ru/rossiya?q=доставка+еды',
 ]
 
 const DEFAULT_UA =
@@ -40,7 +40,7 @@ async function fetchPublicPage(url: string): Promise<string | null> {
 }
 
 async function crawlOnce(): Promise<void> {
-  for (const url of SEED_URLS) {
+  for (const url of URLS) {
     const html = await fetchPublicPage(url)
     if (!html) continue
 
