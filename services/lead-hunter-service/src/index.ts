@@ -1,10 +1,68 @@
+import 'dotenv/config'
 import http from 'node:http'
+import { utils } from 'telegram'
+import { NewMessage, type NewMessageEvent } from 'telegram/events/index.js'
 import { appendTestSignal, getTestSignals, type TestSignal } from './testSignalsStore.js'
 import { startCrawler } from './web-hunter/crawler.js'
+import { createTelegramClient } from './telegram/client.js'
 
 export type { TestSignal }
 
 const PORT = Number(process.env.PORT) || 3847
+
+function isTelegramEnvReady(): boolean {
+  const id = process.env.TELEGRAM_API_ID?.trim()
+  const hash = process.env.TELEGRAM_API_HASH?.trim()
+  const session = process.env.TELEGRAM_SESSION?.trim()
+  return Boolean(id && hash && session)
+}
+
+async function startTelegramSidecar(): Promise<void> {
+  if (!isTelegramEnvReady()) {
+    console.log('[telegram] skipped: missing env')
+    return
+  }
+
+  console.log('[telegram] connecting...')
+  let client
+  try {
+    client = createTelegramClient()
+  } catch (e) {
+    console.error('[telegram] failed to create client:', e instanceof Error ? e.message : e)
+    return
+  }
+
+  try {
+    await client.connect()
+    if (!client.connected) {
+      console.error('[telegram] not connected after connect()')
+      return
+    }
+    const me = await client.getMe()
+    console.log('[telegram] connected')
+    const name = [me.firstName, me.lastName].filter(Boolean).join(' ').trim()
+    const username = me.username ? `@${me.username}` : '—'
+    console.log(`[telegram] account: ${name || '(no name)'} · ${username}`)
+
+    client.addEventHandler(
+      (event: NewMessageEvent) => {
+        const msg = event.message
+        const chatId = String(utils.getPeerId(msg.peerId))
+        const senderId = msg.senderId != null ? String(msg.senderId) : ''
+        const text = typeof msg.message === 'string' ? msg.message : ''
+        console.log(`[telegram] message chatId=${chatId} senderId=${senderId} text=${JSON.stringify(text)}`)
+      },
+      new NewMessage({ incoming: true })
+    )
+  } catch (e) {
+    console.error('[telegram] error:', e instanceof Error ? e.message : e)
+    try {
+      await client.disconnect()
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 function escapeHtml(s: string | null | undefined): string {
   if (s == null) return ''
@@ -140,4 +198,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`lead-hunter-service listening on http://localhost:${PORT}/`)
   startCrawler()
+  void startTelegramSidecar()
 })
