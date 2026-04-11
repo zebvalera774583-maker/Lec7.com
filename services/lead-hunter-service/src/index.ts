@@ -5,6 +5,7 @@ import { appendTestSignal, getTestSignals, type TestSignal } from './testSignals
 import { startCrawler } from './web-hunter/crawler.js'
 import { createTelegramClient } from './telegram/client.js'
 import { handleTelegramLeadMessage } from './telegram/leadHunter.js'
+import { logLastTelegramMessagesOnStartup } from './telegram/startupHistoryDebug.js'
 
 export type { TestSignal }
 
@@ -40,6 +41,7 @@ async function startTelegramSidecar(): Promise<void> {
     }
     const me = await client.getMe()
     console.log('[telegram] connected')
+    await logLastTelegramMessagesOnStartup(client)
     const name = [me.firstName, me.lastName].filter(Boolean).join(' ').trim()
     const username = me.username ? `@${me.username}` : '—'
     console.log(`[telegram] account: ${name || '(no name)'} · ${username}`)
