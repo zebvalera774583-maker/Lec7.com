@@ -158,13 +158,20 @@ function renderIndexHtml(): string {
     th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; vertical-align: top; text-align: left; }
     th { background: #f4f4f4; }
     code { background: #f0f0f0; padding: 0.1rem 0.35rem; }
-    .tech-topbar { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; }
-    .hamburger {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid #bbb; border-radius: 6px;
-      background: #f8f8f8; cursor: pointer; font-size: 1.25rem; line-height: 1;
+    .tech-topbar {
+      display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem;
+      padding: 0.35rem 0; border-bottom: 1px solid #e0e0e0;
     }
-    .hamburger:hover { background: #eee; }
+    .hamburger {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      min-height: 2.75rem; padding: 0.35rem 0.75rem; border: 1px solid #888; border-radius: 8px;
+      background: #fff; cursor: pointer; font: inherit; color: #111;
+      box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    }
+    .hamburger:hover { background: #f3f3f3; }
+    .hamburger-icon { display: flex; flex-direction: column; justify-content: center; gap: 4px; width: 1.35rem; flex-shrink: 0; }
+    .hamburger-icon .bar { display: block; height: 3px; width: 100%; background: #111; border-radius: 1px; }
+    .hamburger-text { font-size: 0.95rem; font-weight: 600; letter-spacing: 0.02em; }
     .tech-drawer-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 999;
     }
@@ -183,7 +190,10 @@ function renderIndexHtml(): string {
 </head>
 <body>
   <div class="tech-topbar">
-    <button type="button" class="hamburger" id="tech-menu-btn" aria-expanded="false" aria-controls="tech-drawer" title="Меню">☰</button>
+    <button type="button" class="hamburger" id="tech-menu-btn" aria-expanded="false" aria-controls="tech-drawer" title="Открыть меню">
+      <span class="hamburger-icon" aria-hidden="true"><span class="bar"></span><span class="bar"></span><span class="bar"></span></span>
+      <span class="hamburger-text">Меню</span>
+    </button>
   </div>
   <div id="tech-drawer-backdrop" class="tech-drawer-backdrop" hidden></div>
   <aside id="tech-drawer" class="tech-drawer" aria-hidden="true">
@@ -264,7 +274,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && path === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        Pragma: 'no-cache',
+      })
       res.end(renderIndexHtml())
       return
     }
