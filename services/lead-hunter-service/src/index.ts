@@ -54,6 +54,17 @@ async function startTelegramSidecar(): Promise<void> {
       },
       new NewMessage({ incoming: true })
     )
+
+    client.addEventHandler(
+      async (event: NewMessageEvent) => {
+        const message = event.message
+        console.log('[telegram-debug] incoming')
+        console.log('  chatId=', message.chatId)
+        console.log('  senderId=', message.senderId)
+        console.log('  text=', message.message || '(no text)')
+      },
+      new NewMessage({})
+    )
   } catch (e) {
     console.error('[telegram] error:', e instanceof Error ? e.message : e)
     try {
