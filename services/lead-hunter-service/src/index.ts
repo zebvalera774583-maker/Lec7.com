@@ -4,7 +4,6 @@ import { NewMessage, type NewMessageEvent } from 'telegram/events'
 import { appendTestSignal, getTestSignals, type TestSignal } from './testSignalsStore.js'
 import { startCrawler } from './web-hunter/crawler.js'
 import { createTelegramClient } from './telegram/client.js'
-import { handleTelegramLeadMessage } from './telegram/leadHunter.js'
 import { logLastTelegramMessagesOnStartup } from './telegram/startupHistoryDebug.js'
 
 export type { TestSignal }
@@ -47,21 +46,37 @@ async function startTelegramSidecar(): Promise<void> {
     console.log(`[telegram] account: ${name || '(no name)'} · ${username}`)
 
     client.addEventHandler(
-      (event: NewMessageEvent) => {
-        void handleTelegramLeadMessage(event).catch((err) => {
-          console.error('[telegram-hunter] handler error:', err instanceof Error ? err.message : err)
-        })
-      },
-      new NewMessage({ incoming: true })
-    )
-
-    client.addEventHandler(
       async (event: NewMessageEvent) => {
         const message = event.message
         console.log('[telegram-debug] incoming')
         console.log('  chatId=', message.chatId)
         console.log('  senderId=', message.senderId)
         console.log('  text=', message.message || '(no text)')
+
+        const text = (message.message || '').toLowerCase()
+        const keywords = [
+          'где заказать',
+          'доставка еды',
+          'посоветуйте доставку',
+          'хочу заказать еду',
+          'пицца доставка',
+        ]
+        if (!keywords.some((k) => text.includes(k))) return
+
+        console.log('[telegram-hunter] hit')
+        console.log(`  chatId=${message.chatId}`)
+        console.log(`  senderId=${message.senderId}`)
+        console.log(`  text=${JSON.stringify(message.message || '')}`)
+
+        appendTestSignal({
+          receivedAt: new Date().toISOString(),
+          source: 'telegram',
+          chatId: String(message.chatId),
+          chatTitle: '',
+          username: String(message.senderId ?? ''),
+          text,
+          messageLink: '',
+        })
       },
       new NewMessage({})
     )
