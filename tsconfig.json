@@ -23,5 +23,9 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "services/max-bot-service/**"]
+  "exclude": [
+    "node_modules",
+    "services/max-bot-service/**",
+    "services/lead-hunter-service/**"
+  ]
 }

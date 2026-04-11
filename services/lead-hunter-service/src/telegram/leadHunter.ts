@@ -1,5 +1,5 @@
 import { utils } from 'telegram'
-import type { NewMessageEvent } from 'telegram/events/index.js'
+import type { NewMessageEvent } from 'telegram/events'
 import { appendTestSignal, type TestSignal } from '../testSignalsStore.js'
 
 /** Фразы для поиска в тексте (нижний регистр). */
