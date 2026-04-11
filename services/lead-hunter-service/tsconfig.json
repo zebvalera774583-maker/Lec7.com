@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "telegram/events": ["node_modules/telegram/events/index.d.ts"]
+      "telegram/events/index.js": ["node_modules/telegram/events/index.d.ts"]
     }
   },
   "include": ["src/**/*"],

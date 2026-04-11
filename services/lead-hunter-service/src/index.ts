@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import http from 'node:http'
-import { NewMessage, type NewMessageEvent } from 'telegram/events'
+import { NewMessage, type NewMessageEvent } from 'telegram/events/index.js'
 import { appendTestSignal, getTestSignals, type TestSignal } from './testSignalsStore.js'
 import { startCrawler } from './web-hunter/crawler.js'
 import { createTelegramClient } from './telegram/client.js'
