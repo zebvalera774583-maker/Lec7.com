@@ -1,10 +1,10 @@
 import 'dotenv/config'
 import http from 'node:http'
-import { utils } from 'telegram'
 import { NewMessage, type NewMessageEvent } from 'telegram/events/index.js'
 import { appendTestSignal, getTestSignals, type TestSignal } from './testSignalsStore.js'
 import { startCrawler } from './web-hunter/crawler.js'
 import { createTelegramClient } from './telegram/client.js'
+import { handleTelegramLeadMessage } from './telegram/leadHunter.js'
 
 export type { TestSignal }
 
@@ -46,11 +46,9 @@ async function startTelegramSidecar(): Promise<void> {
 
     client.addEventHandler(
       (event: NewMessageEvent) => {
-        const msg = event.message
-        const chatId = String(utils.getPeerId(msg.peerId))
-        const senderId = msg.senderId != null ? String(msg.senderId) : ''
-        const text = typeof msg.message === 'string' ? msg.message : ''
-        console.log(`[telegram] message chatId=${chatId} senderId=${senderId} text=${JSON.stringify(text)}`)
+        void handleTelegramLeadMessage(event).catch((err) => {
+          console.error('[telegram-hunter] handler error:', err instanceof Error ? err.message : err)
+        })
       },
       new NewMessage({ incoming: true })
     )
