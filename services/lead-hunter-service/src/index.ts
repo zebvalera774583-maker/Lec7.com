@@ -2,6 +2,7 @@ import 'dotenv/config'
 import http from 'node:http'
 import { NewMessage, type NewMessageEvent } from 'telegram/events/index.js'
 import { appendTestSignal, getTestSignals, type TestSignal } from './testSignalsStore.js'
+import { getTelegramChats } from './telegramChatsStore.js'
 import { startCrawler } from './web-hunter/crawler.js'
 import { createTelegramClient } from './telegram/client.js'
 import { logLastTelegramMessagesOnStartup } from './telegram/startupHistoryDebug.js'
@@ -128,6 +129,20 @@ function renderIndexHtml(): string {
       )
       .join('\n') || ''
 
+  const telegramChats = getTelegramChats()
+  const telegramRows =
+    telegramChats
+      .map(
+        (c) => `<tr>
+  <td>${escapeHtml(c.title)}</td>
+  <td>${escapeHtml(c.username)}</td>
+  <td>${escapeHtml(c.chatId)}</td>
+  <td>${escapeHtml(c.query)}</td>
+  <td>${escapeHtml(c.joinStatus)}</td>
+</tr>`
+      )
+      .join('\n') || ''
+
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -143,9 +158,50 @@ function renderIndexHtml(): string {
     th, td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; vertical-align: top; text-align: left; }
     th { background: #f4f4f4; }
     code { background: #f0f0f0; padding: 0.1rem 0.35rem; }
+    .tech-topbar { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.75rem; }
+    .hamburger {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2.5rem; height: 2.5rem; padding: 0; border: 1px solid #bbb; border-radius: 6px;
+      background: #f8f8f8; cursor: pointer; font-size: 1.25rem; line-height: 1;
+    }
+    .hamburger:hover { background: #eee; }
+    .tech-drawer-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 999;
+    }
+    .tech-drawer-backdrop[hidden] { display: none; }
+    .tech-drawer {
+      position: fixed; top: 0; left: 0; height: 100%; width: min(24rem, 92vw);
+      max-width: 100%; background: #fff; box-shadow: 4px 0 20px rgba(0,0,0,.12);
+      z-index: 1000; transform: translateX(-100%); transition: transform .2s ease;
+      overflow: auto; box-sizing: border-box;
+    }
+    body.drawer-open .tech-drawer { transform: translateX(0); }
+    .tech-drawer-inner { padding: 1rem 1rem 2rem; }
+    .tech-drawer-title { font-size: 1.1rem; margin: 0 0 0.75rem; }
+    .tech-drawer .tg-table { font-size: 12px; }
   </style>
 </head>
 <body>
+  <div class="tech-topbar">
+    <button type="button" class="hamburger" id="tech-menu-btn" aria-expanded="false" aria-controls="tech-drawer" title="Меню">☰</button>
+  </div>
+  <div id="tech-drawer-backdrop" class="tech-drawer-backdrop" hidden></div>
+  <aside id="tech-drawer" class="tech-drawer" aria-hidden="true">
+    <div class="tech-drawer-inner">
+      <h2 class="tech-drawer-title">Telegram Chats</h2>
+      <table class="tg-table">
+        <thead>
+          <tr>
+            <th>title</th><th>username</th><th>chatId</th><th>query</th><th>joinStatus</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${telegramRows || '<tr><td colspan="5">Нет данных по Telegram chats</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </aside>
+
   <h1>lead-hunter-service</h1>
   <p class="meta">Статус: <span class="ok">OK</span> · Порт: <code>${PORT}</code> · Время сервера: <code>${escapeHtml(serverTime)}</code></p>
   <p class="meta">Тестовых сигналов (<code>/ingest/test</code>): <strong>${count}</strong></p>
@@ -160,6 +216,32 @@ function renderIndexHtml(): string {
       ${rows || '<tr><td colspan="7">Нет сигналов</td></tr>'}
     </tbody>
   </table>
+  <script>
+(function () {
+  var btn = document.getElementById('tech-menu-btn')
+  var drawer = document.getElementById('tech-drawer')
+  var backdrop = document.getElementById('tech-drawer-backdrop')
+  if (!btn || !drawer || !backdrop) return
+  function openDrawer() {
+    document.body.classList.add('drawer-open')
+    drawer.setAttribute('aria-hidden', 'false')
+    btn.setAttribute('aria-expanded', 'true')
+    backdrop.hidden = false
+  }
+  function closeDrawer() {
+    document.body.classList.remove('drawer-open')
+    drawer.setAttribute('aria-hidden', 'true')
+    btn.setAttribute('aria-expanded', 'false')
+    backdrop.hidden = true
+  }
+  function toggle() {
+    if (document.body.classList.contains('drawer-open')) closeDrawer()
+    else openDrawer()
+  }
+  btn.addEventListener('click', function (e) { e.stopPropagation(); toggle() })
+  backdrop.addEventListener('click', closeDrawer)
+})()
+  </script>
 </body>
 </html>`
 }
