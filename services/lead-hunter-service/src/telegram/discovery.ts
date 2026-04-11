@@ -40,15 +40,19 @@ async function tryJoinPublicChannel(
   }
 }
 
-function labelChatEntity(entity: Api.TypeChat | Api.Channel): { title: string; username: string } {
-  const title = 'title' in entity && entity.title ? String(entity.title) : ''
-  const username = 'username' in entity && entity.username ? String(entity.username) : ''
+function labelChannel(ch: Api.Channel): { title: string; username: string } {
+  const title = ch.title ? String(ch.title) : ''
+  const username = ch.username ? String(ch.username) : ''
   return { title, username }
 }
 
+/** Публичный канал или супергруппа / гигагруппа (все в TL как Channel). */
+function isChannelOrSupergroup(ch: Api.Channel): boolean {
+  return Boolean(ch.broadcast || ch.megagroup || ch.gigagroup)
+}
+
 /**
- * Глобальный поиск по запросам, опционально вступление в публичные каналы/супергруппы.
- * Вызывается один раз после подключения клиента.
+ * Глобальный поиск через messages.SearchGlobal, опционально вступление в каналы/супергруппы.
  */
 export async function runTelegramDiscovery(client: TelegramClient): Promise<void> {
   const queries = parseDiscoveryQueries()
@@ -69,43 +73,52 @@ export async function runTelegramDiscovery(client: TelegramClient): Promise<void
 
   for (const query of queries) {
     console.log(`[telegram-discovery] query: ${query}`)
-    const seen = new Set<string>()
-    const batchLimit = Math.min(100, Math.max(perQueryLimit * 3, 20))
 
     try {
-      for await (const msg of client.iterMessages(undefined, { search: query, limit: batchLimit })) {
-        const peerId = msg.peerId
-        if (!peerId) continue
-        if (peerId instanceof Api.PeerUser) continue
+      const result = await client.invoke(
+        new Api.messages.SearchGlobal({
+          q: query,
+          filter: new Api.InputMessagesFilterEmpty(),
+          minDate: 0,
+          maxDate: 0,
+          offsetRate: 0,
+          offsetPeer: new Api.InputPeerEmpty(),
+          offsetId: 0,
+          limit: perQueryLimit,
+        })
+      )
 
-        const dedupeKey = String(utils.getPeerId(peerId))
+      if (result instanceof Api.messages.MessagesNotModified) {
+        continue
+      }
+
+      console.log('[telegram-discovery] global search used')
+
+      if (!('chats' in result) || !result.chats?.length) {
+        continue
+      }
+
+      const seen = new Set<string>()
+
+      for (const ent of result.chats) {
+        if (!(ent instanceof Api.Channel)) continue
+        if (!isChannelOrSupergroup(ent)) continue
+
+        const dedupeKey = String(utils.getPeerId(ent))
         if (seen.has(dedupeKey)) continue
+        if (seen.size >= perQueryLimit) break
         seen.add(dedupeKey)
-        if (seen.size > perQueryLimit) break
 
-        let ent: Api.TypeUser | Api.TypeChat
-        try {
-          ent = (await client.getEntity(peerId)) as Api.TypeUser | Api.TypeChat
-        } catch {
-          continue
-        }
-
-        if (ent instanceof Api.User) continue
-
-        const { title, username } =
-          ent instanceof Api.Channel || ent instanceof Api.Chat ? labelChatEntity(ent) : { title: '', username: '' }
-
-        const chatId = String(utils.getPeerId(peerId))
+        const { title, username } = labelChannel(ent)
+        const chatId = String(utils.getPeerId(ent))
 
         let joinStatus: TelegramChatDiscoveryRow['joinStatus']
         if (!autoJoin) {
           joinStatus = 'skipped'
-        } else if (ent instanceof Api.Channel) {
+        } else {
           const jr = await tryJoinPublicChannel(client, ent)
           joinStatus = jr
           if (jr === 'failed') failedJoins += 1
-        } else {
-          joinStatus = 'skipped'
         }
 
         rows.push({
