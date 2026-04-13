@@ -114,6 +114,8 @@ services:
 
   lead-hunter-service:
     build: ./services/lead-hunter-service
+    env_file:
+      - ./services/lead-hunter-service/.env
     ports:
       - "127.0.0.1:3847:3847"
     environment:
