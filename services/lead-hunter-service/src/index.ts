@@ -141,6 +141,7 @@ function renderIndexHtml(): string {
   <td>${escapeHtml(c.chatId)}</td>
   <td>${escapeHtml(c.query)}</td>
   <td>${escapeHtml(c.joinStatus)}</td>
+  <td>${escapeHtml(c.joinedAt)}</td>
 </tr>`
       )
       .join('\n') || ''
@@ -187,7 +188,22 @@ function renderIndexHtml(): string {
     body.drawer-open .tech-drawer { transform: translateX(0); }
     .tech-drawer-inner { padding: 1rem 1rem 2rem; }
     .tech-drawer-title { font-size: 1.1rem; margin: 0 0 0.75rem; }
-    .tech-drawer .tg-table { font-size: 12px; }
+    .tg-table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 -0.25rem;
+      padding: 0 0.25rem;
+    }
+    .tech-drawer .tg-table {
+      font-size: 12px;
+      width: max-content;
+      min-width: 100%;
+      max-width: none;
+    }
+    .tech-drawer .tg-table th,
+    .tech-drawer .tg-table td { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -201,16 +217,18 @@ function renderIndexHtml(): string {
   <aside id="tech-drawer" class="tech-drawer" aria-hidden="true">
     <div class="tech-drawer-inner">
       <h2 class="tech-drawer-title">Telegram Chats</h2>
+      <div class="tg-table-scroll">
       <table class="tg-table">
         <thead>
           <tr>
-            <th>title</th><th>username</th><th>chatId</th><th>query</th><th>joinStatus</th>
+            <th>title</th><th>username</th><th>chatId</th><th>query</th><th>joinStatus</th><th>joinedAt</th>
           </tr>
         </thead>
         <tbody>
-          ${telegramRows || '<tr><td colspan="5">Нет данных по Telegram chats</td></tr>'}
+          ${telegramRows || '<tr><td colspan="6">Нет данных по Telegram chats</td></tr>'}
         </tbody>
       </table>
+      </div>
     </div>
   </aside>
 

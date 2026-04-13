@@ -5,6 +5,8 @@ export interface TelegramChatDiscoveryRow {
   chatId: string
   query: string
   joinStatus: string
+  /** ISO 8601, только если joinStatus === joined */
+  joinedAt: string
 }
 
 const telegramChatDiscoveryRows: TelegramChatDiscoveryRow[] = []

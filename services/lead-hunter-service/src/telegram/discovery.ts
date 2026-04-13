@@ -113,11 +113,15 @@ export async function runTelegramDiscovery(client: TelegramClient): Promise<void
         const chatId = String(utils.getPeerId(ent))
 
         let joinStatus: TelegramChatDiscoveryRow['joinStatus']
+        let joinedAt = ''
         if (!autoJoin) {
           joinStatus = 'skipped'
         } else {
           const jr = await tryJoinPublicChannel(client, ent)
           joinStatus = jr
+          if (jr === 'joined') {
+            joinedAt = new Date().toISOString()
+          }
           if (jr === 'failed') failedJoins += 1
         }
 
@@ -127,6 +131,7 @@ export async function runTelegramDiscovery(client: TelegramClient): Promise<void
           chatId,
           query,
           joinStatus,
+          joinedAt,
         })
       }
     } catch (e) {
