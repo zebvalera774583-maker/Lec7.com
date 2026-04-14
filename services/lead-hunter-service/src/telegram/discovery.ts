@@ -18,6 +18,17 @@ function autoJoinEnabled(): boolean {
   return process.env.TELEGRAM_AUTO_JOIN?.trim().toLowerCase() === 'true'
 }
 
+const JOIN_ALLOW_KEYWORDS = ['чат', 'обсуждение', 'форум', 'help', 'помощь']
+const JOIN_BLOCK_KEYWORDS = ['новости', 'news', 'tv', 'канал']
+
+function shouldAllowJoinByTitle(title: string): boolean {
+  const normalized = title.trim().toLowerCase()
+  if (!normalized) return false
+  const hasAllowWord = JOIN_ALLOW_KEYWORDS.some((word) => normalized.includes(word))
+  const hasBlockWord = JOIN_BLOCK_KEYWORDS.some((word) => normalized.includes(word))
+  return hasAllowWord && !hasBlockWord
+}
+
 function isRpcLike(err: unknown): err is { errorMessage?: string } {
   return typeof err === 'object' && err !== null && 'errorMessage' in err
 }
@@ -117,12 +128,20 @@ export async function runTelegramDiscovery(client: TelegramClient): Promise<void
         if (!autoJoin) {
           joinStatus = 'skipped'
         } else {
-          const jr = await tryJoinPublicChannel(client, ent)
-          joinStatus = jr
-          if (jr === 'joined') {
-            joinedAt = new Date().toISOString()
+          const allowJoin = shouldAllowJoinByTitle(title)
+          const printableTitle = title || username || chatId
+          if (!allowJoin) {
+            console.log(`[JOIN FILTER] skipped: ${printableTitle}`)
+            joinStatus = 'skipped'
+          } else {
+            console.log(`[JOIN FILTER] allowed: ${printableTitle}`)
+            const jr = await tryJoinPublicChannel(client, ent)
+            joinStatus = jr
+            if (jr === 'joined') {
+              joinedAt = new Date().toISOString()
+            }
+            if (jr === 'failed') failedJoins += 1
           }
-          if (jr === 'failed') failedJoins += 1
         }
 
         rows.push({
