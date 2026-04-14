@@ -40,10 +40,12 @@ async function startTelegramSidecar(): Promise<void> {
       console.error('[telegram] not connected after connect()')
       return
     }
+    console.log('[DISCOVERY] start')
+    await runTelegramDiscovery(client)
+    console.log('[DISCOVERY] done')
     const me = await client.getMe()
     console.log('[telegram] connected')
     await logLastTelegramMessagesOnStartup(client)
-    await runTelegramDiscovery(client)
     const name = [me.firstName, me.lastName].filter(Boolean).join(' ').trim()
     const username = me.username ? `@${me.username}` : '—'
     console.log(`[telegram] account: ${name || '(no name)'} · ${username}`)
