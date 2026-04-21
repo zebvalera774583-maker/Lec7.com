@@ -81,7 +81,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const statsProjects = business.profile?.statsProjects ?? 2578
   const statsCities = business.profile?.statsCities ?? 4
   const statsCasesLabel = business.profile?.statsCasesLabel || 'уникальных кейсов'
-  const statsProjectsLabel = business.profile?.statsProjectsLabel || 'проектов'
+  const statsProjectsLabel = business.profile?.statsProjectsLabel || ''
   const statsCitiesLabel = business.profile?.statsCitiesLabel || 'городов'
   const hasMetricLabel = (label?: string | null) => Boolean(label && label.trim().length > 0)
   const showCasesMetric = statsCases > 0 || hasMetricLabel(statsCasesLabel)

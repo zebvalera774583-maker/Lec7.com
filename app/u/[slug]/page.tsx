@@ -50,7 +50,7 @@ export default async function PublicBusinessPage({ params }: PageProps) {
         projects: business.profile.statsProjects,
         cities: business.profile.statsCities,
         casesLabel: business.profile.statsCasesLabel || 'уникальных кейсов',
-        projectsLabel: business.profile.statsProjectsLabel || 'проектов',
+        projectsLabel: business.profile.statsProjectsLabel || '',
         citiesLabel: business.profile.statsCitiesLabel || 'городов',
       }
     : null
