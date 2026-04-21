@@ -485,10 +485,10 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       onClick={() => setSelectedCaseIndex(index)}
                       style={{
                         width: '100%',
-                        paddingTop: '100%',
+                        aspectRatio: '4 / 3',
                         position: 'relative',
                         overflow: 'hidden',
-                        background: '#e5e7eb',
+                        background: '#f3f4f6',
                         borderRadius: 0,
                         cursor: 'pointer',
                         transition: 'opacity 0.2s',
@@ -510,7 +510,9 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                             inset: 0,
                             width: '100%',
                             height: '100%',
-                            objectFit: 'cover',
+                            objectFit: 'contain',
+                            objectPosition: 'center',
+                            background: '#f3f4f6',
                           }}
                         />
                       )}
@@ -551,10 +553,10 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   key={photo.id}
                   style={{
                     width: '100%',
-                    paddingTop: '100%',
+                    aspectRatio: '4 / 3',
                     position: 'relative',
                     overflow: 'hidden',
-                    background: '#e5e7eb',
+                    background: '#f3f4f6',
                     borderRadius: 0,
                   }}
                 >
@@ -567,7 +569,9 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       inset: 0,
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover',
+                      objectFit: 'contain',
+                      objectPosition: 'center',
+                      background: '#f3f4f6',
                     }}
                   />
                 </div>
