@@ -83,7 +83,11 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const statsCasesLabel = business.profile?.statsCasesLabel || 'уникальных кейсов'
   const statsProjectsLabel = business.profile?.statsProjectsLabel || 'проектов'
   const statsCitiesLabel = business.profile?.statsCitiesLabel || 'городов'
-  const hasAnyStats = statsCases > 0 || statsProjects > 0 || statsCities > 0
+  const hasMetricLabel = (label?: string | null) => Boolean(label && label.trim().length > 0)
+  const showCasesMetric = statsCases > 0 || hasMetricLabel(statsCasesLabel)
+  const showProjectsMetric = statsProjects > 0 || hasMetricLabel(statsProjectsLabel)
+  const showCitiesMetric = statsCities > 0 || hasMetricLabel(statsCitiesLabel)
+  const hasAnyStats = showCasesMetric || showProjectsMetric || showCitiesMetric
 
   const profileCities = business.profile?.cities ?? []
   const profileServices = (business.profile?.services ?? []).filter((s) => s && String(s).trim().length > 0)
@@ -177,7 +181,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   {business.name}
                 </h1>
 
-                {/* Stats — только ненулевые */}
+                {/* Stats — показываем и без числа, если есть подпись */}
                 {hasAnyStats && (
                   <div
                     style={{
@@ -188,19 +192,22 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                       color: '#111827',
                     }}
                   >
-                    {statsCases > 0 && (
+                    {showCasesMetric && (
                       <div>
-                        <span style={{ fontWeight: 600 }}>{statsCases}</span> {statsCasesLabel}
+                        {statsCases > 0 ? <span style={{ fontWeight: 600 }}>{statsCases}</span> : null}{' '}
+                        {statsCasesLabel}
                       </div>
                     )}
-                    {statsProjects > 0 && (
+                    {showProjectsMetric && (
                       <div>
-                        <span style={{ fontWeight: 600 }}>{statsProjects}</span> {statsProjectsLabel}
+                        {statsProjects > 0 ? <span style={{ fontWeight: 600 }}>{statsProjects}</span> : null}{' '}
+                        {statsProjectsLabel}
                       </div>
                     )}
-                    {statsCities > 0 && (
+                    {showCitiesMetric && (
                       <div>
-                        <span style={{ fontWeight: 600 }}>{statsCities}</span> {statsCitiesLabel}
+                        {statsCities > 0 ? <span style={{ fontWeight: 600 }}>{statsCities}</span> : null}{' '}
+                        {statsCitiesLabel}
                       </div>
                     )}
                   </div>
@@ -272,11 +279,26 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
                   color: '#111827',
                 }}
               >
-                {statsCases > 0 && <><span style={{ fontWeight: 600 }}>{statsCases}</span> {statsCasesLabel}</>}
-                {statsCases > 0 && (statsProjects > 0 || statsCities > 0) && ' | '}
-                {statsProjects > 0 && <><span style={{ fontWeight: 600 }}>{statsProjects}</span> {statsProjectsLabel}</>}
-                {statsProjects > 0 && statsCities > 0 && ' | '}
-                {statsCities > 0 && <><span style={{ fontWeight: 600 }}>{statsCities}</span> {statsCitiesLabel}</>}
+                {showCasesMetric && (
+                  <>
+                    {statsCases > 0 ? <span style={{ fontWeight: 600 }}>{statsCases}</span> : null}{' '}
+                    {statsCasesLabel}
+                  </>
+                )}
+                {showCasesMetric && (showProjectsMetric || showCitiesMetric) && ' | '}
+                {showProjectsMetric && (
+                  <>
+                    {statsProjects > 0 ? <span style={{ fontWeight: 600 }}>{statsProjects}</span> : null}{' '}
+                    {statsProjectsLabel}
+                  </>
+                )}
+                {showProjectsMetric && showCitiesMetric && ' | '}
+                {showCitiesMetric && (
+                  <>
+                    {statsCities > 0 ? <span style={{ fontWeight: 600 }}>{statsCities}</span> : null}{' '}
+                    {statsCitiesLabel}
+                  </>
+                )}
               </p>
             )}
           </div>

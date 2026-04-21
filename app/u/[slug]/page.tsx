@@ -134,8 +134,11 @@ export default async function PublicBusinessPage({ params }: PageProps) {
             </p>
           )}
 
-          {/* Метрики — показываем только ненулевые */}
-          {stats && (stats.cases > 0 || stats.projects > 0 || stats.cities > 0) && (
+          {/* Метрики — показываем и без числа, если есть подпись */}
+          {stats &&
+            ((stats.cases > 0 || (stats.casesLabel && stats.casesLabel.trim().length > 0)) ||
+              (stats.projects > 0 || (stats.projectsLabel && stats.projectsLabel.trim().length > 0)) ||
+              (stats.cities > 0 || (stats.citiesLabel && stats.citiesLabel.trim().length > 0))) && (
             <div
               style={{
                 display: 'flex',
@@ -145,21 +148,27 @@ export default async function PublicBusinessPage({ params }: PageProps) {
                 flexWrap: 'wrap',
               }}
             >
-              {stats.cases > 0 && (
+              {(stats.cases > 0 || (stats.casesLabel && stats.casesLabel.trim().length > 0)) && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.cases}</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
+                    {stats.cases > 0 ? stats.cases : ''}
+                  </div>
                   <div style={{ fontSize: '0.875rem', color: '#666' }}>{stats.casesLabel}</div>
                 </div>
               )}
-              {stats.projects > 0 && (
+              {(stats.projects > 0 || (stats.projectsLabel && stats.projectsLabel.trim().length > 0)) && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.projects}</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
+                    {stats.projects > 0 ? stats.projects : ''}
+                  </div>
                   <div style={{ fontSize: '0.875rem', color: '#666' }}>{stats.projectsLabel}</div>
                 </div>
               )}
-              {stats.cities > 0 && (
+              {(stats.cities > 0 || (stats.citiesLabel && stats.citiesLabel.trim().length > 0)) && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>{stats.cities}</div>
+                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a' }}>
+                    {stats.cities > 0 ? stats.cities : ''}
+                  </div>
                   <div style={{ fontSize: '0.875rem', color: '#666' }}>{stats.citiesLabel}</div>
                 </div>
               )}
