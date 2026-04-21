@@ -111,13 +111,13 @@ export const PUT = withBusinessAccess(async (req, user) => {
     if (statsCities !== undefined && (typeof statsCities !== 'number' || statsCities < 0)) {
       return NextResponse.json({ error: 'Invalid statsCities' }, { status: 400 })
     }
-    if (statsCasesLabel !== undefined && typeof statsCasesLabel !== 'string') {
+    if (statsCasesLabel !== undefined && statsCasesLabel !== null && typeof statsCasesLabel !== 'string') {
       return NextResponse.json({ error: 'Invalid statsCasesLabel' }, { status: 400 })
     }
-    if (statsProjectsLabel !== undefined && typeof statsProjectsLabel !== 'string') {
+    if (statsProjectsLabel !== undefined && statsProjectsLabel !== null && typeof statsProjectsLabel !== 'string') {
       return NextResponse.json({ error: 'Invalid statsProjectsLabel' }, { status: 400 })
     }
-    if (statsCitiesLabel !== undefined && typeof statsCitiesLabel !== 'string') {
+    if (statsCitiesLabel !== undefined && statsCitiesLabel !== null && typeof statsCitiesLabel !== 'string') {
       return NextResponse.json({ error: 'Invalid statsCitiesLabel' }, { status: 400 })
     }
     if (cities !== undefined && !Array.isArray(cities)) {
