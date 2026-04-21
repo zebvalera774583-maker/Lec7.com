@@ -83,7 +83,7 @@ export default function BusinessProfileEditor({
   })
   const [metricsLabels, setMetricsLabels] = useState({
     cases: 'Уникальных кейсов',
-    projects: 'Проектов',
+    projects: '',
     cities: 'Городов',
   })
   const [loading, setLoading] = useState(false)
@@ -188,7 +188,7 @@ export default function BusinessProfileEditor({
         })
         setMetricsLabels({
           cases: profile.statsCasesLabel || 'Уникальных кейсов',
-          projects: profile.statsProjectsLabel || 'Проектов',
+          projects: profile.statsProjectsLabel || '',
           cities: profile.statsCitiesLabel || 'Городов',
         })
       } catch (err) {
