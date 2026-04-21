@@ -78,6 +78,7 @@ export const PUT = withBusinessAccess(async (req, user) => {
       avatarUrl,
       phone,
       telegramUsername,
+      requestButtonLabel,
       legalName: legalNameBody,
       statsCases,
       statsProjects,
@@ -104,6 +105,9 @@ export const PUT = withBusinessAccess(async (req, user) => {
     // Валидация
     if (statsCases !== undefined && (typeof statsCases !== 'number' || statsCases < 0)) {
       return NextResponse.json({ error: 'Invalid statsCases' }, { status: 400 })
+    }
+    if (requestButtonLabel !== undefined && requestButtonLabel !== null && typeof requestButtonLabel !== 'string') {
+      return NextResponse.json({ error: 'Invalid requestButtonLabel' }, { status: 400 })
     }
     if (statsProjects !== undefined && (typeof statsProjects !== 'number' || statsProjects < 0)) {
       return NextResponse.json({ error: 'Invalid statsProjects' }, { status: 400 })
@@ -165,6 +169,7 @@ export const PUT = withBusinessAccess(async (req, user) => {
         avatarUrl: avatarUrl || null,
         phone: phone || null,
         telegramUsername: telegramUsername || null,
+        requestButtonLabel: requestButtonLabel || null,
         statsCases: statsCases ?? 40,
         statsProjects: statsProjects ?? 2578,
         statsCities: statsCities ?? 4,
@@ -177,6 +182,7 @@ export const PUT = withBusinessAccess(async (req, user) => {
         avatarUrl: avatarUrl !== undefined ? avatarUrl || null : undefined,
         phone: phone !== undefined ? phone || null : undefined,
         telegramUsername: telegramUsername !== undefined ? telegramUsername || null : undefined,
+        requestButtonLabel: requestButtonLabel !== undefined ? requestButtonLabel || null : undefined,
         statsCases: statsCases !== undefined ? statsCases : undefined,
         statsProjects: statsProjects !== undefined ? statsProjects : undefined,
         statsCities: statsCities !== undefined ? statsCities : undefined,

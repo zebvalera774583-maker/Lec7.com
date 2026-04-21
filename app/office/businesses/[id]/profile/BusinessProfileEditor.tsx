@@ -20,6 +20,7 @@ interface BusinessProfile {
   avatarUrl: string | null
   phone: string | null
   telegramUsername: string | null
+  requestButtonLabel?: string | null
   residentNumber: string | null
   legalName?: string | null
   statsCases: number
@@ -72,6 +73,7 @@ export default function BusinessProfileEditor({
   const [legalName, setLegalName] = useState('')
   const [phone, setPhone] = useState('')
   const [telegramUsername, setTelegramUsername] = useState('')
+  const [requestButtonLabel, setRequestButtonLabel] = useState('')
   const [residentNumber, setResidentNumber] = useState('')
   const [cities, setCities] = useState<string[]>([])
   const [services, setServices] = useState<string[]>([])
@@ -167,6 +169,7 @@ export default function BusinessProfileEditor({
         setLegalName(profile.legalName ?? '')
         setPhone(profile.phone || '')
         setTelegramUsername(profile.telegramUsername || '')
+        setRequestButtonLabel(profile.requestButtonLabel || '')
         setResidentNumber(profile.residentNumber || '')
         setCities(profile.cities || [])
         setServices(profile.services || [])
@@ -532,6 +535,7 @@ export default function BusinessProfileEditor({
         legalName: legalName.trim() || null,
         phone: phone || null,
         telegramUsername: telegramUsername || null,
+        requestButtonLabel: requestButtonLabel.trim() || null,
         statsCases: metrics.cases,
         statsProjects: metrics.projects,
         statsCities: metrics.cities,
@@ -1661,6 +1665,28 @@ export default function BusinessProfileEditor({
               />
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
                 Без символа @, например: username
+              </p>
+            </div>
+            <div style={{ marginBottom: '0' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>
+                Текст кнопки «Расчёт»
+              </label>
+              <input
+                type="text"
+                value={requestButtonLabel}
+                onChange={(e) => setRequestButtonLabel(e.target.value)}
+                placeholder="Расчёт"
+                maxLength={40}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '1rem',
+                }}
+              />
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#666' }}>
+                Будет отображаться в первой кнопке на витрине
               </p>
             </div>
           </section>

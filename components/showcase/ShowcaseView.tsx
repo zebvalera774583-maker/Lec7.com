@@ -29,6 +29,7 @@ interface ShowcaseBusiness {
   profile?: {
     phone: string | null
     telegramUsername: string | null
+    requestButtonLabel?: string | null
     statsCases: number
     statsProjects: number
     statsCities: number
@@ -80,6 +81,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
   const statsCases = business.profile?.statsCases ?? 40
   const statsProjects = business.profile?.statsProjects ?? 2578
   const statsCities = business.profile?.statsCities ?? 4
+  const requestButtonLabel = business.profile?.requestButtonLabel?.trim() || 'Расчёт'
   const statsCasesLabel = business.profile?.statsCasesLabel || 'уникальных кейсов'
   const statsProjectsLabel = business.profile?.statsProjectsLabel || ''
   const statsCitiesLabel = business.profile?.statsCitiesLabel || 'городов'
@@ -383,7 +385,7 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
               whiteSpace: 'nowrap',
             }}
           >
-            Расчёт
+            {requestButtonLabel}
           </button>
           <button
             type="button"

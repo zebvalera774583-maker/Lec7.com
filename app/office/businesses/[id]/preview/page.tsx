@@ -23,6 +23,7 @@ export default async function BusinessPreviewPage({ params }: PageProps) {
           avatarUrl: true,
           phone: true,
           telegramUsername: true,
+          requestButtonLabel: true,
           statsCases: true,
           statsProjects: true,
           statsCities: true,

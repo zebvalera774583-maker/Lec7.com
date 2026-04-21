@@ -40,6 +40,7 @@ export default async function BizPage({ params }: PageProps) {
           avatarUrl: true,
           phone: true,
           telegramUsername: true,
+          requestButtonLabel: true,
           statsCases: true,
           statsProjects: true,
           statsCities: true,
