@@ -319,17 +319,6 @@ export default function ShowcaseView({ business, mode }: ShowcaseViewProps) {
         {/* Сферы деятельности — только если заполнены */}
         {profileServices.length > 0 && (
           <div>
-            <h2
-              style={{
-                margin: 0,
-                marginBottom: '0.75rem',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                fontWeight: 600,
-                color: '#111827',
-              }}
-            >
-              Сферы деятельности
-            </h2>
             <ul
               style={{
                 margin: 0,
