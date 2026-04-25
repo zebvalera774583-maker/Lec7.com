@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getNextRequestNumber } from '@/lib/request-number'
+import { notifyAdminAboutInvestLead } from '@/lib/notify-admin'
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +44,12 @@ export async function POST(req: NextRequest) {
           status: 'NEW',
         },
       })
+    })
+
+    await notifyAdminAboutInvestLead({
+      name: createdRequest.clientName,
+      phone: createdRequest.clientPhone,
+      createdAt: createdRequest.createdAt,
     })
 
     return NextResponse.json(createdRequest)

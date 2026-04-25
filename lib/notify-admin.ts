@@ -8,6 +8,8 @@ import { sendTelegramMessage, sendTelegramPhoto } from '@/lib/telegram'
 
 const ADMIN_MAX_CHAT_ID = '208922838'
 const ADMIN_TELEGRAM_CHAT_ID = process.env.ADMIN_TG_CHAT_ID?.trim() || ''
+const ADMIN_MAX_USER_ID = process.env.ADMIN_MAX_USER_ID?.trim() || ''
+const ADMIN_MAX_CHAT_ID_ENV = process.env.ADMIN_MAX_CHAT_ID?.trim() || ''
 
 const TELEGRAM_MESSAGE_MAX = 4096
 const RAW_MIRROR_SAFE_LEN = 3500
@@ -165,5 +167,48 @@ export async function notifyAdminAboutRequest(
     }
   } catch (e) {
     console.warn('[notifyAdmin] send error:', e)
+  }
+}
+
+export async function notifyAdminAboutInvestLead(params: {
+  name?: string | null
+  phone?: string | null
+  createdAt: Date | string
+}): Promise<void> {
+  const name = params.name?.trim() || '—'
+  const phone = params.phone?.trim() || '—'
+  const createdAtDate = params.createdAt instanceof Date ? params.createdAt : new Date(params.createdAt)
+  const createdAt = Number.isNaN(createdAtDate.getTime()) ? '—' : createdAtDate.toLocaleString('ru-RU')
+
+  const text = `НОВАЯ ЗАЯВКА (ИНВЕСТИЦИЯ)
+
+Имя: ${name}
+Телефон: ${phone}
+Дата: ${createdAt}
+
+Источник: RentCapitalRealty`
+
+  const recipientId = ADMIN_MAX_USER_ID || ADMIN_MAX_CHAT_ID_ENV
+  const recipientType = ADMIN_MAX_USER_ID ? 'user_id' : 'chat_id'
+
+  if (!process.env.MAX_BOT_TOKEN) {
+    console.warn('[INVEST LEAD] MAX_BOT_TOKEN is missing')
+    return
+  }
+
+  if (!recipientId) {
+    console.warn('[INVEST LEAD] ADMIN_MAX_USER_ID or ADMIN_MAX_CHAT_ID is missing')
+    return
+  }
+
+  try {
+    const res = await sendMaxMessage(recipientId, text, undefined, recipientType)
+    if (!res.ok) {
+      console.warn('[INVEST LEAD] failed to send to MAX', { error: res.error, recipientType })
+      return
+    }
+    console.log('[INVEST LEAD] sent to MAX', { name, phone })
+  } catch (error) {
+    console.warn('[INVEST LEAD] send error', error)
   }
 }
